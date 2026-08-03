@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint 30 Review — #81 ログイン済みユーザー情報をRiverpodで保持</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #f8f7f5; }
+
+  .page { max-width: 860px; margin: 0 auto; padding: 48px 24px; }
+
+  /* Header */
+  .sprint-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin-bottom: 8px; }
+  h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px; }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+  .badge-sprint { background: #e8f0fe; color: #1a56db; }
+  .badge-issue { background: #f0fdf4; color: #166534; }
+  .badge-refactor { background: #fdf4ff; color: #7e22ce; }
+  .badge-mobile { background: #fff7ed; color: #c2410c; }
+
+  /* Sections */
+  section { margin-bottom: 40px; }
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #888; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e5e5e5; }
+
+  /* Problem box */
+  .problem-box { background: #fff8f0; border-left: 3px solid #f59e0b; border-radius: 0 8px 8px 0; padding: 16px 20px; margin-bottom: 16px; }
+  .problem-box .label { font-size: 11px; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .problem-box p { color: #451a03; font-size: 13px; }
+
+  /* Architecture change */
+  .arch-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: center; margin-bottom: 8px; }
+  .arch-box { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; }
+  .arch-box .arch-title { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .arch-box.before { border-color: #fca5a5; }
+  .arch-box.after { border-color: #86efac; }
+  .arch-arrow { font-size: 20px; color: #888; text-align: center; }
+  .flow-item { font-size: 12px; color: #374151; padding: 3px 0; display: flex; align-items: flex-start; gap: 6px; }
+  .flow-item .dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .dot-red { background: #ef4444; }
+  .dot-green { background: #22c55e; }
+
+  /* AC cards */
+  .ac-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+  .ac-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid #f0f0f0; }
+  .ac-check { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .ac-check.done { background: #dcfce7; color: #166534; }
+  .ac-num { font-size: 11px; font-weight: 700; color: #888; }
+  .ac-text { font-size: 13px; font-weight: 600; color: #1a1a1a; flex: 1; }
+  .ac-body { padding: 16px 18px; }
+  .ac-body p { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+
+  /* File change */
+  .file-change { margin-bottom: 16px; }
+  .file-name { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; background: #f3f4f6; color: #374151; padding: 5px 10px; border-radius: 4px 4px 0 0; border: 1px solid #e5e5e5; border-bottom: none; display: flex; justify-content: space-between; }
+  .diff-stat { color: #888; }
+  .code-block { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.7; background: #1e1e2e; color: #cdd6f4; padding: 14px 16px; border-radius: 0 0 6px 6px; overflow-x: auto; }
+  .code-line { display: flex; }
+  .line-num { color: #45475a; min-width: 28px; user-select: none; }
+  .line-add { background: rgba(166, 227, 161, 0.12); color: #a6e3a1; }
+  .line-del { background: rgba(243, 139, 168, 0.12); color: #f38ba8; }
+  .line-ctx { color: #cdd6f4; }
+  .line-prefix { min-width: 14px; }
+
+  /* Annotation */
+  .annotation { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-size: 12px; color: #78350f; display: flex; gap: 8px; }
+  .annotation-icon { font-size: 14px; flex-shrink: 0; }
+
+  /* Verify section */
+  .verify-list { list-style: none; }
+  .verify-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; }
+  .verify-item:last-child { border-bottom: none; }
+  .verify-num { width: 22px; height: 22px; background: #e8f0fe; color: #1a56db; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .verify-content { flex: 1; }
+  .verify-content strong { font-size: 13px; color: #1a1a1a; display: block; margin-bottom: 3px; }
+  .verify-content span { font-size: 12px; color: #6b7280; }
+
+  /* Scope table */
+  .scope-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .scope-table th { text-align: left; padding: 8px 12px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .scope-table td { padding: 10px 12px; border: 1px solid #e5e5e5; color: #374151; vertical-align: top; }
+  .scope-table tr:hover td { background: #f9fafb; }
+  .tag-changed { font-size: 11px; font-weight: 600; background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 3px; }
+  .tag-unchanged { font-size: 11px; font-weight: 600; background: #f3f4f6; color: #6b7280; padding: 2px 6px; border-radius: 3px; }
+
+  /* API call count */
+  .api-count-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .api-count-box { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; text-align: center; }
+  .api-count-box .label { font-size: 11px; color: #888; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+  .api-count-box .count { font-size: 36px; font-weight: 700; line-height: 1; }
+  .api-count-box .sublabel { font-size: 11px; color: #888; margin-top: 4px; }
+  .count-before { color: #ef4444; }
+  .count-after { color: #22c55e; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="sprint-label">Sprint 30 Review</div>
+  <h1>#81 — ログイン済みユーザー情報をRiverpodで保持し、<br>各画面の冗長なAPI呼び出しを解消する</h1>
+  <div class="meta">
+    <span class="badge badge-sprint">Sprint 30</span>
+    <span class="badge badge-issue">#81</span>
+    <span class="badge badge-refactor">refactor</span>
+    <span class="badge badge-mobile">mobile</span>
+  </div>
+
+  <!-- Problem -->
+  <section>
+    <h2>なぜこの改修が必要だったか</h2>
+    <div class="problem-box">
+      <div class="label">問題</div>
+      <p>ログイン時にバックエンドから返ってくる <code>AuthUser</code>（userId / email / displayName）を <code>AuthState</code> に保持していなかった。そのため、ホーム画面・タスク画面の初期化のたびに <code>loadCurrentUserId()</code> APIを個別に発行していた。</p>
+    </div>
+    <div class="arch-grid">
+      <div class="arch-box before">
+        <div class="arch-title">改修前</div>
+        <div class="flow-item"><span class="dot dot-red"></span>ログイン → tokenのみ保存、AuthUser破棄</div>
+        <div class="flow-item"><span class="dot dot-red"></span>AuthState: token有無のみ管理</div>
+        <div class="flow-item"><span class="dot dot-red"></span>ホーム表示 → <code>loadCurrentUserId()</code> API発行</div>
+        <div class="flow-item"><span class="dot dot-red"></span>タスク表示 → <code>loadCurrentUserId()</code> API発行</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-box after">
+        <div class="arch-title">改修後</div>
+        <div class="flow-item"><span class="dot dot-green"></span>ログイン → token + AuthUser をstateに保持</div>
+        <div class="flow-item"><span class="dot dot-green"></span>AuthState: userInfo込みで管理</div>
+        <div class="flow-item"><span class="dot dot-green"></span>ホーム表示 → stateから参照のみ（API不要）</div>
+        <div class="flow-item"><span class="dot dot-green"></span>タスク表示 → stateから参照のみ（API不要）</div>
+      </div>
+    </div>
+    <div class="api-count-grid" style="margin-top:16px;">
+      <div class="api-count-box">
+        <div class="label">画面初期化時のAPI呼び出し（改修前）</div>
+        <div class="count count-before">+2</div>
+        <div class="sublabel">ホーム・タスク各1回</div>
+      </div>
+      <div class="api-count-box">
+        <div class="label">画面初期化時のAPI呼び出し（改修後）</div>
+        <div class="count count-after">0</div>
+        <div class="sublabel">stateから参照するのでAPI不要</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AC breakdown -->
+  <section>
+    <h2>AC別 実装内容</h2>
+
+    <!-- AC1 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC1</div>
+        <div class="ac-text">ログイン成功時、AuthUser が AuthAuthenticated state に保持される</div>
+      </div>
+      <div class="ac-body">
+        <p><code>AuthState</code> の <code>AuthAuthenticated</code> クラスに <code>AuthUser</code> フィールドを追加。ログイン時に <code>saveTokens()</code> へ <code>user</code> を渡すよう変更。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>lib/core/auth/auth_state.dart</span>
+            <span class="diff-stat">+3 / -1</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-del"><span class="line-num">9</span><span class="line-prefix">-</span><span>final class AuthAuthenticated extends AuthState {</span></div>
+            <div class="code-line line-del"><span class="line-num">10</span><span class="line-prefix">-</span><span>  const AuthAuthenticated();</span></div>
+            <div class="code-line line-add"><span class="line-num">9</span><span class="line-prefix">+</span><span>final class AuthAuthenticated extends AuthState {</span></div>
+            <div class="code-line line-add"><span class="line-num">10</span><span class="line-prefix">+</span><span>  const AuthAuthenticated({required this.user});</span></div>
+            <div class="code-line line-add"><span class="line-num">11</span><span class="line-prefix">+</span><span>  final AuthUser user;</span></div>
+            <div class="code-line line-ctx"><span class="line-num">12</span><span class="line-prefix"> </span><span>}</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span><code>AuthUnauthenticated</code> は変更なし。ログアウト時は user 情報も自動的に消える（stateが切り替わるため）。</span>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>lib/features/auth/presentation/login/login_notifier.dart</span>
+            <span class="diff-stat">+1 / -0</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">29</span><span class="line-prefix"> </span><span>await ref.read(authNotifierProvider.notifier).saveTokens(</span></div>
+            <div class="code-line line-ctx"><span class="line-num">30</span><span class="line-prefix"> </span><span>  accessToken: resp.accessToken,</span></div>
+            <div class="code-line line-ctx"><span class="line-num">31</span><span class="line-prefix"> </span><span>  refreshToken: resp.refreshToken,</span></div>
+            <div class="code-line line-add"><span class="line-num">32</span><span class="line-prefix">+</span><span>  user: resp.user,</span></div>
+            <div class="code-line line-ctx"><span class="line-num">33</span><span class="line-prefix"> </span><span>);</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC2 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC2</div>
+        <div class="ac-text">アプリ起動時（token復元時）、/me API を1回呼び出してuserInfoをstateに保持する</div>
+      </div>
+      <div class="ac-body">
+        <p>既存の <code>AuthNotifier.build()</code> はtokenの存在チェックのみだった。token復元時に <code>/me</code> APIを呼び出し、取得した <code>AuthUser</code> を <code>AuthAuthenticated</code> に渡すよう変更。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>lib/core/auth/auth_notifier.dart</span>
+            <span class="diff-stat">+6 / -2</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">10</span><span class="line-prefix"> </span><span>  Future&lt;AuthState&gt; build() async {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">11</span><span class="line-prefix"> </span><span>    await _clearOnFreshInstall();</span></div>
+            <div class="code-line line-ctx"><span class="line-num">12</span><span class="line-prefix"> </span><span>    final token = await ref.read(tokenStorageProvider).getAccessToken();</span></div>
+            <div class="code-line line-del"><span class="line-num">13</span><span class="line-prefix">-</span><span>    return token != null</span></div>
+            <div class="code-line line-del"><span class="line-num">14</span><span class="line-prefix">-</span><span>        ? const AuthAuthenticated()</span></div>
+            <div class="code-line line-del"><span class="line-num">15</span><span class="line-prefix">-</span><span>        : const AuthUnauthenticated();</span></div>
+            <div class="code-line line-add"><span class="line-num">13</span><span class="line-prefix">+</span><span>    if (token == null) return const AuthUnauthenticated();</span></div>
+            <div class="code-line line-add"><span class="line-num">14</span><span class="line-prefix">+</span><span>    try {</span></div>
+            <div class="code-line line-add"><span class="line-num">15</span><span class="line-prefix">+</span><span>      final user = await ref.read(authRepositoryProvider).getMe();</span></div>
+            <div class="code-line line-add"><span class="line-num">16</span><span class="line-prefix">+</span><span>      return AuthAuthenticated(user: user);</span></div>
+            <div class="code-line line-add"><span class="line-num">17</span><span class="line-prefix">+</span><span>    } catch (_) {</span></div>
+            <div class="code-line line-add"><span class="line-num">18</span><span class="line-prefix">+</span><span>      return const AuthUnauthenticated();</span></div>
+            <div class="code-line line-add"><span class="line-num">19</span><span class="line-prefix">+</span><span>    }</span></div>
+            <div class="code-line line-ctx"><span class="line-num">20</span><span class="line-prefix"> </span><span>  }</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>catch で <code>AuthUnauthenticated</code> を返すのは、tokenが期限切れ等で /me が失敗した場合に再ログインを促すため。secure_storage に保存する方式は採用しなかった（Web側でプロフィール変更後に古い情報を使い続けるリスクがあるため）。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC3 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC3</div>
+        <div class="ac-text">home_notifier.dart の loadCurrentUserId() を削除し、authNotifierProvider から取得</div>
+      </div>
+      <div class="ac-body">
+        <p><code>Future.wait</code> で並列発行していた <code>loadCurrentUserId()</code> を削除。<code>authNotifierProvider</code> から <code>AuthAuthenticated.user.userId</code> を参照するよう変更。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>lib/features/home/presentation/home_notifier.dart</span>
+            <span class="diff-stat">+3 / -5</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">27</span><span class="line-prefix"> </span><span>  Future&lt;HomeState&gt; _load(int householdId) async {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">28</span><span class="line-prefix"> </span><span>    final repo = ref.read(homeRepositoryProvider);</span></div>
+            <div class="code-line line-add"><span class="line-num">29</span><span class="line-prefix">+</span><span>    final authState = ref.read(authNotifierProvider).valueOrNull;</span></div>
+            <div class="code-line line-add"><span class="line-num">30</span><span class="line-prefix">+</span><span>    final currentUserId = (authState as AuthAuthenticated).user.userId;</span></div>
+            <div class="code-line line-del"><span class="line-num">31</span><span class="line-prefix">-</span><span>    final results = await Future.wait([</span></div>
+            <div class="code-line line-del"><span class="line-num">32</span><span class="line-prefix">-</span><span>      repo.loadAll(householdId),</span></div>
+            <div class="code-line line-del"><span class="line-num">33</span><span class="line-prefix">-</span><span>      repo.loadCurrentUserId(),</span></div>
+            <div class="code-line line-del"><span class="line-num">34</span><span class="line-prefix">-</span><span>    ]);</span></div>
+            <div class="code-line line-del"><span class="line-num">35</span><span class="line-prefix">-</span><span>    final raw = results[0] as HomeRawData;</span></div>
+            <div class="code-line line-del"><span class="line-num">36</span><span class="line-prefix">-</span><span>    final currentUserId = results[1] as int;</span></div>
+            <div class="code-line line-add"><span class="line-num">31</span><span class="line-prefix">+</span><span>    final raw = await repo.loadAll(householdId);</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC4 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC4</div>
+        <div class="ac-text">my_tasks_notifier.dart の loadCurrentUserId() を削除し、authNotifierProvider から取得</div>
+      </div>
+      <div class="ac-body">
+        <p>AC3と同じパターン。<code>my_tasks_notifier.dart</code> の <code>Future.wait</code> から <code>loadCurrentUserId()</code> を除去し、stateから参照。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>lib/features/tasks/presentation/my_tasks_notifier.dart</span>
+            <span class="diff-stat">+3 / -5</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">22</span><span class="line-prefix"> </span><span>  Future&lt;MyTasksState&gt; _load(int householdId) async {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">23</span><span class="line-prefix"> </span><span>    final repo = ref.read(myTasksRepositoryProvider);</span></div>
+            <div class="code-line line-add"><span class="line-num">24</span><span class="line-prefix">+</span><span>    final authState = ref.read(authNotifierProvider).valueOrNull;</span></div>
+            <div class="code-line line-add"><span class="line-num">25</span><span class="line-prefix">+</span><span>    final currentUserId = (authState as AuthAuthenticated).user.userId;</span></div>
+            <div class="code-line line-del"><span class="line-num">26</span><span class="line-prefix">-</span><span>    final results = await Future.wait([</span></div>
+            <div class="code-line line-del"><span class="line-num">27</span><span class="line-prefix">-</span><span>      repo.fetchOpenTasks(householdId: householdId),</span></div>
+            <div class="code-line line-del"><span class="line-num">28</span><span class="line-prefix">-</span><span>      repo.loadCurrentUserId(),</span></div>
+            <div class="code-line line-del"><span class="line-num">29</span><span class="line-prefix">-</span><span>    ]);</span></div>
+            <div class="code-line line-del"><span class="line-num">30</span><span class="line-prefix">-</span><span>    final tasks = results[0] as List&lt;HouseworkTaskDto&gt;;</span></div>
+            <div class="code-line line-del"><span class="line-num">31</span><span class="line-prefix">-</span><span>    final currentUserId = results[1] as int;</span></div>
+            <div class="code-line line-add"><span class="line-num">26</span><span class="line-prefix">+</span><span>    final tasks = await repo.fetchOpenTasks(householdId: householdId);</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Verify -->
+  <section>
+    <h2>動作確認ポイント（ユーザー確認用）</h2>
+    <ul class="verify-list">
+      <li class="verify-item">
+        <div class="verify-num">1</div>
+        <div class="verify-content">
+          <strong>ログイン → ホーム画面表示でAPIが2本→1本になっていること</strong>
+          <span>開発者ツール or Charles でネットワーク確認。/me が1回 + /household/xxx が1回のみ（旧: /me が1回 + /user/current が別途1回 × 2画面）</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">2</div>
+        <div class="verify-content">
+          <strong>アプリを完全終了→再起動しても自分のタスクが正しく表示されること</strong>
+          <span>token復元後の /me API呼び出しで userId が取得できているか確認</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">3</div>
+        <div class="verify-content">
+          <strong>WebでdisplayName変更 → アプリを再起動すると最新の名前が表示されること</strong>
+          <span>secure_storage に保存せず /me APIで取得する方式なので、常に最新情報になるはず</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">4</div>
+        <div class="verify-content">
+          <strong>ログアウト → 再ログインしても正常動作すること</strong>
+          <span>AuthUnauthenticated → AuthAuthenticated の切り替え時に userId がリセット・再取得されているか</span>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- Scope -->
+  <section>
+    <h2>改修スコープ確認</h2>
+    <table class="scope-table">
+      <tr>
+        <th>ファイル</th>
+        <th>変更</th>
+        <th>内容</th>
+      </tr>
+      <tr>
+        <td><code>auth_state.dart</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>AuthAuthenticated に user フィールド追加</td>
+      </tr>
+      <tr>
+        <td><code>auth_notifier.dart</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>token復元時に /me API呼び出し追加、saveTokens に user 引数追加</td>
+      </tr>
+      <tr>
+        <td><code>login_notifier.dart</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>saveTokens 呼び出しに user: resp.user を追加</td>
+      </tr>
+      <tr>
+        <td><code>home_notifier.dart</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>loadCurrentUserId() 削除、authNotifierProvider から取得</td>
+      </tr>
+      <tr>
+        <td><code>my_tasks_notifier.dart</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>loadCurrentUserId() 削除、authNotifierProvider から取得</td>
+      </tr>
+      <tr>
+        <td><code>home_repository.dart</code></td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td>loadCurrentUserId() メソッドは残存（他の利用箇所がないか確認済み）</td>
+      </tr>
+      <tr>
+        <td>UI層（home_page, my_tasks_page）</td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td>画面の見た目・動作に変更なし</td>
+      </tr>
+    </table>
+  </section>
+
+</div>
+</body>
+</html>

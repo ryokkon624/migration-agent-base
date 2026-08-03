@@ -1,0 +1,18 @@
+# MCP設定（Discordトークンを含むためgit管理外）
+.mcp.json
+
+# Playwright MCP ユーザーデータ（ブラウザセッション・クッキー）
+.playwright-mcp/
+
+# Claude Code ローカル設定（パーミッション・個人設定）
+.claude/settings.local.json
+
+# Claude Code ハーネス自動生成ファイル
+build/
+
+# セキュリティ Find-and-Fix ループの一時実行成果物（security/ を使う場合の安全網）
+# 未修正脆弱性の file:line・悪用手順・PoC を含むため public リポには載せない
+/security/
+
+# reports/ は Phase1 scan(before) / Phase4 verify(after) の成果を版管理する（このリポは private 前提）。
+# public 化する場合は reports/ の内容を必ずレビューすること。
