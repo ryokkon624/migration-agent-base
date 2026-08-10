@@ -12,7 +12,7 @@
 | **D2** | WHO カラムは**残す**。機能識別子は `ProgramType` enum を**廃止**し **`ClassName#method` テキスト**に | enum/コード管理を廃止 |
 | **D3** | WHO カラムは **AOP＋MyBatis Interceptor で自動付与**（最外の業務サービスが勝つ） | 各 Service の手渡しを廃止 |
 | **D4** | 区分値 `m_code` は**残す**。多言語は**日英のみ**（`display_name_es` 列を廃止） | es 列を削除 |
-| **D5** | enum 生成は **TS を流用生成**、**Java enum は手書き**（`CodeEnum` 実装）、entity/mapper は MyBatis Generator を流用。**Dart 生成は廃止**、`0012`(ProgramType) は生成対象外 | Dart 出力・0012 生成を廃止 |
+| **D5** | enum 生成は **TS（database）・Java（backend）とも既存ジェネレータを流用**、entity/mapper は MyBatis Generator を流用。**Dart 生成は廃止**、`0012`(ProgramType) は生成対象外 | Dart 出力・0012 生成を廃止 |
 
 ---
 
@@ -90,11 +90,15 @@ polyrepo。GitHub 作成はりょこさん、ローカル雛形は別途用意�
 
 | ツール | 出所 | 本プロジェクトでの扱い |
 | --- | --- | --- |
-| **MultiEnumGenerator**（m_code→TS[＋Dart]） | hw-hub-**database** | **流用**。**Dart 出力を削除**、参照列から `display_name_es` を除外。TS 定数を frontend へ |
+| **MultiEnumGenerator**（m_code→TS[＋Dart]） | hw-hub-**database** | **流用**。**Dart 出力（generateMobile）を削除**し TS のみに。`display_name_es` は元々不参照。出力は `build/generated/frontend/`（成果物）→ frontend へ |
+| **EnumGenerator**（m_code→Java enum） | hw-hub-**backend** | **流用**（`./gradlew generateEnums`）。`code_type_name_en`→クラス名、`display_name_en`→定数、`code_value`→`getCode()`＋`fromCode()`、`CodeEnum` 実装。出力は `domain/enums/*.java` の**ソースツリー直下（コミット対象）**。`display_name_es` は元々不参照 |
 | **MyBatis Generator**（スキーマ→entity/mapper） | hw-hub-**backend** | **流用**（設定移植） |
-| m_code→**Java enum** 生成 | — | **存在しない＝手書き**。backend に `CodeEnum` 実装で数個記述（区分値僅少のため生成ツール新設は不要） |
 
-> 補足: 「Java も m_code から生成」したい場合は MultiEnumGenerator に Java 出力を足す小改修で可能だが、今回は不要と判断（区分値が少ない）。将来増えたら再検討。
+> 補足:
+> - **domain/enums の enum 群は"生成物"**（EnumGenerator 出力）であり手書きではない。区分値を足す＝m_code に登録 →`generateEnums` 再実行、で TS/Java 両方が更新される。
+> - 2ジェネレータとも **`display_name_es` を参照しない**ため、m_code から es 列を削除しても両生成は無影響。
+> - `0012`(ProgramType) を廃止（§2）＝その code_type が存在しない → ProgramType enum も生成されない（WHO はテキスト自動付与）。
+> - 移植時に変更するのは主に **JDBC 接続情報（DB 名 `jpetstore` 等）・パッケージ名・出力先パス**。
 
 ---
 
