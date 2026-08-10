@@ -66,7 +66,7 @@ Pronghorn 4階層（Epic → Feature → User Story → Acceptance Criteria）�
 - **F4.3 パスワード変更の再認証**：現在PW確認/再認証必須（SBD-16）＝S6 是正。
 - **F4.4 状態変更の CSRF**：登録/編集/PW変更に CSRF トークン・非冪等 POST（SBD-3）＝before Top3 #3（CSRF 乗っ取り）の起点遮断。
 - **F4.5 入力検証**：email 形式・最大長・PW 強度（as-is は非空＋一致のみ）。
-> **PO 論点**：bannerdata/MyList 機能の要否（**廃止時は login/account 取得クエリの INNER JOIN→LEFT JOIN 化 or 分離が必須**）／status 運用／言語設定／入力検証範囲。
+> **決定**：bannerdata/MyList **廃止**（→ login/account クエリから bannerdata 除外＝JOIN 依存解消・`favouriteCategoryId` は任意設定）。 **PO 論点**：status 運用／言語設定／入力検証範囲。
 
 ## E5 認証（Auth / Signon）
 挙動 spec: [`spec/behavior/auth.md`](./behavior/auth.md)（全 Epic の認可土台）
@@ -76,8 +76,8 @@ Pronghorn 4階層（Epic → Feature → User Story → Acceptance Criteria）�
   ↳ 否定AC種: DB に平文パスワードが存在しない。
 - **F5.3 認証堅牢化**：レート制限/ロックアウト（S10）・既定資格情報プリフィル廃止・**GET 認証廃止**（S11）・**リダイレクト先検証**（S9）。
 - **F5.4 保護ゲート＋認可土台**：認証プリンシパル基準の認可（SBD-1）を全ドメインへ提供（identity の完全性が注文/編集の前提）。
-> **PO 論点**：認証方式（セッション or JWT）／元URL復帰UX／多言語ログイン。
+> **決定**：認証＝**JWT を httpOnly Cookie＋refresh**（localStorage 不使用）・元URL復帰維持。 **PO 論点**：多言語ログイン。
 
 ---
 
-（E6 基盤＝ターゲットアーキ・DB 移行(Flyway)・`security-baseline.md` の適用順序は実装フェーズ E6 で詳細化。**DB 移行の要点**：`signon.password` をハッシュ長へ拡張〔例 varchar(255)〕／account・login 取得の bannerdata **INNER JOIN → LEFT JOIN 化 or クエリ分離**〔さもなくば bannerdata 廃止でログイン破壊〕。**フロント/デザイン方針**：UI は **Claude Design** で新規デザイン、画像は **nano banana** で新規生成〔レガシーの JSP/埋め込み画像・HTML は継承しない〕）
+（E6 基盤＝ターゲットアーキ・DB 移行(Flyway)・`security-baseline.md` の適用順序は実装フェーズ E6 で詳細化。**DB 移行の要点**：`signon.password` をハッシュ長へ拡張〔例 varchar(255)〕／account・login 取得は **bannerdata 廃止（決定）で bannerdata を除外**（JOIN 依存解消）。認証＝**JWT httpOnly Cookie＋refresh**。**フロント/デザイン方針**：UI は **Claude Design** で新規デザイン、画像は **nano banana** で新規生成〔レガシーの JSP/埋め込み画像・HTML は継承しない〕。デザインブリーフ＝`spec/design/design-brief.md`）

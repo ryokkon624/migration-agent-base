@@ -54,4 +54,5 @@
 
 - **挙動等価で残す**：登録・編集・プロフィール（言語/おすすめカテゴリ/リスト・バナー設定）。
 - **変える（モダン化）**：3表 CRUD を MyBatis に、更新対象を**本人固定**、パスワードは**ハッシュ**、PW変更は**現在PW確認**。JSP→Vue3 SPA＋REST。
-- **PO へ送る論点**：①bannerdata/バナー・MyList 機能の要否（→**廃止時は login/account 取得クエリの INNER JOIN を LEFT JOIN 化 or 分離が必須**）②status 列（"OK"）の運用 ③言語設定(english/japanese)の扱い ④**入力検証の範囲**（email 形式・最大長・PW 強度＝as-is は非空＋一致のみ）。
+- **決定（2026-08-10）**：**bannerdata/バナー・MyList は廃止** → login/account 取得クエリから **bannerdata を除外**（INNER JOIN 依存が解消）。`favouriteCategoryId` は任意のプロフィール設定として残す（バナー/リスト表示はしない）。`bannerName` seam も消滅。
+- **PO へ送る論点**：①status 列（"OK"）の運用 ②言語設定(english/japanese)の扱い ③**入力検証の範囲**（email 形式・最大長・PW 強度＝as-is は非空＋一致のみ）。

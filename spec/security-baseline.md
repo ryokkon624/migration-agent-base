@@ -33,3 +33,4 @@
 | **SBD-18 XSS 対策（出力エスケープ）** | 動的出力を**文脈に応じてエスケープ**（フレームワーク既定を無効化しない）。**レガシーの HTML 内包列**（`product.description`・`bannerdata.bannername`＝as-is は `escapeXml=false`）は **HTML を継承せず plaintext 化**し、画像は**新規アセットに分離**（生 HTML を出さない＝sanitize 不要）。 | before clean（維持）＋ L1 seam | 反射/格納 XSS が実行されない（HTML 描画面が消える）|
 
 > 注: **SBD-8 / SBD-13 / SBD-14** は before の直接 finding ではなくモダン化で足す correct/secure-by-default 追加（過大評価しない）。**SBD-17 / SBD-18** は before で clean だった姿勢の**維持**（Phase 4 で"維持"を検証）。支払（実カード非保持）は各ドメイン（例 F3.6）でドメイン固有に具体化。
+> **認証トークン方針（決定）**: JWT を **httpOnly Cookie** に保管（**localStorage 不使用**＝XSS でトークンを盗ませない）＋短命＋refresh で失効を担保。Cookie 方式ゆえ CSRF（SBD-3）必須。SBD-4（セッション/認証状態管理）と一体で担保。

@@ -43,5 +43,6 @@
 ## 6. スコープ（Factory 方針）
 
 - **挙動等価で残す**：サインオン/サインオフ、保護アクションのサインオン誘導（＋元URL復帰）。
-- **変える（モダン化）**：平文PW→ハッシュ、ログイン時セッション再生成、リダイレクト検証、レート制限、既定資格情報プリフィル廃止、GET認証廃止。認証機構は Spring Security 等の標準に載せ替え（session `accountForm` 手組み→標準の認証プリンシパル）。JSP→Vue3 SPA＋REST（トークン/セッション方式は E6 で決定）。
-- **PO へ送る論点**：①認証方式（セッション or JWT 等）②「元URL復帰」UX の踏襲 ③多言語ログイン画面の扱い。
+- **変える（モダン化）**：平文PW→ハッシュ、リダイレクト検証、レート制限、既定資格情報プリフィル廃止、GET認証廃止。認証機構は Spring Security 標準へ（session `accountForm` 手組み→標準の認証プリンシパル）。JSP→Vue3 SPA＋REST。
+- **決定（2026-08-10）認証方式**：**JWT を httpOnly Cookie に保管＋refresh**（**localStorage 不使用＝XSS でトークンを盗ませない**）。状態変更は CSRF（SBD-3）。**元URL復帰は維持**。※HwHub は localStorage トークンだが、本アプリは httpOnly Cookie で secure-by-default に一歩改善。
+- **PO へ送る論点**：①多言語ログイン画面の扱い。
