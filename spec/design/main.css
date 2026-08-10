@@ -1,0 +1,1353 @@
+@import 'tailwindcss';
+
+/* ─────────────────────────────────────────────────────────
+   JPetStore — Design Tokens / Theme
+   ─────────────────────────────────────────────────────────
+   Dark Mode 戦略
+   - 既定は OS 設定 (prefers-color-scheme) に追従
+   - ユーザーが明示的に切り替えたい場合は <html class="dark">
+     または <html class="light"> をつければ上書きされる
+   - Tailwind v4 では @custom-variant で dark: の挙動を定義
+   ───────────────────────────────────────────────────────── */
+@custom-variant dark (&:where(.dark, .dark *):not(.light *):not(.light));
+
+/* OS 追従用: html に class が無いときは prefers-color-scheme で切替 */
+@media (prefers-color-scheme: dark) {
+  html:not(.light):not(.dark) {
+    color-scheme: dark;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────
+   Design Tokens (CSS Custom Properties)
+   ─────────────────────────────────────────────────────────
+   ライト/ダークで値だけが変わる。Tailwind の utility と
+   .bg-jps-* クラスはこの変数を参照するので、テーマ切替で
+   全 UI が一斉に追従する。
+   ブランド: テラコッタ (primary) × セージ (accent) × クリーム面
+   ───────────────────────────────────────────────────────── */
+:root {
+  color-scheme: light;
+
+  /* Surface */
+  --jps-surface: #fbf8f4; /* ページ地 (クリーム) */
+  --jps-surface-card: #ffffff;
+  --jps-surface-subtle: #fdf1ea; /* primary tint */
+  --jps-surface-inset: #f3eee7; /* 入力の非活性・スケルトン */
+  --jps-surface-login: #f3eee7;
+
+  /* Border */
+  --jps-border: #e7ded2;
+  --jps-border-strong: #d8ccbc;
+  --jps-border-subtle: #f4e5da;
+
+  /* Text */
+  --jps-text-heading: #2b211b;
+  --jps-text-body: #4a3e36;
+  --jps-text-muted: #8a7a6d;
+  --jps-text-disabled: #b3a79c;
+  --jps-text-brand: #2b211b;
+  --jps-text-inverse: #fffefc;
+
+  /* Primary (terracotta) */
+  --jps-primary: #c0532a;
+  --jps-primary-hover: #a3421f;
+  --jps-primary-soft: #fdf1ea;
+  --jps-primary-text: #a3421f; /* 本文リンク・淡面上の文字 */
+  --jps-primary-border: #efc3ab;
+  --jps-primary-ring: #e08a5f;
+  --jps-on-primary: #ffffff;
+
+  /* Accent (sage) */
+  --jps-accent: #3f8a6e;
+  --jps-accent-hover: #336f58;
+  --jps-accent-soft: #eaf4ef;
+  --jps-accent-border: #bedccd;
+  --jps-accent-text: #2f6b54;
+  --jps-on-accent: #ffffff;
+
+  /* Success */
+  --jps-success: #2e7d57;
+  --jps-success-soft: #eaf4ef;
+  --jps-success-border: #bedccd;
+  --jps-success-text: #2f6b54;
+
+  /* Warning */
+  --jps-warning: #c98a15;
+  --jps-warning-soft: #fdf3e0;
+  --jps-warning-border: #f0dcaf;
+  --jps-warning-text: #8a5d06;
+
+  /* Danger */
+  --jps-danger: #c4453a;
+  --jps-danger-hover: #a5352c;
+  --jps-danger-soft: #fcedeb;
+  --jps-danger-border: #f0c6c0;
+  --jps-danger-text: #a5352c;
+  --jps-on-danger: #ffffff;
+
+  /* Info */
+  --jps-info: #2f6fa8;
+  --jps-info-soft: #eaf2fa;
+  --jps-info-border: #c3daee;
+  --jps-info-text: #245a8a;
+
+  /* 在庫ステータス */
+  --jps-stock-in-bg: #eaf4ef;
+  --jps-stock-in-text: #2f6b54;
+  --jps-stock-in-border: #bedccd;
+  --jps-stock-low-bg: #fdf3e0;
+  --jps-stock-low-text: #8a5d06;
+  --jps-stock-low-border: #f0dcaf;
+  --jps-stock-back-bg: #f3eee7;
+  --jps-stock-back-text: #8a7a6d;
+  --jps-stock-back-border: #e7ded2;
+  --jps-stock-out-bg: #fcedeb;
+  --jps-stock-out-text: #a5352c;
+  --jps-stock-out-border: #f0c6c0;
+
+  /* 注文ステータス */
+  --jps-order-placed-bg: #f3eee7;
+  --jps-order-placed-text: #4a3e36;
+  --jps-order-shipped-bg: #eaf2fa;
+  --jps-order-shipped-text: #245a8a;
+  --jps-order-delivered-bg: #eaf4ef;
+  --jps-order-delivered-text: #2f6b54;
+  --jps-order-canceled-bg: #fcedeb;
+  --jps-order-canceled-text: #a5352c;
+
+  /* カテゴリ (Fish / Dogs / Cats / Reptiles / Birds) */
+  --jps-cat-fish-soft: #f2f7fb;
+  --jps-cat-fish-border: #cfe2f0;
+  --jps-cat-fish-text: #2f6fa8;
+
+  --jps-cat-dogs-soft: #fcf6ec;
+  --jps-cat-dogs-border: #eeddc0;
+  --jps-cat-dogs-text: #8a5d06;
+
+  --jps-cat-cats-soft: #f7f3fb;
+  --jps-cat-cats-border: #ddd0ef;
+  --jps-cat-cats-text: #6b4fa0;
+
+  --jps-cat-reptiles-soft: #f1f8f4;
+  --jps-cat-reptiles-border: #c8e3d4;
+  --jps-cat-reptiles-text: #2f6b54;
+
+  --jps-cat-birds-soft: #fdf3f4;
+  --jps-cat-birds-border: #f2d3d6;
+  --jps-cat-birds-text: #a5352c;
+
+  /* Elevation / Radius / Focus */
+  --jps-shadow-sm: 0 1px 2px rgba(43, 33, 27, 0.08);
+  --jps-shadow-md: 0 6px 16px -6px rgba(43, 33, 27, 0.22);
+  --jps-shadow-lg: 0 18px 40px -20px rgba(43, 33, 27, 0.35);
+  --jps-radius-sm: 8px;
+  --jps-radius-md: 12px;
+  --jps-radius-lg: 18px;
+  --jps-radius-pill: 999px;
+  --jps-focus-ring: #e08a5f;
+
+  /* 画像スロット (nano banana 生成前のプレースホルダ) */
+  --jps-placeholder-a: #f3eee7;
+  --jps-placeholder-b: #fbf8f4;
+}
+
+/* ─── DARK (Warm Night) ───
+   クリーム/テラコッタの温度感を残した暖色系ダーク。
+   面は茶を帯びた黒、primary は一段明るくして発色させる。 */
+:root.dark,
+:root.dark body {
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not(.light) {
+    color-scheme: dark;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────
+   .dark クラス
+   ───────────────────────────────────────────────────────── */
+:root.dark {
+  /* Surface */
+  --jps-surface: #17120f;
+  --jps-surface-card: #1f1917;
+  --jps-surface-subtle: #2a1c14;
+  --jps-surface-inset: #262019;
+  --jps-surface-login: #1f1917;
+
+  /* Border */
+  --jps-border: #332924;
+  --jps-border-strong: #453930;
+  --jps-border-subtle: #2b231e;
+
+  /* Text */
+  --jps-text-heading: #f3ebe3;
+  --jps-text-body: #d4c8bd;
+  --jps-text-muted: #a79a8e;
+  --jps-text-disabled: #776c62;
+  --jps-text-brand: #f3ebe3;
+  --jps-text-inverse: #17120f;
+
+  /* Primary */
+  --jps-primary: #f08a5d;
+  --jps-primary-hover: #f5a37c;
+  --jps-primary-soft: #2a1c14;
+  --jps-primary-text: #f5a37c;
+  --jps-primary-border: rgba(240, 138, 93, 0.36);
+  --jps-primary-ring: #f08a5d;
+  --jps-on-primary: #2a1108;
+
+  /* Accent */
+  --jps-accent: #6fbf9c;
+  --jps-accent-hover: #8fd9b6;
+  --jps-accent-soft: #16261e;
+  --jps-accent-border: rgba(111, 191, 156, 0.32);
+  --jps-accent-text: #8fd9b6;
+  --jps-on-accent: #082018;
+
+  /* Success */
+  --jps-success: #6fbf9c;
+  --jps-success-soft: #16261e;
+  --jps-success-border: rgba(111, 191, 156, 0.32);
+  --jps-success-text: #8fd9b6;
+
+  /* Warning */
+  --jps-warning: #e0a94a;
+  --jps-warning-soft: #2a2115;
+  --jps-warning-border: rgba(224, 169, 74, 0.32);
+  --jps-warning-text: #edc47a;
+
+  /* Danger */
+  --jps-danger: #ef7b70;
+  --jps-danger-hover: #f59a91;
+  --jps-danger-soft: #2c1a18;
+  --jps-danger-border: rgba(239, 123, 112, 0.32);
+  --jps-danger-text: #f59a91;
+  --jps-on-danger: #2a0e0b;
+
+  /* Info */
+  --jps-info: #6fa8dc;
+  --jps-info-soft: #16222e;
+  --jps-info-border: rgba(111, 168, 220, 0.32);
+  --jps-info-text: #9cc6ea;
+
+  /* 在庫ステータス */
+  --jps-stock-in-bg: #16261e;
+  --jps-stock-in-text: #8fd9b6;
+  --jps-stock-in-border: rgba(111, 191, 156, 0.32);
+  --jps-stock-low-bg: #2a2115;
+  --jps-stock-low-text: #edc47a;
+  --jps-stock-low-border: rgba(224, 169, 74, 0.32);
+  --jps-stock-back-bg: #262019;
+  --jps-stock-back-text: #a79a8e;
+  --jps-stock-back-border: #332924;
+  --jps-stock-out-bg: #2c1a18;
+  --jps-stock-out-text: #f59a91;
+  --jps-stock-out-border: rgba(239, 123, 112, 0.32);
+
+  /* 注文ステータス */
+  --jps-order-placed-bg: #262019;
+  --jps-order-placed-text: #d4c8bd;
+  --jps-order-shipped-bg: #16222e;
+  --jps-order-shipped-text: #9cc6ea;
+  --jps-order-delivered-bg: #16261e;
+  --jps-order-delivered-text: #8fd9b6;
+  --jps-order-canceled-bg: #2c1a18;
+  --jps-order-canceled-text: #f59a91;
+
+  /* カテゴリ */
+  --jps-cat-fish-soft: #16222e;
+  --jps-cat-fish-border: rgba(111, 168, 220, 0.32);
+  --jps-cat-fish-text: #9cc6ea;
+
+  --jps-cat-dogs-soft: #2a2115;
+  --jps-cat-dogs-border: rgba(224, 169, 74, 0.32);
+  --jps-cat-dogs-text: #edc47a;
+
+  --jps-cat-cats-soft: #221c2e;
+  --jps-cat-cats-border: rgba(167, 139, 250, 0.3);
+  --jps-cat-cats-text: #c0aeea;
+
+  --jps-cat-reptiles-soft: #16261e;
+  --jps-cat-reptiles-border: rgba(111, 191, 156, 0.32);
+  --jps-cat-reptiles-text: #8fd9b6;
+
+  --jps-cat-birds-soft: #2c1a18;
+  --jps-cat-birds-border: rgba(239, 123, 112, 0.32);
+  --jps-cat-birds-text: #f59a91;
+
+  /* Elevation / Focus */
+  --jps-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --jps-shadow-md: 0 6px 16px -6px rgba(0, 0, 0, 0.6);
+  --jps-shadow-lg: 0 18px 40px -20px rgba(0, 0, 0, 0.7);
+  --jps-focus-ring: #f08a5d;
+
+  /* 画像スロット */
+  --jps-placeholder-a: #262019;
+  --jps-placeholder-b: #1f1917;
+}
+
+/* OS dark への追従 (html に .light/.dark が無いときだけ適用)
+   .dark と同じ値を複製。 */
+@media (prefers-color-scheme: dark) {
+  :root:not(.light):not(.dark) {
+    --jps-surface: #17120f;
+    --jps-surface-card: #1f1917;
+    --jps-surface-subtle: #2a1c14;
+    --jps-surface-inset: #262019;
+    --jps-surface-login: #1f1917;
+    --jps-border: #332924;
+    --jps-border-strong: #453930;
+    --jps-border-subtle: #2b231e;
+    --jps-text-heading: #f3ebe3;
+    --jps-text-body: #d4c8bd;
+    --jps-text-muted: #a79a8e;
+    --jps-text-disabled: #776c62;
+    --jps-text-brand: #f3ebe3;
+    --jps-text-inverse: #17120f;
+    --jps-primary: #f08a5d;
+    --jps-primary-hover: #f5a37c;
+    --jps-primary-soft: #2a1c14;
+    --jps-primary-text: #f5a37c;
+    --jps-primary-border: rgba(240, 138, 93, 0.36);
+    --jps-primary-ring: #f08a5d;
+    --jps-on-primary: #2a1108;
+    --jps-accent: #6fbf9c;
+    --jps-accent-hover: #8fd9b6;
+    --jps-accent-soft: #16261e;
+    --jps-accent-border: rgba(111, 191, 156, 0.32);
+    --jps-accent-text: #8fd9b6;
+    --jps-on-accent: #082018;
+    --jps-success: #6fbf9c;
+    --jps-success-soft: #16261e;
+    --jps-success-border: rgba(111, 191, 156, 0.32);
+    --jps-success-text: #8fd9b6;
+    --jps-warning: #e0a94a;
+    --jps-warning-soft: #2a2115;
+    --jps-warning-border: rgba(224, 169, 74, 0.32);
+    --jps-warning-text: #edc47a;
+    --jps-danger: #ef7b70;
+    --jps-danger-hover: #f59a91;
+    --jps-danger-soft: #2c1a18;
+    --jps-danger-border: rgba(239, 123, 112, 0.32);
+    --jps-danger-text: #f59a91;
+    --jps-on-danger: #2a0e0b;
+    --jps-info: #6fa8dc;
+    --jps-info-soft: #16222e;
+    --jps-info-border: rgba(111, 168, 220, 0.32);
+    --jps-info-text: #9cc6ea;
+    --jps-stock-in-bg: #16261e;
+    --jps-stock-in-text: #8fd9b6;
+    --jps-stock-in-border: rgba(111, 191, 156, 0.32);
+    --jps-stock-low-bg: #2a2115;
+    --jps-stock-low-text: #edc47a;
+    --jps-stock-low-border: rgba(224, 169, 74, 0.32);
+    --jps-stock-back-bg: #262019;
+    --jps-stock-back-text: #a79a8e;
+    --jps-stock-back-border: #332924;
+    --jps-stock-out-bg: #2c1a18;
+    --jps-stock-out-text: #f59a91;
+    --jps-stock-out-border: rgba(239, 123, 112, 0.32);
+    --jps-order-placed-bg: #262019;
+    --jps-order-placed-text: #d4c8bd;
+    --jps-order-shipped-bg: #16222e;
+    --jps-order-shipped-text: #9cc6ea;
+    --jps-order-delivered-bg: #16261e;
+    --jps-order-delivered-text: #8fd9b6;
+    --jps-order-canceled-bg: #2c1a18;
+    --jps-order-canceled-text: #f59a91;
+    --jps-cat-fish-soft: #16222e;
+    --jps-cat-fish-border: rgba(111, 168, 220, 0.32);
+    --jps-cat-fish-text: #9cc6ea;
+    --jps-cat-dogs-soft: #2a2115;
+    --jps-cat-dogs-border: rgba(224, 169, 74, 0.32);
+    --jps-cat-dogs-text: #edc47a;
+    --jps-cat-cats-soft: #221c2e;
+    --jps-cat-cats-border: rgba(167, 139, 250, 0.3);
+    --jps-cat-cats-text: #c0aeea;
+    --jps-cat-reptiles-soft: #16261e;
+    --jps-cat-reptiles-border: rgba(111, 191, 156, 0.32);
+    --jps-cat-reptiles-text: #8fd9b6;
+    --jps-cat-birds-soft: #2c1a18;
+    --jps-cat-birds-border: rgba(239, 123, 112, 0.32);
+    --jps-cat-birds-text: #f59a91;
+    --jps-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --jps-shadow-md: 0 6px 16px -6px rgba(0, 0, 0, 0.6);
+    --jps-shadow-lg: 0 18px 40px -20px rgba(0, 0, 0, 0.7);
+    --jps-focus-ring: #f08a5d;
+    --jps-placeholder-a: #262019;
+    --jps-placeholder-b: #1f1917;
+  }
+}
+
+html,
+body {
+  font-family:
+    'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'ヒラギノ角ゴ ProN W3', Meiryo, 'メイリオ',
+    sans-serif;
+  background-color: var(--jps-surface);
+  color: var(--jps-text-body);
+}
+
+/* 見出しは丸ゴシックで親しみを出す */
+h1,
+h2,
+h3,
+h4,
+h5,
+.jps-display {
+  font-family: 'Zen Maru Gothic', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif;
+  color: var(--jps-text-heading);
+}
+
+/* 数値 (価格・数量・SKU・注文番号) */
+.jps-numeric {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* フォーカスリング (キーボード操作時のみ) */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--jps-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--jps-radius-sm);
+}
+
+/* ─────────────────────────────────────────────────────────
+   Utilities
+   ─────────────────────────────────────────────────────────
+   .bg-jps-* / .text-jps-* / .border-jps-* は上の変数を参照。
+   テーマ切替時は変数だけが差し替わり、HTML 側のクラス名は不変。
+   ───────────────────────────────────────────────────────── */
+@layer utilities {
+  /* Primary */
+  .bg-jps-primary {
+    background-color: var(--jps-primary);
+    color: var(--jps-on-primary);
+  }
+  .hover\:bg-jps-primary:hover {
+    background-color: var(--jps-primary-hover);
+  }
+  .bg-jps-primary-soft {
+    background-color: var(--jps-primary-soft);
+  }
+  .text-jps-primary {
+    color: var(--jps-primary-text);
+  }
+  .text-jps-on-primary {
+    color: var(--jps-on-primary);
+  }
+  .border-jps-primary {
+    border-color: var(--jps-primary-border);
+  }
+  .ring-jps-primary {
+    --tw-ring-color: var(--jps-primary-ring);
+  }
+
+  /* Accent */
+  .bg-jps-accent {
+    background-color: var(--jps-accent);
+    color: var(--jps-on-accent);
+  }
+  .hover\:bg-jps-accent:hover {
+    background-color: var(--jps-accent-hover);
+  }
+  .bg-jps-accent-soft {
+    background-color: var(--jps-accent-soft);
+  }
+  .text-jps-accent {
+    color: var(--jps-accent-text);
+  }
+  .border-jps-accent {
+    border-color: var(--jps-accent-border);
+  }
+
+  /* Surface */
+  .bg-jps-surface {
+    background-color: var(--jps-surface);
+  }
+  .bg-jps-surface-card {
+    background-color: var(--jps-surface-card);
+  }
+  .bg-jps-surface-subtle {
+    background-color: var(--jps-surface-subtle);
+  }
+  .bg-jps-surface-inset {
+    background-color: var(--jps-surface-inset);
+  }
+  .bg-jps-surface-login {
+    background-color: var(--jps-surface-login);
+  }
+  .hover\:bg-jps-surface-subtle:hover {
+    background-color: var(--jps-surface-subtle);
+  }
+
+  /* Border */
+  .border-jps-border {
+    border-color: var(--jps-border);
+  }
+  .border-jps-border-strong {
+    border-color: var(--jps-border-strong);
+  }
+  .border-jps-border-subtle {
+    border-color: var(--jps-border-subtle);
+  }
+  .bg-jps-border {
+    background-color: var(--jps-border);
+  }
+
+  /* Text */
+  .text-jps-heading {
+    color: var(--jps-text-heading);
+  }
+  .text-jps-body {
+    color: var(--jps-text-body);
+  }
+  .text-jps-muted {
+    color: var(--jps-text-muted);
+  }
+  .text-jps-disabled {
+    color: var(--jps-text-disabled);
+  }
+  .text-jps-brand {
+    color: var(--jps-text-brand);
+  }
+  .text-jps-inverse {
+    color: var(--jps-text-inverse);
+  }
+
+  /* Success */
+  .bg-jps-success {
+    background-color: var(--jps-success);
+    color: var(--jps-on-accent);
+  }
+  .bg-jps-success-soft {
+    background-color: var(--jps-success-soft);
+  }
+  .text-jps-success {
+    color: var(--jps-success-text);
+  }
+  .border-jps-success {
+    border-color: var(--jps-success-border);
+  }
+
+  /* Warning */
+  .bg-jps-warning {
+    background-color: var(--jps-warning);
+  }
+  .bg-jps-warning-soft {
+    background-color: var(--jps-warning-soft);
+  }
+  .text-jps-warning {
+    color: var(--jps-warning-text);
+  }
+  .border-jps-warning {
+    border-color: var(--jps-warning-border);
+  }
+
+  /* Danger */
+  .bg-jps-danger {
+    background-color: var(--jps-danger);
+    color: var(--jps-on-danger);
+  }
+  .hover\:bg-jps-danger:hover {
+    background-color: var(--jps-danger-hover);
+  }
+  .bg-jps-danger-soft {
+    background-color: var(--jps-danger-soft);
+  }
+  .text-jps-danger {
+    color: var(--jps-danger-text);
+  }
+  .border-jps-danger {
+    border-color: var(--jps-danger-border);
+  }
+
+  /* Info */
+  .bg-jps-info {
+    background-color: var(--jps-info);
+  }
+  .bg-jps-info-soft {
+    background-color: var(--jps-info-soft);
+  }
+  .text-jps-info {
+    color: var(--jps-info-text);
+  }
+  .border-jps-info {
+    border-color: var(--jps-info-border);
+  }
+
+  /* 在庫ステータス (バッジ 1 クラスで面+文字) */
+  .badge-jps-stock-in {
+    background-color: var(--jps-stock-in-bg);
+    color: var(--jps-stock-in-text);
+    border-color: var(--jps-stock-in-border);
+  }
+  .badge-jps-stock-low {
+    background-color: var(--jps-stock-low-bg);
+    color: var(--jps-stock-low-text);
+    border-color: var(--jps-stock-low-border);
+  }
+  .badge-jps-stock-back {
+    background-color: var(--jps-stock-back-bg);
+    color: var(--jps-stock-back-text);
+    border-color: var(--jps-stock-back-border);
+  }
+  .badge-jps-stock-out {
+    background-color: var(--jps-stock-out-bg);
+    color: var(--jps-stock-out-text);
+    border-color: var(--jps-stock-out-border);
+  }
+
+  /* 注文ステータス */
+  .badge-jps-order-placed {
+    background-color: var(--jps-order-placed-bg);
+    color: var(--jps-order-placed-text);
+  }
+  .badge-jps-order-shipped {
+    background-color: var(--jps-order-shipped-bg);
+    color: var(--jps-order-shipped-text);
+  }
+  .badge-jps-order-delivered {
+    background-color: var(--jps-order-delivered-bg);
+    color: var(--jps-order-delivered-text);
+  }
+  .badge-jps-order-canceled {
+    background-color: var(--jps-order-canceled-bg);
+    color: var(--jps-order-canceled-text);
+  }
+
+  /* カテゴリ */
+  .bg-jps-cat-fish-soft {
+    background-color: var(--jps-cat-fish-soft);
+  }
+  .border-jps-cat-fish {
+    border-color: var(--jps-cat-fish-border);
+  }
+  .text-jps-cat-fish {
+    color: var(--jps-cat-fish-text);
+  }
+
+  .bg-jps-cat-dogs-soft {
+    background-color: var(--jps-cat-dogs-soft);
+  }
+  .border-jps-cat-dogs {
+    border-color: var(--jps-cat-dogs-border);
+  }
+  .text-jps-cat-dogs {
+    color: var(--jps-cat-dogs-text);
+  }
+
+  .bg-jps-cat-cats-soft {
+    background-color: var(--jps-cat-cats-soft);
+  }
+  .border-jps-cat-cats {
+    border-color: var(--jps-cat-cats-border);
+  }
+  .text-jps-cat-cats {
+    color: var(--jps-cat-cats-text);
+  }
+
+  .bg-jps-cat-reptiles-soft {
+    background-color: var(--jps-cat-reptiles-soft);
+  }
+  .border-jps-cat-reptiles {
+    border-color: var(--jps-cat-reptiles-border);
+  }
+  .text-jps-cat-reptiles {
+    color: var(--jps-cat-reptiles-text);
+  }
+
+  .bg-jps-cat-birds-soft {
+    background-color: var(--jps-cat-birds-soft);
+  }
+  .border-jps-cat-birds {
+    border-color: var(--jps-cat-birds-border);
+  }
+  .text-jps-cat-birds {
+    color: var(--jps-cat-birds-text);
+  }
+
+  /* Elevation / Radius */
+  .shadow-jps-sm {
+    box-shadow: var(--jps-shadow-sm);
+  }
+  .shadow-jps-md {
+    box-shadow: var(--jps-shadow-md);
+  }
+  .shadow-jps-lg {
+    box-shadow: var(--jps-shadow-lg);
+  }
+  .rounded-jps-sm {
+    border-radius: var(--jps-radius-sm);
+  }
+  .rounded-jps-md {
+    border-radius: var(--jps-radius-md);
+  }
+  .rounded-jps-lg {
+    border-radius: var(--jps-radius-lg);
+  }
+  .rounded-jps-pill {
+    border-radius: var(--jps-radius-pill);
+  }
+
+  /* 画像スロット (nano banana 生成前) */
+  .bg-jps-placeholder {
+    background-image: repeating-linear-gradient(
+      135deg,
+      var(--jps-placeholder-a) 0 10px,
+      var(--jps-placeholder-b) 10px 20px
+    );
+    color: var(--jps-text-muted);
+  }
+
+  /* スケルトン */
+  .bg-jps-skeleton {
+    background-color: var(--jps-surface-inset);
+  }
+}
+
+
+/* ─────────────────────────────────────────────────────────
+   Components
+   ─────────────────────────────────────────────────────────
+   全画面デザイン (JPetStore UI.dc.html) の見た目をクラス化。
+   Tailwind の utility より前に置く層なので、個別調整は
+   HTML 側の utility クラスで上書きできる。
+   ───────────────────────────────────────────────────────── */
+@layer components {
+  /* ── Button ─────────────────────────────────────────── */
+  .jps-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 44px; /* タップ領域の最小値 */
+    padding: 0.875rem 1.375rem;
+    border: 1px solid transparent;
+    border-radius: var(--jps-radius-pill);
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1;
+    text-decoration: none;
+    cursor: pointer;
+    transition:
+      background-color 0.15s ease,
+      border-color 0.15s ease,
+      color 0.15s ease;
+  }
+  .jps-btn:disabled,
+  .jps-btn[aria-disabled='true'] {
+    background-color: var(--jps-surface-inset);
+    border-color: transparent;
+    color: var(--jps-text-disabled);
+    cursor: not-allowed;
+  }
+
+  .jps-btn-primary {
+    background-color: var(--jps-primary);
+    color: var(--jps-on-primary);
+  }
+  .jps-btn-primary:hover:not(:disabled) {
+    background-color: var(--jps-primary-hover);
+  }
+
+  .jps-btn-secondary {
+    background-color: var(--jps-primary-soft);
+    border-color: var(--jps-primary-border);
+    color: var(--jps-primary-text);
+  }
+  .jps-btn-secondary:hover:not(:disabled) {
+    background-color: var(--jps-surface-subtle);
+    border-color: var(--jps-primary-ring);
+  }
+
+  .jps-btn-ghost {
+    background-color: var(--jps-surface-card);
+    border-color: var(--jps-border);
+    color: var(--jps-text-body);
+  }
+  .jps-btn-ghost:hover:not(:disabled) {
+    background-color: var(--jps-surface);
+    border-color: var(--jps-border-strong);
+  }
+
+  .jps-btn-danger {
+    background-color: var(--jps-danger);
+    color: var(--jps-on-danger);
+  }
+  .jps-btn-danger:hover:not(:disabled) {
+    background-color: var(--jps-danger-hover);
+  }
+
+  .jps-btn-link {
+    min-height: 0;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 0;
+    color: var(--jps-primary-text);
+    font-weight: 500;
+    text-decoration: none;
+  }
+  .jps-btn-link:hover {
+    text-decoration: underline;
+  }
+
+  .jps-btn-sm {
+    min-height: 36px;
+    padding: 0.625rem 0.875rem;
+    font-size: 0.8125rem;
+  }
+  .jps-btn-lg {
+    min-height: 52px;
+    padding: 1.0625rem 1.875rem;
+    font-size: 0.9375rem;
+  }
+  .jps-btn-block {
+    width: 100%;
+  }
+
+  /* ── Form ───────────────────────────────────────────── */
+  .jps-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4375rem;
+  }
+  .jps-label {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--jps-text-heading);
+  }
+  .jps-required::after {
+    content: '必須';
+    margin-left: 0.5rem;
+    padding: 0.125rem 0.375rem;
+    border-radius: var(--jps-radius-sm);
+    background-color: var(--jps-danger-soft);
+    color: var(--jps-danger-text);
+    font-size: 0.6875rem;
+    font-weight: 600;
+  }
+  .jps-input,
+  .jps-select,
+  .jps-textarea {
+    width: 100%;
+    min-height: 46px;
+    padding: 0.6875rem 0.875rem;
+    background-color: var(--jps-surface-card);
+    border: 1px solid var(--jps-border);
+    border-radius: var(--jps-radius-md);
+    color: var(--jps-text-heading);
+    font-size: 0.875rem;
+    font-family: inherit;
+  }
+  .jps-textarea {
+    min-height: 104px;
+    line-height: 1.8;
+    resize: vertical;
+  }
+  .jps-input::placeholder,
+  .jps-textarea::placeholder {
+    color: var(--jps-text-muted);
+  }
+  .jps-input:focus,
+  .jps-select:focus,
+  .jps-textarea:focus {
+    border-color: var(--jps-primary-ring);
+    outline: 2px solid color-mix(in srgb, var(--jps-primary-ring) 32%, transparent);
+    outline-offset: 0;
+  }
+  .jps-input:disabled,
+  .jps-select:disabled,
+  .jps-textarea:disabled {
+    background-color: var(--jps-surface-inset);
+    color: var(--jps-text-muted);
+    cursor: not-allowed;
+  }
+  .jps-input[aria-invalid='true'],
+  .jps-input-error {
+    background-color: var(--jps-danger-soft);
+    border-color: var(--jps-danger);
+    color: var(--jps-danger-text);
+  }
+  .jps-help {
+    font-size: 0.75rem;
+    color: var(--jps-text-muted);
+  }
+  .jps-error-text {
+    font-size: 0.75rem;
+    color: var(--jps-danger-text);
+  }
+
+  /* 数量ステッパー (カート・アイテム詳細で共用) */
+  .jps-qty {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--jps-border);
+    border-radius: var(--jps-radius-md);
+    background-color: var(--jps-surface-card);
+    overflow: hidden;
+  }
+  .jps-qty button {
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: 0;
+    color: var(--jps-text-body);
+    font-size: 1.125rem;
+    cursor: pointer;
+  }
+  .jps-qty button:hover:not(:disabled) {
+    background-color: var(--jps-surface-subtle);
+  }
+  .jps-qty button:disabled {
+    color: var(--jps-text-disabled);
+    cursor: not-allowed;
+  }
+  .jps-qty input {
+    width: 52px;
+    border: 0;
+    background: none;
+    text-align: center;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--jps-text-heading);
+  }
+
+  /* トグル (通知設定など) */
+  .jps-switch {
+    width: 46px;
+    height: 26px;
+    padding: 3px;
+    border-radius: var(--jps-radius-pill);
+    background-color: var(--jps-border);
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+  }
+  .jps-switch > span {
+    width: 20px;
+    height: 20px;
+    border-radius: var(--jps-radius-pill);
+    background-color: #ffffff;
+    transition: transform 0.15s ease;
+  }
+  .jps-switch[aria-checked='true'] {
+    background-color: var(--jps-primary);
+  }
+  .jps-switch[aria-checked='true'] > span {
+    transform: translateX(20px);
+  }
+
+  /* ── Card / Surface ─────────────────────────────────── */
+  .jps-card {
+    background-color: var(--jps-surface-card);
+    border: 1px solid var(--jps-border);
+    border-radius: var(--jps-radius-lg);
+  }
+  .jps-card-pad {
+    padding: 1.5rem;
+  }
+  .jps-panel {
+    background-color: var(--jps-surface-subtle);
+    border: 1px solid var(--jps-primary-border);
+    border-radius: var(--jps-radius-lg);
+    padding: 2rem;
+  }
+  .jps-divider {
+    height: 1px;
+    background-color: var(--jps-border-subtle);
+    border: 0;
+  }
+
+  /* 商品カード */
+  .jps-product-card {
+    display: flex;
+    flex-direction: column;
+    background-color: var(--jps-surface-card);
+    border: 1px solid var(--jps-border);
+    border-radius: var(--jps-radius-md);
+    overflow: hidden;
+    text-decoration: none;
+    transition:
+      border-color 0.15s ease,
+      box-shadow 0.15s ease;
+  }
+  .jps-product-card:hover {
+    border-color: var(--jps-primary-border);
+    box-shadow: var(--jps-shadow-md);
+  }
+  .jps-product-card__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.875rem;
+  }
+  .jps-product-card__name {
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.5;
+    color: var(--jps-text-heading);
+  }
+  .jps-price {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--jps-text-heading);
+  }
+  .jps-price-lg {
+    font-size: 1.875rem;
+  }
+
+  /* 画像スロット (nano banana 生成前) */
+  .jps-media {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-image: repeating-linear-gradient(
+      135deg,
+      var(--jps-placeholder-a) 0 10px,
+      var(--jps-placeholder-b) 10px 20px
+    );
+    color: var(--jps-text-muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.6875rem;
+  }
+
+  /* ── Badge / Chip ───────────────────────────────────── */
+  .jps-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid transparent;
+    border-radius: var(--jps-radius-pill);
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+  }
+  .jps-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
+    padding: 0.625rem 0.875rem;
+    background-color: var(--jps-surface-card);
+    border: 1px solid var(--jps-border);
+    border-radius: var(--jps-radius-pill);
+    color: var(--jps-text-body);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .jps-chip[aria-pressed='true'],
+  .jps-chip-active {
+    background-color: var(--jps-primary);
+    border-color: var(--jps-primary);
+    color: var(--jps-on-primary);
+  }
+
+  /* ── Alert ──────────────────────────────────────────── */
+  .jps-alert {
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    border: 1px solid transparent;
+    border-radius: var(--jps-radius-md);
+    font-size: 0.8125rem;
+    line-height: 1.7;
+  }
+  .jps-alert::before {
+    content: '';
+    flex: none;
+    width: 8px;
+    border-radius: var(--jps-radius-pill);
+    background-color: currentColor;
+  }
+  .jps-alert-danger {
+    background-color: var(--jps-danger-soft);
+    border-color: var(--jps-danger-border);
+    color: var(--jps-danger-text);
+  }
+  .jps-alert-success {
+    background-color: var(--jps-success-soft);
+    border-color: var(--jps-success-border);
+    color: var(--jps-success-text);
+  }
+  .jps-alert-warning {
+    background-color: var(--jps-warning-soft);
+    border-color: var(--jps-warning-border);
+    color: var(--jps-warning-text);
+  }
+  .jps-alert-info {
+    background-color: var(--jps-info-soft);
+    border-color: var(--jps-info-border);
+    color: var(--jps-info-text);
+  }
+
+  /* ── Header / Nav ───────────────────────────────────── */
+  .jps-header {
+    background-color: var(--jps-surface-card);
+    border-bottom: 1px solid var(--jps-border);
+  }
+  .jps-header__bar {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    height: 72px;
+    padding: 0 1.75rem;
+  }
+  .jps-logo {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    font-family: 'Zen Maru Gothic', sans-serif;
+    font-size: 1.1875rem;
+    font-weight: 700;
+    color: var(--jps-text-brand);
+    text-decoration: none;
+  }
+  .jps-logo__mark {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--jps-radius-md);
+    background-color: var(--jps-primary);
+    color: var(--jps-on-primary);
+    font-size: 0.9375rem;
+  }
+  .jps-search {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    flex: 1;
+    max-width: 520px;
+    height: 44px;
+    padding: 0 0.875rem;
+    background-color: var(--jps-surface);
+    border: 1px solid var(--jps-border);
+    border-radius: var(--jps-radius-pill);
+  }
+  .jps-search input {
+    flex: 1;
+    border: 0;
+    background: none;
+    font-size: 0.875rem;
+    font-family: inherit;
+    color: var(--jps-text-body);
+  }
+  .jps-navlink {
+    padding: 0.625rem 0.75rem;
+    border-radius: var(--jps-radius-sm);
+    color: var(--jps-text-body);
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-decoration: none;
+  }
+  .jps-navlink:hover {
+    background-color: var(--jps-surface-subtle);
+    color: var(--jps-primary-text);
+  }
+  .jps-navlink[aria-current='page'],
+  .jps-navlink-active {
+    background-color: var(--jps-primary-soft);
+    color: var(--jps-primary-text);
+  }
+  .jps-cart-count {
+    min-width: 20px;
+    height: 20px;
+    padding: 0 0.375rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--jps-radius-pill);
+    background-color: rgba(255, 255, 255, 0.22);
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+  .jps-breadcrumb {
+    font-size: 0.8125rem;
+    color: var(--jps-text-muted);
+  }
+  .jps-breadcrumb [aria-current='page'] {
+    color: var(--jps-text-heading);
+  }
+
+  /* ── Table (在庫アイテム・注文履歴) ─────────────────── */
+  .jps-table {
+    width: 100%;
+    background-color: var(--jps-surface-card);
+    border: 1px solid var(--jps-border);
+    border-radius: var(--jps-radius-lg);
+    border-collapse: separate;
+    border-spacing: 0;
+    overflow: hidden;
+  }
+  .jps-table th {
+    padding: 0.875rem 1.25rem;
+    background-color: var(--jps-surface);
+    border-bottom: 1px solid var(--jps-border);
+    color: var(--jps-text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-align: left;
+  }
+  .jps-table td {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--jps-border-subtle);
+    font-size: 0.875rem;
+    color: var(--jps-text-heading);
+    vertical-align: middle;
+  }
+  .jps-table tbody tr:last-child td {
+    border-bottom: 0;
+  }
+  .jps-table tbody tr:hover {
+    background-color: var(--jps-surface-subtle);
+  }
+
+  /* ── Pagination ─────────────────────────────────────── */
+  .jps-pagination {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .jps-page {
+    min-width: 40px;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 0.625rem;
+    background-color: var(--jps-surface-card);
+    border: 1px solid var(--jps-border);
+    border-radius: var(--jps-radius-sm);
+    color: var(--jps-text-body);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.8125rem;
+    text-decoration: none;
+  }
+  .jps-page:hover:not([aria-disabled='true']) {
+    border-color: var(--jps-primary-border);
+    color: var(--jps-primary-text);
+  }
+  .jps-page[aria-current='page'] {
+    background-color: var(--jps-primary);
+    border-color: var(--jps-primary);
+    color: var(--jps-on-primary);
+    font-weight: 700;
+  }
+  .jps-page[aria-disabled='true'] {
+    color: var(--jps-text-disabled);
+    pointer-events: none;
+  }
+
+  /* ── Checkout stepper ───────────────────────────────── */
+  .jps-steps {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+  .jps-step {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6875rem 1rem;
+    background-color: var(--jps-surface-card);
+    border: 1px solid var(--jps-border);
+    border-radius: var(--jps-radius-pill);
+    color: var(--jps-text-muted);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .jps-step-done {
+    background-color: var(--jps-success-soft);
+    border-color: var(--jps-success-border);
+    color: var(--jps-success-text);
+    font-weight: 600;
+  }
+  .jps-step[aria-current='step'],
+  .jps-step-current {
+    background-color: var(--jps-primary);
+    border-color: var(--jps-primary);
+    color: var(--jps-on-primary);
+    font-weight: 600;
+  }
+  .jps-steps__sep {
+    width: 24px;
+    height: 1px;
+    background-color: var(--jps-border-strong);
+  }
+
+  /* ── Empty / Error state ────────────────────────────── */
+  .jps-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.875rem;
+    padding: 2.25rem 1.75rem;
+    background-color: var(--jps-surface-card);
+    border: 1px solid var(--jps-border);
+    border-radius: var(--jps-radius-lg);
+    text-align: center;
+  }
+  .jps-empty__title {
+    font-family: 'Zen Maru Gothic', sans-serif;
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--jps-text-heading);
+  }
+  .jps-empty__desc {
+    font-size: 0.8125rem;
+    line-height: 1.9;
+    color: var(--jps-text-muted);
+  }
+
+  /* ── Skeleton ───────────────────────────────────────── */
+  .jps-skeleton {
+    background-color: var(--jps-surface-inset);
+    border-radius: var(--jps-radius-sm);
+    position: relative;
+    overflow: hidden;
+  }
+  .jps-skeleton::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, var(--jps-surface-card) 70%, transparent),
+      transparent
+    );
+    animation: jps-shimmer 1.4s infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .jps-skeleton::after {
+      animation: none;
+    }
+  }
+}
+
+@keyframes jps-shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}

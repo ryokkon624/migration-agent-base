@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400" role="img" aria-label="No image">
+  <rect width="400" height="400" rx="20" fill="#f3eee7"/>
+  <rect x="0.5" y="0.5" width="399" height="399" rx="20" fill="none" stroke="#e7ded2"/>
+  <g fill="#d8ccbc" transform="translate(200 180)">
+    <ellipse cx="0" cy="34" rx="46" ry="36"/>
+    <circle cx="-46" cy="-8" r="18"/>
+    <circle cx="-16" cy="-30" r="20"/>
+    <circle cx="16" cy="-30" r="20"/>
+    <circle cx="46" cy="-8" r="18"/>
+  </g>
+  <text x="200" y="322" text-anchor="middle" font-family="'Segoe UI', system-ui, sans-serif" font-size="20" fill="#b3a79c">No image</text>
+</svg>

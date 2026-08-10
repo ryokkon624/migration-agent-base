@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 80" width="340" height="80" role="img" aria-label="JPetStore logo">
+  <rect x="4" y="12" width="56" height="56" rx="16" fill="#fdf1ea"/>
+  <g fill="#c0532a">
+    <ellipse cx="32" cy="49" rx="13" ry="10"/>
+    <circle cx="19" cy="36" r="5.2"/>
+    <circle cx="28.5" cy="30" r="5.6"/>
+    <circle cx="38.5" cy="30" r="5.6"/>
+    <circle cx="47" cy="36" r="5.2"/>
+  </g>
+  <text x="76" y="52" font-family="'Segoe UI', system-ui, -apple-system, sans-serif" font-size="34" font-weight="800" letter-spacing="-0.5">
+    <tspan fill="#2b211b">J</tspan><tspan fill="#c0532a">Pet</tspan><tspan fill="#2b211b">Store</tspan>
+  </text>
+</svg>
