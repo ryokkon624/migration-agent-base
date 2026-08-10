@@ -45,7 +45,7 @@
 | **S12/R14 登録のユーザ名列挙** | 登録重複エラーで存在推測（ログイン本体は clean） | **レート制限＋メール検証**（登録の一律メッセージ化は非現実的） | SBD-6 |
 | **S5 CSRF（要接続）** | 状態変更（newAccount/editAccount/PW変更）に CSRF 対策なし＝before Top3 #3「CSRF 駆動の遠隔乗っ取り(S5+S2+S6)」の起点＝editAccount | 状態変更に CSRF トークン・非冪等 POST | SBD-3 |
 | **S8 登録の自動ログイン** | 登録直後の自動ログインでセッション再生成なし | 登録/ログイン時にセッション再生成 | SBD-4 |
-| **XSS seam（bannerName）** | `IncludeBanner.jsp:7` が `account.bannerName`（HTML）を `escapeXml=false` 描画（catalog の description と同型） | HTML-by-design 列は sanitize/データ分離 | SBD-18 |
+| **XSS seam（bannerName）** | `IncludeBanner.jsp:7` が `account.bannerName`（HTML）を `escapeXml=false` 描画（catalog の description と同型） | bannerName の HTML も**継承せず**（バナーは新 UI・新規画像で再設計）＝全エスケープ | SBD-18 |
 | **clean 維持（SQLi）** | 全パラメタライズ | 維持 | SBD-17 |
 
 > newAccount で他人 username を指定しても account PK 衝突で **insert 失敗＝上書き不可（before で clean 確認済）**。乗っ取りベクトルは editAccount（update）。

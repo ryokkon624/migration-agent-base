@@ -44,7 +44,7 @@ Pronghorn 4階層（Epic → Feature → User Story → Acceptance Criteria）�
 
 - **F1.1 カタログ階層閲覧**：カテゴリ→商品→在庫アイテムの閲覧（サーバ側ページング）。JSP→Vue3 SPA＋REST。
 - **F1.2 商品検索**：複数語 LIKE の部分一致検索（パラメタライズ維持＝SBD-17）、ページング。
-- **F1.3 参照の堅牢化・出力安全化**：不正 ID・**stale-session ページング**（viewCategory=throw/viewProduct=NPE/viewItem=NPE）を 404/空へ正規化・trace 非露出（SBD-10）。出力エスケープ維持＋**`product.description` の HTML は sanitize/データ分離**（SBD-18・意図的非等価）。
+- **F1.3 参照の堅牢化・出力安全化**：不正 ID・**stale-session ページング**（viewCategory=throw/viewProduct=NPE/viewItem=NPE）を 404/空へ正規化・trace 非露出（SBD-10）。出力エスケープ維持＋**`product.description` は plaintext 化・商品画像は新規アセット（nano banana 生成）**（SBD-18・意図的非等価。レガシーHTML継承せず）。
 > **PO 論点**：検索一致仕様の踏襲／ページサイズ(4)/在庫表示仕様。
 
 ## E2 カート（Cart）
@@ -80,4 +80,4 @@ Pronghorn 4階層（Epic → Feature → User Story → Acceptance Criteria）�
 
 ---
 
-（E6 基盤＝ターゲットアーキ・DB 移行(Flyway)・`security-baseline.md` の適用順序は実装フェーズ E6 で詳細化。**DB 移行の要点**：`signon.password` をハッシュ長へ拡張〔例 varchar(255)〕／account・login 取得の bannerdata **INNER JOIN → LEFT JOIN 化 or クエリ分離**〔さもなくば bannerdata 廃止でログイン破壊〕）
+（E6 基盤＝ターゲットアーキ・DB 移行(Flyway)・`security-baseline.md` の適用順序は実装フェーズ E6 で詳細化。**DB 移行の要点**：`signon.password` をハッシュ長へ拡張〔例 varchar(255)〕／account・login 取得の bannerdata **INNER JOIN → LEFT JOIN 化 or クエリ分離**〔さもなくば bannerdata 廃止でログイン破壊〕。**フロント/デザイン方針**：UI は **Claude Design** で新規デザイン、画像は **nano banana** で新規生成〔レガシーの JSP/埋め込み画像・HTML は継承しない〕）

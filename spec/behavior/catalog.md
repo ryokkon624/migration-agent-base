@@ -33,12 +33,12 @@
 | before | as-is | after（secure-by-default） |
 | --- | --- | --- |
 | **clean 維持（SQLi）** | 全 SQL パラメタライズ | **SBD-17**：パラメタライズ維持（検索も）。 |
-| **L1 格納XSS の seam / SBD-18** | **`product.description` が表示用 HTML を内包**（シードに `<image src=...>` 等）し `escapeXml="false"` で描画（`Item.jsp:16` / `SearchProducts.jsp:14`。DB シード由来・書込経路なし＝Latent）。検索語の**反射は無い**（clean）。※`bannerName` も同型だが account scope（→account.md） | **HTML-by-design 列（description）は sanitize（安全 HTML のみ許可）or 画像URLをデータ分離してテキストはエスケープ**（＝**意図的な非等価変更**）。それ以外の動的出力は全て文脈エスケープ（**SBD-18**、無効化しない）。 |
+| **L1 格納XSS の seam / SBD-18** | **`product.description` が表示用 HTML を内包**（シードに `<image src=...>` 等）し `escapeXml="false"` で描画（`Item.jsp:16` / `SearchProducts.jsp:14`。DB シード由来・書込経路なし＝Latent）。検索語の**反射は無い**（clean）。※`bannerName` も同型だが account scope（→account.md） | **description は HTML を継承せず plaintext 化**（全エスケープ）。商品画像は**新規生成（nano banana）で別アセット**として持つ（レガシーの `<image>` 埋め込みは廃止）＝意図的な非等価変更。全動的出力はエスケープ（**SBD-18**）。 |
 | **SBD-10 情報漏えい** | 不正/欠落入力で trace 露出が**3経路**：`viewItem`（不正 itemId→`getItem` null→`item.getProduct()` NPE）／`viewCategory`（stale-session→IllegalStateException）／`viewProduct`（stale-session→NPE） | 不正 ID・stale は 404/空へ正規化・スタックトレース非露出。 |
 
 ## 6. スコープ（Factory 方針）
 
 - **挙動等価で残す**：カテゴリ→商品→アイテムの階層閲覧・検索・ページング。
-- **変える（モダン化）**：JSP → Vue3 SPA＋REST（一覧/検索 API）。iBATIS→MyBatis、HSQLDB→MySQL。セッション保持ページング → API のページングパラメータに。出力エスケープはフレームワーク既定で担保。
-- **意図的な非等価変更（要ユーザー承認）**：`product.description`（HTML-by-design）を sanitize/データ分離（as-is は非エスケープ描画）／stale-session エラーの 404 正規化。
-- **PO へ送る論点**：①検索の一致仕様（部分一致 LIKE・複数語 OR の維持要否）②ページサイズ(4)の踏襲要否 ③在庫状況の表示仕様 ④description の HTML を維持（sanitize）か plaintext 化か。
+- **変える（モダン化）**：JSP → Vue3 SPA＋REST（一覧/検索 API）。iBATIS→MyBatis、HSQLDB→MySQL。セッション保持ページング → API のページングパラメータに。出力エスケープはフレームワーク既定で担保。**UI は Claude Design で新規デザイン、商品画像は nano banana で新規生成**（レガシーの JSP/埋め込み画像は継承しない）。
+- **意図的な非等価変更（承認済 2026-08-10）**：`product.description` は HTML を継承せず **plaintext＋新規画像アセット（nano banana 生成）** に置換（as-is は HTML 埋め込み）／stale-session エラーの 404 正規化。
+- **PO へ送る論点**：①検索の一致仕様（部分一致 LIKE・複数語 OR の維持要否）②ページサイズ(4)の踏襲要否 ③在庫状況の表示仕様。
