@@ -39,4 +39,45 @@ Pronghorn 4階層（Epic → Feature → User Story → Acceptance Criteria）�
 
 ---
 
-（E1/E2/E4/E5/E6 は、この E3 と同じ粒度で順次詳細化する）
+## E1 カタログ（Catalog）
+挙動 spec: [`spec/behavior/catalog.md`](./behavior/catalog.md)（全公開・読み取り専用・before clean）
+
+- **F1.1 カタログ階層閲覧**：カテゴリ→商品→在庫アイテムの閲覧（サーバ側ページング）。JSP→Vue3 SPA＋REST。
+- **F1.2 商品検索**：複数語 LIKE の部分一致検索（パラメタライズ維持＝SBD-17）、ページング。
+- **F1.3 参照の堅牢化・出力安全化**：不正 ID・**stale-session ページング**（viewCategory=throw/viewProduct=NPE/viewItem=NPE）を 404/空へ正規化・trace 非露出（SBD-10）。出力エスケープ維持＋**`product.description` の HTML は sanitize/データ分離**（SBD-18・意図的非等価）。
+> **PO 論点**：検索一致仕様の踏襲／ページサイズ(4)/在庫表示仕様。
+
+## E2 カート（Cart）
+挙動 spec: [`spec/behavior/cart.md`](./behavior/cart.md)（全公開・セッションのみ・before clean）
+
+- **F2.1 カート操作**：追加/数量更新（0で削除）/削除/表示。セッションカート→SPA状態＋カートREST（数量更新は明示 {itemId, quantity} API に）。
+- **F2.2 価格権威・数量のみ受理**：小計はサーバ計算（`Item.listPrice`）、クライアントは数量のみ（正整数検証）＝SBD-2 維持。
+- **F2.3 カート変更の CSRF・冪等整理**：add/update/remove の状態変更に CSRF（SBD-3）、REST 冪等性を整理。
+> **PO 論点**：未ログインカートの永続化/マージ／在庫切れの表示・追加可否／数量上限。
+
+---
+
+## E4 アカウント（Account & Profile）
+挙動 spec: [`spec/behavior/account.md`](./behavior/account.md)（before findings 集中）
+
+- **F4.1 ユーザー登録**：公開・account/signon/profile 3表・登録後自動ログイン（**セッション再生成**＝SBD-4）。JSP→SPA＋REST。列挙対策は**レート制限＋メール検証**（SBD-6）。
+- **F4.2 アカウント/プロフィール編集（本人固定）**：**更新対象を認証プリンシパルに固定**（`username` をクライアントから受けない）＋マスアサインメント allowlist ＝ **S2/S3 是正**（SBD-1/SBD-2）。
+  ↳ 否定AC種: `account.username=他人` で editAccount → 他人は更新されない（自分のみ）。
+- **F4.3 パスワード変更の再認証**：現在PW確認/再認証必須（SBD-16）＝S6 是正。
+- **F4.4 状態変更の CSRF**：登録/編集/PW変更に CSRF トークン・非冪等 POST（SBD-3）＝before Top3 #3（CSRF 乗っ取り）の起点遮断。
+- **F4.5 入力検証**：email 形式・最大長・PW 強度（as-is は非空＋一致のみ）。
+> **PO 論点**：bannerdata/MyList 機能の要否（**廃止時は login/account 取得クエリの INNER JOIN→LEFT JOIN 化 or 分離が必須**）／status 運用／言語設定／入力検証範囲。
+
+## E5 認証（Auth / Signon）
+挙動 spec: [`spec/behavior/auth.md`](./behavior/auth.md)（全 Epic の認可土台）
+
+- **F5.1 サインオン/サインオフ**：ログイン成功時**セッション再生成**（S8）・CSRF（S5）・元URL復帰。
+- **F5.2 パスワードのハッシュ化**：ハッシュ＋ソルト保存・照合（SBD-5）＝S7 是正。
+  ↳ 否定AC種: DB に平文パスワードが存在しない。
+- **F5.3 認証堅牢化**：レート制限/ロックアウト（S10）・既定資格情報プリフィル廃止・**GET 認証廃止**（S11）・**リダイレクト先検証**（S9）。
+- **F5.4 保護ゲート＋認可土台**：認証プリンシパル基準の認可（SBD-1）を全ドメインへ提供（identity の完全性が注文/編集の前提）。
+> **PO 論点**：認証方式（セッション or JWT）／元URL復帰UX／多言語ログイン。
+
+---
+
+（E6 基盤＝ターゲットアーキ・DB 移行(Flyway)・`security-baseline.md` の適用順序は実装フェーズ E6 で詳細化。**DB 移行の要点**：`signon.password` をハッシュ長へ拡張〔例 varchar(255)〕／account・login 取得の bannerdata **INNER JOIN → LEFT JOIN 化 or クエリ分離**〔さもなくば bannerdata 廃止でログイン破壊〕）
