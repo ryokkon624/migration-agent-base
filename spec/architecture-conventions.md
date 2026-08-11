@@ -98,7 +98,7 @@ polyrepo。GitHub 作成はりょこさん、ローカル雛形は別途用意�
 > - **domain/enums の enum 群は"生成物"**（EnumGenerator 出力）であり手書きではない。区分値を足す＝m_code に登録 →`generateEnums` 再実行、で TS/Java 両方が更新される。
 > - 2ジェネレータとも **`display_name_es` を参照しない**ため、m_code から es 列を削除しても両生成は無影響。
 > - `0012`(ProgramType) を廃止（§2）＝その code_type が存在しない → ProgramType enum も生成されない（WHO はテキスト自動付与）。
-> - 移植時に変更するのは主に **JDBC 接続情報（DB 名 `jpetstore` 等）・パッケージ名・出力先パス**。
+> - 移植時に変更するのは主に **JDBC 接続情報（DB 名 `jpetstore_db`・user/pass `jpetstore`）・パッケージ名（`com.example.jpetstore.backend`）・出力先パス**。
 
 ---
 
