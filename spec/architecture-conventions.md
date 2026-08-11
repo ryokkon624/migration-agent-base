@@ -13,6 +13,7 @@
 | **D3** | WHO カラムは **AOP＋MyBatis Interceptor で自動付与**（最外の業務サービスが勝つ） | 各 Service の手渡しを廃止 |
 | **D4** | 区分値 `m_code` は**残す**。多言語は**日英のみ**（`display_name_es` 列を廃止） | es 列を削除 |
 | **D5** | enum 生成は **TS（database）・Java（backend）とも既存ジェネレータを流用**、entity/mapper は MyBatis Generator を流用。**Dart 生成は廃止**、`0012`(ProgramType) は生成対象外 | Dart 出力・0012 生成を廃止 |
+| **D6** | 並行制御：**在庫引き当て＝ガード付きアトミック減算**、**編集系エンティティ＝`version` 列で楽観ロック**（`updated_at` はロックに使わず監査専用） | 新規（legacy はガード無し減算で売り越し可能） |
 
 ---
 
@@ -99,6 +100,44 @@ polyrepo。GitHub 作成はりょこさん、ローカル雛形は別途用意�
 > - 2ジェネレータとも **`display_name_es` を参照しない**ため、m_code から es 列を削除しても両生成は無影響。
 > - `0012`(ProgramType) を廃止（§2）＝その code_type が存在しない → ProgramType enum も生成されない（WHO はテキスト自動付与）。
 > - 移植時に変更するのは主に **JDBC 接続情報（DB 名 `jpetstore_db`・user/pass `jpetstore`）・パッケージ名（`com.example.jpetstore.backend`）・出力先パス**。
+
+---
+
+## 4. 並行制御（D6）
+
+在庫引き当てのような「後勝ちで壊れる」更新は、トランザクション＋以下の方式で保護する。**`updated_at` はロックに使わず監査専用**（DB が `ON UPDATE CURRENT_TIMESTAMP(6)` で打つ値であり、タイムスタンプは解像度・単調性の点でロックトークンに不適）。
+
+### 4.1 在庫引き当て＝ガード付きアトミック減算
+
+- **legacy の実態**（`legacy-jpetstore` iBATIS `Item.xml`）: `select qty ... where itemid=?`（getInventoryQuantity）→ 別クエリで `update inventory set qty = qty - :n where itemid=:id`（**ガード無し**）。read→act 分離の **TOCTOU で売り越し・マイナス在庫が起き得る**。
+- **修正方針**（単一のアトミック UPDATE でガード）:
+
+  ```sql
+  UPDATE inventory
+     SET qty = qty - :n
+   WHERE item_id = :id
+     AND qty >= :n;      -- ← ガード
+  ```
+
+  - 影響行数 `== 0` → **在庫不足（or 競合負け）** として注文失敗。
+  - InnoDB が対象行に排他ロックを取り**同時減算は直列化**、`AND qty >= :n` で**売り越し不可**。**`version` 列・`SELECT ... FOR UPDATE`・リトライループは不要**。MyBatis は `update()` の戻り値（affected rows）で判定。
+- 注文確定は **`@Transactional`** で「注文ヘッダ＋明細＋在庫減算」を **all-or-nothing**。1品でも不足なら全ロールバック。
+- カート複数商品は **`item_id` 昇順など固定順で減算**し、同時多品注文どうしの**デッドロックを回避**。
+- 分離レベルは MySQL 既定（REPEATABLE READ）でよい。減算の正しさはガード付き UPDATE の行ロックで担保し、分離レベル依存にしない。
+
+### 4.2 編集系エンティティの後勝ち防止＝`version` 楽観ロック
+
+- **更新が発生するエンティティ表**に `version BIGINT NOT NULL DEFAULT 0` を持たせる。
+- 更新: `UPDATE t SET ..., version = version + 1 WHERE pk = :id AND version = :readVersion;` → 影響行数 `== 0` は競合 → **HTTP 409 Conflict** で最新を再読込させる。
+- MyBatis に JPA `@Version` 相当は無いので **affected rows を自前チェック**（or MyBatis-Plus `OptimisticLockerInnerInterceptor`）。読込時に `version` を返し、更新要求で往復させる。
+
+### 4.3 標準列との関係（どの表に何を付けるか）
+
+- **WHO 6列**（§2）は**全業務表**。
+- **`version`** は**更新が発生するエンティティ表に追加**する。**純追記表**（注文明細・履歴・ログ等）や **migration 管理の `m_code`** は不要。
+- **在庫表**は主機構が §4.1 のガード付き減算のため **`version` は必須でない**（他の更新経路も楽観ロックで守るなら付けてもよい）。
+
+> tie-in: **SBD-2**（数量・合計・所有者などはサーバ権威で決定）／**SBD-14**（注文作成＝状態変更を監査）と一体で担保。並行性 AC（例「二重発注でも売り越さない」「在庫不足で注文失敗」）は本節を根拠に PO が Story の AC 化する。
 
 ---
 

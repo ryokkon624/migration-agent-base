@@ -95,6 +95,35 @@ V00_001_015__add_column_theme.sql   ← 例
 
 ---
 
+## 並行制御（在庫 / version 楽観ロック）
+
+決定・背景は [`spec/architecture-conventions.md` §4](../../spec/architecture-conventions.md#4-並行制御d6)。**`updated_at` はロックに使わず監査専用**。
+
+### 在庫引き当て＝ガード付きアトミック減算
+
+- 在庫減算は**ガード付きの単一 UPDATE**で行い、影響行数で在庫不足を判定する（read→act 分離の TOCTOU を避ける）。
+
+  ```sql
+  UPDATE inventory SET qty = qty - #{n}
+   WHERE item_id = #{itemId} AND qty >= #{n};
+  ```
+
+  - affected rows `== 0` → 在庫不足（or 競合負け）＝注文失敗。`version` 列・`SELECT ... FOR UPDATE` は不要。
+  - 注文確定は `@Transactional` で 注文＋明細＋在庫減算を all-or-nothing。複数商品は `item_id` 昇順など**固定順で減算**しデッドロック回避。
+
+### 編集系エンティティ＝`version` 楽観ロック
+
+- **更新が発生するエンティティ表**には、WHO 6列に加えて **`version BIGINT NOT NULL DEFAULT 0`** を付ける（列は WHO の前・業務カラムの末尾あたり）。
+
+  ```sql
+  , version BIGINT NOT NULL DEFAULT 0 COMMENT '楽観ロック用バージョン'
+  ```
+
+- 更新 SQL は必ず `SET ..., version = version + 1 WHERE pk = #{id} AND version = #{version}`。affected rows `== 0` は競合 → アプリは **409 Conflict** を返す（MyBatis に `@Version` 相当は無いので affected rows を自前チェック）。
+- **付けない表**: 純追記表（注文明細・履歴・ログ）、migration 管理の `m_code`。**在庫表**はガード付き減算が主機構のため必須ではない。
+
+---
+
 ## m_code（コードマスター）
 
 ### 目的
@@ -276,7 +305,7 @@ ALTER TABLE t_order ADD COLUMN ship_note VARCHAR(255) NULL AFTER status_code;
 
 ### 新規テーブル追加
 
-1. `flyway/sql/` に CREATE TABLE SQL を追加（**WHO カラム6列を末尾に付与**。m_code `0012`/enum 追加は不要）
+1. `flyway/sql/` に CREATE TABLE SQL を追加（**WHO カラム6列を末尾に付与**。**更新が発生するエンティティ表は `version` 列も付与**＝「並行制御」参照。m_code `0012`/enum 追加は不要）
 2. `generatorConfig.xml` に `<table>` 要素を追加
 3. `jpetstore-database` で `./gradlew flywayClean && ./gradlew flywayMigrate && ./gradlew seedDevData`
 4. `jpetstore-backend` で `rm -rf src/main/resources/mapper/generated`
