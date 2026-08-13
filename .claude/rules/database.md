@@ -50,7 +50,7 @@ docker compose down     # 停止
 
 ### ローカル開発環境での適用手順
 
-開発環境では `seedDevData` を常時適用しているため、`flywayMigrate` 単体では新規マイグレーションを適用できない（sql-test のバージョンと競合するため）。**ローカルでは必ず以下の順番で実行すること。**
+`flyway/sql-test` は repeatable migration（`R__`）で、`seedDevData` は `flyway/sql` と `flyway/sql-test` の両ロケーションを適用する（build.gradle 参照）。一度 `seedDevData` を適用した DB に `flywayMigrate`（`flyway/sql` 単体）を実行すると、履歴にある repeatable が現在のロケーションから解決できず validate が失敗し得る。**ローカルでは必ず以下の順番で実行して状態をそろえること。**
 
 ```bash
 ./gradlew flywayClean
@@ -62,6 +62,8 @@ docker compose down     # 停止
 
 ## マイグレーションファイル命名規則
 
+### `flyway/sql`（本番相当）＝ versioned migration（`V__`）
+
 ```
 V00_001_015__add_column_theme.sql   ← 例
 ```
@@ -69,6 +71,15 @@ V00_001_015__add_column_theme.sql   ← 例
 - バージョン番号は `flyway/sql` 内の最新ファイルの次の番号を採番する
 - 既存ファイルの編集は禁止。必ず新規ファイルを追加する
 - 説明部分（`__` 以降）は英小文字・アンダースコア区切り
+
+### `flyway/sql-test`（開発・テスト用データ）＝ repeatable migration（`R__`）
+
+- **開発・テスト用シードデータは versioned（`V__`）ではなく repeatable（`R__説明.sql`）で作成する。** 命名例: `R__test_user.sql`（`R__test_<entity>.sql`）。
+- **理由**: versioned にすると version 順序に組み込まれ、後から `flyway/sql` 側に（より小さい version の）マイグレーションを追記した際に out-of-order となり migrate が壊れる。repeatable はすべての versioned 適用後に実行される仕様のため、`flyway/sql` の version 採番と衝突・干渉しない。
+- **冪等に書くこと**: repeatable は内容（checksum）が変わるたびに再適用されるため、各 INSERT は「対象行が存在しない場合のみ」に限定する（`INSERT ... SELECT ... WHERE NOT EXISTS (SELECT 1 FROM ...)`）。再実行してもユニーク/PK 制約に違反しないこと。
+- WHO は seed のため `'INIT_DATA'` リテラルを明示する（下記 WHO 規約参照）。
+
+> 背景: Sprint 1 で AC-neg1 フィクスチャを versioned（`V01_000_001`）で採番し out-of-order 破綻の懸念があったため、repeatable（`R__test_user.sql`）へ是正した（Sprint 1 Retro）。
 
 ---
 
