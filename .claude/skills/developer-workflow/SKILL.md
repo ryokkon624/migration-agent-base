@@ -158,6 +158,7 @@ ACや仕様書に書かれていなかった判断・変更・妥協点が発生
    - [ ] **モバイルの場合 - 繰り返し指摘チェック**（`memory/dev/long_term.md` の「コミット前セルフチェック」を参照）:
      - [ ] `ListView.builder` / `ListView` で生成するウィジェットに `ValueKey(item.id)` を付与したか（Sprint 38, 59 で繰り返し指摘）
      - [ ] テストで `find.text('日本語テキスト')` を直接使っていないか（l10nキー経由 `find.text(l10n.keyName)` またはKeyベース検証を使うこと。Sprint 45, 50, 53, 59 で繰り返し指摘）
+   - [ ] **バックエンドで新規エンドポイント・Security設定・`application.yml` の変更を伴う場合**: 実機起動（`./gradlew bootRun`＋必要な環境変数）して主要エンドポイントの疎通（例: `/api/ping`・Swagger UI・`/actuator/health`）と IDE 警告ゼロ（deprecated プロパティ・unknown property・lint）を確認する。自動テスト（Spock/MockMvc）だけでは Spring Security の実際のフィルタ挙動やIDE向けmetadataの過不足を見逃すことがある（Sprint 2 #23 の Sprint Review で指摘8件中6件がこの確認で防げたと判明。実機確認の手順は `backend-conventions` §9 参照）
 2. **`backlog/sprint_XX/sprint_backlog.md` のACをすべて `[x]` に更新する**
 3. コミットする（`git` ルール参照）
 4. **`git push -u origin {ブランチ名}` でリモートにプッシュする**（SMのPR作成に必要）

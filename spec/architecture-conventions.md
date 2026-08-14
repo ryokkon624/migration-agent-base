@@ -139,6 +139,20 @@ polyrepo。GitHub 作成はりょこさん、ローカル雛形は別途用意�
 
 > tie-in: **SBD-2**（数量・合計・所有者などはサーバ権威で決定）／**SBD-14**（注文作成＝状態変更を監査）と一体で担保。並行性 AC（例「二重発注でも売り越さない」「在庫不足で注文失敗」）は本節を根拠に PO が Story の AC 化する。
 
+### 4.4 純追記表の entity/mapper は MyBatis Generator を適用しない（追記専用の制約表現）
+
+**純追記表**（§4.3。注文明細・履歴・監査ログ等、update/delete を業務上許可しないテーブル）の entity/mapper は
+**MyBatis Generator の対象にせず、`infrastructure.mybatis.custom.{entity,mapper}` に手書きで置く**
+（命名は `XxxCustomEntity`/`XxxCustomMapper`。§3.2 の「JOIN結果受け取り用カスタムentity」と同じ置き場所を流用）。
+
+- **理由**: MyBatis Generator を適用すると update/delete 系メソッドまで生成されてしまい、「追記専用」という
+  テーブルの制約をコードで表現できなくなる。生成には稼働中 DB 接続も必要で、書き込み専用の単機能（INSERT のみ）
+  には生成コストが見合わないことが多い。
+- **判例**: `t_audit_log`（#23・AC7 監査ログ基盤）の `AuditLogCustomEntity`/`AuditLogCustomMapper`。
+
+> 通常の業務表（生成CRUD一式が必要）は引き続き §3.2 のとおり MyBatis Generator を使う。この節は
+> **純追記表に限った例外規約**であることに注意。
+
 ---
 
 ## 参照
