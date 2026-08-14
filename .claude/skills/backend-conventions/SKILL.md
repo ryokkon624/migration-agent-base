@@ -1,11 +1,16 @@
 ---
 name: backend-conventions
-description: HwHubバックエンド（hw-hub-backend）およびバッチ（hw-hub-batch）の設計規約・実装方針。Javaファイル・Groovyファイル・MyBatisマッパー・Flywayマイグレーションファイルを新規作成・編集するときは必ずこのスキルを参照すること。DDDライク3層構造・ドメインモデル・セキュリティ・テスト方針など、実装の判断に必要な規約をすべてここに集約している。
+description: HwHubバックエンド（hw-hub-backend）およびバッチ（hw-hub-batch）、jpetstore-backendの設計規約・実装方針。Javaファイル・Groovyファイル・MyBatisマッパー・Flywayマイグレーションファイルを新規作成・編集するときは必ずこのスキルを参照すること。DDDライク3層構造・ドメインモデル・セキュリティ・テスト方針など、実装の判断に必要な規約をすべてここに集約している。
 ---
 
 # Backend Conventions
 
-hw-hub-backend・hw-hub-batchの設計規約・実装方針。
+hw-hub-backend・hw-hub-batch・jpetstore-backendの設計規約・実装方針。
+
+> §1〜§8 はhw-hub由来（ベースパッケージ`com.hwhub.backend`の実例を含む）。**§9はjpetstore-backend固有**
+> （Spring Boot 4.x／ベースパッケージ`com.example.jpetstore.backend`）。DDDライク3層・`reconstruct()`パターン
+> 等の思想はプロジェクト共通だが、実例のパッケージ名は各プロジェクトの実態に読み替えること
+> （CLAUDE.md記載のとおりPhase 3実装時にJIT調整中）。
 
 ---
 
@@ -303,3 +308,74 @@ def "タスクのステータス更新"() {
 - EventBridge Scheduler → ECS Fargate の単発タスクとして実行される
 - Dockerfileはシングルステージ（JARをCOPYするだけ）
 - backendのマルチステージとは異なるため注意
+
+---
+
+## 9. jpetstore-backend 固有の注意事項（Spring Boot 4.x / Spring Security 7）
+
+### Spring Boot 4.1 の自動構成 ObjectMapper は Jackson 3系
+
+Spring管理の `ObjectMapper` を注入する場合は **`tools.jackson.databind.ObjectMapper`**（Jackson 3系）を使う。
+`com.fasterxml.jackson.databind.ObjectMapper`（Jackson 2系）は Spring Bean 未登録で
+`NoSuchBeanDefinitionException` になる。
+
+```java
+// ✅ 正しい（Spring Boot 4.1）
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException; // 例外もJackson3系（非チェック例外）
+
+// ❌ Bean未登録でエラーになる
+import com.fasterxml.jackson.databind.ObjectMapper;
+```
+
+Jackson 2系（`com.fasterxml.jackson.*`）はjjwt-jackson/springdoc等サードパーティの内部利用のみで
+クラスパスに残存する（`@JsonProperty`等のannotationパッケージはJackson3でも`com.fasterxml.jackson.annotation`
+のまま変わらない点に注意）。
+
+> **背景（Sprint 2 #23）**: convention-reviewerがJackson2前提で`tools.jackson.*` importを誤指摘（偽陽性）。
+> `./gradlew dependencies`の依存木で`spring-boot-starter-jackson → tools.jackson.core:jackson-databind`
+> （Jackson3）が実際に解決されることを確認して却下した。Boot 4.1以降のプロジェクトはこの前提で判断すること。
+
+### JWTのaccess/refreshは `typ` claimで型を区別する（secure-by-default）
+
+access/refreshトークンをTTL以外同一構造で発行すると、種別を取り違えて悪用されうる
+（例: refresh tokenをaccess token用Cookieに入れると保護エンドポイントに直接認証できてしまう）。
+
+- 発行時に `typ` claim（`"access"`/`"refresh"`）を埋め込む
+- 検証メソッドを型ごとに分離する（例: `parseAccessToken`/`parseRefreshToken`）。共通ロジックは
+  内部で期待型を受け取り `typ` claimと照合、不一致は検証失敗（`Optional.empty()`等）として扱う
+- 消費箇所（認証フィルタ・refresh処理等）はそれぞれ対応する検証メソッドのみを呼ぶ
+
+> **背景（Sprint 2 #23・SecReviewer指摘）**: `JwtService.buildToken`がaccess/refreshで完全同一構造・
+> `typ`無しだったため、`jpetstore-backend`の`JwtService`（`parseAccessToken`/`parseRefreshToken`）で対応した。
+
+### 監査ログ等の client_ip は X-Forwarded-For を無条件信頼しない
+
+`X-Forwarded-For`はクライアントが自由に送れるヘッダ。信頼できるリバースプロキシ構成
+（プロキシがヘッダを上書きする設定）が無い限り、既定は **`request.getRemoteAddr()`** を使う。
+XFFを無条件信頼すると偽装により監査証跡・アクセス制御の判断材料が汚染されうる。
+信頼プロキシ配下で運用する場合のXFF採用は、対象プロキシのIPを検証したうえで限定的に拡張する。
+
+> **背景（Sprint 2 #23・SecReviewer指摘）**: `AuditLogRecorder#clientIp`がXFFを無条件信頼していた。
+
+### カスタム（MyBatis Generator非生成）entity/mapperの配置・命名
+
+hw-hub-backendの`infrastructure.mybatis.custom.{entity,mapper}`慣習をjpetstore-backendでも踏襲する。
+
+- 配置: `infrastructure.mybatis.custom.entity` / `infrastructure.mybatis.custom.mapper`
+  （生成物の`infrastructure.mybatis.generated.*`とは明確に分離）
+- 命名: `XxxCustomEntity` / `XxxCustomMapper`
+- 実装方式: 動的条件の無い単純なCRUD（1SQL・パラメータもシンプル）は `@Insert`/`@Select`等の
+  アノテーションで簡潔に書いてよい。複雑な動的SQL・JOINはXMLマッパー（`resources/mapper/custom/*.xml`）
+  を使う（hw-hub-backendの既存custom mapperはXML中心）
+- **純追記表**（update/delete を業務上許可しないテーブル。例: 監査ログ）の entity/mapper は
+  **MyBatis Generatorの対象にしない**（意図しないupdate/delete系メソッドが生成されてしまうため）。
+  詳細・アーキ上の位置づけは `spec/architecture-conventions.md` §4.4 参照
+
+> **背景（Sprint 2 #23）**: `AuditLogEntity`/`AuditLogMapper`（当初`infrastructure.audit`直下に手書き）を、
+> ユーザーからの配置に関する質問を受けて`infrastructure.mybatis.custom.{entity,mapper}`へ
+> `AuditLogCustomEntity`/`AuditLogCustomMapper`として改名移設した。
+
+> Swagger UIのpermitAll・`server.error.*`→`spring.web.error.*`・依存更新後のIDE lint staleness は
+> Sprint 2で初出（1回目）のため、2回ルールに従い本Skillには未反映（`memory/dev/long_term.md`
+> 「技術的なハマりポイント」参照）。2回目の発生でSkill昇格を検討する。

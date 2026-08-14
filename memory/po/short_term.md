@@ -1,17 +1,19 @@
 # PO 短期記憶（今スプリント）
 
-## Sprint 1 Retro（2026-08-13）で棚卸し済み
+## Sprint 2 Retro（2026-08-14）で棚卸し済み
 
-前回Retro以前のRefinement詳細（Phase2 specからのバックログ起票・24 Issue起票・#18〜24 Ready昇格＋SP付与・段階的ローカライズ判断・質問ログ5件 等）はSprint 1 Retroで棚卸し済み。要点は `memory/po/long_term.md`（質問傾向）と GitHub Issues / Project #2（バックログ本体）側に反映済み。
+Sprint 1 Retro以降の文脈（Sprint2計画フェーズでのDEV→ユーザー質問6件〔#23 スコープ境界・実証手段・監査ログ範囲・秘密管理・他repo Flyway適用・jjwt版〕）はSprint 2 Retroで棚卸し済み。要点は `memory/po/long_term.md`（質問傾向へ追記・先回りチェックリストへ正式昇格・意思決定ログ追記）に反映済み。GitHub Issue（#23）本体への反映は次回Refinementでユーザーに確認のうえ実施する。
 
 ### 未解決の判断事項
 
 - 確認メール（#8備考）を独立の将来Feature Issue として NotReady で track するか（現状は #8 備考に記録のみ）。
+- #23のAC/備考への先回り明記（スコープ境界・実証手段・監査ログ範囲・秘密管理方針・他repo連携方式）は次回Refinementでユーザーに確認のうえ反映する。
 
 ### 次回PO稼働時のTODO
 
 - #1〜#17 の Ready昇格＋SP付与（次バッチ）。
 - 確認メール（#8備考）の将来Feature化（Issue起票 or ドロップ）の判断。
+- #23のAC/備考へ、Sprint2質問ログで判明した5観点（スコープ境界・実証手段・監査ログ範囲・秘密管理・他repo連携）を反映。
 - 振る舞いを変える新判断が出たら `spec/intended-diff-ledger.md` に追記。
 
 ## SMやDevから受けた質問ログ
