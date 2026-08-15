@@ -403,8 +403,35 @@ hw-hub-backendの`infrastructure.mybatis.custom.{entity,mapper}`慣習をjpetsto
 
 > **背景（Sprint 3 #18）**: `jpetstore-backend`の`JdbcUserDetailsService`で採用。
 
+### 本人スコープ（所有者一致）認可は `OwnershipAuthorizationService` に集約する
+
+ドメイン固有のリソース（注文・アカウント等）への操作を「呼び出し元本人のリソースか」で認可する場合は、
+`domain.security.OwnershipAuthorizationService#assertOwner(Long resourceOwnerUserId)` を使う。
+
+- **`resourceOwnerUserId`は必ずサーバー側で解決した値を渡す**（対象リソースIDからRepository等で解決した
+  真の所有者userId）。リクエストのparam/body（例: `?userId=`）をそのまま渡してはならない
+  （hw-hub-backend §5「リソース認可でクライアント入力のhouseholdIdを信頼しない」と同じ思想＝IDOR防止）
+- 判定は`CurrentUserProvider`のみをidentity源とする。不一致・未認証は`AccessDeniedException`を投げ、
+  既存の`GlobalExceptionHandler`が403へ正規化しつつ監査ログに記録する（新規のエラーハンドリングは不要）
+- ADMINロール等の別経路が必要な場合は`@PreAuthorize("hasRole('ADMIN')")`と併用してよい
+  （`OwnershipAuthorizationService`自体はUSERプリンシパルの本人性のみを扱う薄い部品）
+
+```java
+// OK: リソースIDからサーバー側で所有者を解決してから検証する
+OrderModel order = orderRepository.findById(orderId);
+ownershipAuthorizationService.assertOwner(order.getUserId());
+
+// NG: クライアント入力のuserIdをそのまま検証に使う（IDOR）
+ownershipAuthorizationService.assertOwner(request.getUserId());
+```
+
+> **背景（Sprint 4 #21）**: 認可土台として`OwnershipAuthorizationService`（`domain.security`）を新設。
+> 本Storyでは対象ドメインリソースが未実装のため`SecuredPingController#myResource`での実証にとどめ、
+> 各ドメインへの適用（リソースIDから所有者を解決する処理）は各Storyへ委譲した。
+
 > Swagger UIのpermitAll・`server.error.*`→`spring.web.error.*`・依存更新後のIDE lint staleness・
 > `@RestControllerAdvice`のcatch-allがフレームワーク例外（`HttpRequestMethodNotSupportedException`等）を
-> 意図しないステータスに丸める問題・CSRFトークンのconsume-then-regenerate挙動は、いずれも初出（1回目）
-> のため、2回ルールに従い本Skillには未反映（`memory/dev/long_term.md`「技術的なハマりポイント」参照）。
-> 2回目の発生でSkill昇格を検討する。
+> 意図しないステータスに丸める問題・CSRFトークンのconsume-then-regenerate挙動・セキュリティ上意味のある
+> 日時比較はDB側`NOW(6)`で行うべき問題（Sprint4）・`ON DUPLICATE KEY UPDATE`のSET句左→右評価順依存の
+> 二重計算（Sprint4）は、いずれも初出（1回目）のため、2回ルールに従い本Skillには未反映
+> （`memory/dev/long_term.md`「技術的なハマりポイント」参照）。2回目の発生でSkill昇格を検討する。

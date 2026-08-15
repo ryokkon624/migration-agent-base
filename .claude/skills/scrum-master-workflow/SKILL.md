@@ -273,7 +273,7 @@ SendMessageでDEVに以下を伝える：
 全レビュアー「指摘なし」確認後、**SMが直接 PR を作成する**（DEV再起動不要）。
 
 > **複数Issue実装時は1ブランチにまとめる方針（Sprint 55確立）**のため、PR漏れは原則発生しない。
-> ただし既存ブランチ継続など特殊ケースで複数ブランチが存在する場合は、`git log main...[各ブランチ名] --oneline` を全ブランチに実行して未マージコミットの漏れを確認してからPRを作成すること（Sprint 55でスタック型ブランチの独立ブランチがPR漏れになった実績）。
+> ただし既存ブランチ継続や cross-repo など複数ブランチが存在する場合は、`git log origin/main...[各ブランチ名] --oneline` を全ブランチに実行して未マージコミットの漏れを確認してからPRを作成すること（Sprint 55でスタック型ブランチの独立ブランチがPR漏れになった実績）。**基準は origin/main**（ローカル main が Sprint マージ分未取得で stale な場合があるため・Sprint 4 教訓）。
 
 > ⚠️ **既存ブランチ継続時（前スプリントから同一ブランチを使い続けている場合）は新規PRを作成しない。**
 > 既存PRにコミットが自動追従しているため、既存PRのbodyをPATCHで更新してSprint N分の `closes` 行を追加する。
@@ -283,7 +283,7 @@ SendMessageでDEVに以下を伝える：
 Write ツールで `C:/work/claude/pr_[リポジトリ]_[PR番号].json` に更新後のbody全体を書き出す：
 ```json
 {
-  "body": "[既存のbody全文]\ncloses ryokkon624/hw-hub-manage#N"
+  "body": "[既存のbody全文]\ncloses ryokkon624/jpetstore-manage#N"
 }
 ```
 
@@ -292,7 +292,7 @@ curl -s -X PATCH \
   -H "Authorization: Bearer $GITHUB_PERSONAL_ACCESS_TOKEN" \
   -H "Accept: application/vnd.github+json" \
   -H "Content-Type: application/json" \
-  "https://api.github.com/repos/ryokkon624/hw-hub-[リポジトリ名]/pulls/[PR番号]" \
+  "https://api.github.com/repos/ryokkon624/jpetstore-[リポジトリ名]/pulls/[PR番号]" \
   --data-binary "@C:/work/claude/pr_[リポジトリ]_[PR番号].json"
 ```
 
@@ -302,17 +302,22 @@ curl -s -X PATCH \
 
 **【新規PRを作成する場合】ブランチが属するリポジトリのディレクトリで実行する：**
 
-| ブランチのprefix例 | 実行ディレクトリ |
-|---|---|
-| フロントエンド変更 | `C:\work\hw-hub\hw-hub-frontend` |
-| バックエンド変更 | `C:\work\hw-hub\hw-hub-backend` |
+| 変更対象 | 実行ディレクトリ | API リポジトリ名 |
+|---|---|---|
+| バックエンド | `C:\work\java-migration\jpetstore-backend` | `jpetstore-backend` |
+| フロントエンド | `C:\work\java-migration\jpetstore-frontend` | `jpetstore-frontend` |
+| データベース | `C:\work\java-migration\jpetstore-database` | `jpetstore-database` |
 
-複数リポジトリにまたがる場合は、それぞれのリポジトリで同じ手順を実施する。
+> **cross-repo（複数リポジトリにまたがる実装・Sprint 3/4 実績で確立）**:
+> - 各リポジトリに**同名ブランチ＋各リポジトリで PR** を作成する（同じブランチ名を全 repo で使う）。
+> - **Issue の `closes` は主リポジトリ（通常 backend）の PR に集約**し、従リポジトリ（database 等）の PR body は `Related: ryokkon624/jpetstore-manage#N` に留める（従 PR が先にマージされて Issue が早期クローズするのを避ける）。別 repo の PR マージからでも cross-repo `closes` が機能することは確認済（Sprint 3）。
+> - SM は各リポジトリで `git diff origin/main...[ブランチ名] --name-only` を実行して変更ファイルを把握する（ローカル main が stale な場合があるため origin/main 基準で取る・Sprint 4 教訓）。
+> - #20 のロックアウトのように backend が database の Flyway を参照する場合、backend で `./gradlew syncTestSchema` により test resources が同期済であることを確認する。
 
 **gh が使える場合（推奨）:**
 
 ```bash
-cd C:/work/hw-hub/hw-hub-[対象リポジトリ]
+cd C:/work/java-migration/jpetstore-[対象リポジトリ]
 gh pr create \
   --title "[feat|fix|refactor]: [スプリントゴールの概要]" \
   --body "$(cat <<'EOF'
@@ -322,7 +327,7 @@ gh pr create \
 ## Acceptance Criteria
 - [AC一覧（sprint_backlog.md から転記）]
 
-closes ryokkon624/hw-hub-manage#N
+closes ryokkon624/jpetstore-manage#N
 EOF
 )"
 ```
@@ -333,17 +338,16 @@ EOF
 
 ```bash
 # Step 0: 実際のGitHubリポジトリ名を確認する（必須）
-# git remote -v でローカルのリポジトリ名とGitHub上のリポジトリ名が一致しているか確認する
-# hw-hub-knowledge など命名規則が異なるリポジトリが存在するため、APIのURLに使うリポジトリ名は必ずここで確認する
-cd C:/work/hw-hub/hw-hub-[対象リポジトリ]
+# git remote -v で origin URL 末尾のリポジトリ名を確認する（JPetStore は jpetstore-* で命名統一）
+cd C:/work/java-migration/jpetstore-[対象リポジトリ]
 git remote -v
-# → 例: origin  https://github.com/ryokkon624/hw-hub-knowledge.git (fetch)
-# → この場合のAPIリポジトリ名は "hw-hub-knowledge"
+# → 例: origin  https://github.com/ryokkon624/jpetstore-backend.git (fetch)
+# → この場合のAPIリポジトリ名は "jpetstore-backend"
 ```
 
 ```bash
 # Step 1: ブランチをリモートにプッシュ（まだしていない場合）
-cd C:/work/hw-hub/hw-hub-[対象リポジトリ]
+cd C:/work/java-migration/jpetstore-[対象リポジトリ]
 git push -u origin [ブランチ名]
 ```
 
@@ -353,7 +357,7 @@ Write ツールで `C:/work/claude/pr_XX.json` を作成する：
   "title": "feat: [タイトル]",
   "head": "[ブランチ名]",
   "base": "main",
-  "body": "## Summary\n...\n\ncloses ryokkon624/hw-hub-manage#N"
+  "body": "## Summary\n...\n\ncloses ryokkon624/jpetstore-manage#N"
 }
 ```
 
@@ -363,13 +367,13 @@ curl -s -X POST \
   -H "Authorization: Bearer $GITHUB_PERSONAL_ACCESS_TOKEN" \
   -H "Accept: application/vnd.github+json" \
   -H "Content-Type: application/json" \
-  "https://api.github.com/repos/ryokkon624/hw-hub-[リポジトリ名]/pulls" \
+  "https://api.github.com/repos/ryokkon624/jpetstore-[リポジトリ名]/pulls" \
   --data-binary "@C:/work/claude/pr_XX.json"
 ```
 
 レスポンスの `html_url` を PR URL として使用する。
 
-> **【必須】** PR本文に `closes ryokkon624/hw-hub-manage#N` を含める（Issueごとに1行）。
+> **【必須】** PR本文に `closes ryokkon624/jpetstore-manage#N` を含める（Issueごとに1行）。
 > マージ時にGitHub Projects側のIssueが自動クローズされる。
 > Issueが複数ある場合は `closes` を複数行記載する。
 
@@ -509,7 +513,7 @@ Sprint Review ファイルをブラウザで開いて動作確認をお願いし
    - 回避すること（Avoid）
    - チャレンジすること（Challenge）
 
-6. ユーザーの指摘を GitHub REST API（curl）で `ryokkon624/hw-hub-manage` にIssueを作成する（`github-issues` スキル参照）
+6. ユーザーの指摘を GitHub REST API（curl）で `ryokkon624/jpetstore-manage` にIssueを作成する（`github-issues` スキル参照）
    - **起票前に必ず `mcp__github__list_issues`（state: open）で既存Issueのタイトルを確認し、同内容が存在しないことを確認してから起票する**（Sprint 34 Retroで2重起票が発生）
    - `github-issues` スキルの手順3に従い、Issue作成（Step 1）→ Projectsへの追加（Step 2）→ ReadyフィールドをDraftに設定（Step 3）まで**SMが行う**
    - Draft→Ready更新・Story Points設定はユーザーが行う（SMは不要）

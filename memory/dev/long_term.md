@@ -9,11 +9,18 @@
   発生スプリント: Sprint1（#22）
 
 ### jpetstore-backend
-Sprint2（#23）・Sprint3（#18/#19）とも実装スプリントを終えたが、3観点レビュー（規約/セキュリティ/パフォーマンス）
-での**指摘は今のところ0件の繰り返しも無し**（Sprint3はレビュー指摘自体が0件だった）。以下の発見はいずれも
-DEV自身がTDD・実機検証中に見つけたもので初出＝1回目のため、2回ルールに従い本セクションではなく「習得したこと」
+Sprint2（#23）・Sprint3（#18/#19）・Sprint4（#21/#20）とも実装スプリントを終えたが、3観点レビュー
+（規約/セキュリティ/パフォーマンス）での**指摘は今のところ0件の繰り返しも無し**（Sprint3はレビュー指摘自体が
+0件、Sprint4は規約/パフォーマンスが0件・セキュリティは非ブロッキング2件）。以下の発見はいずれもDEV自身が
+TDD・実機検証中に見つけたもので初出＝1回目のため、2回ルールに従い本セクションではなく「習得したこと」
 「技術的なハマりポイント」に記録する。ただし一部は参照知識/実装パターンとして初出からSkillへ即時反映した
 （詳細は「Skills更新履歴」）。
+
+Sprint4のセキュリティ非ブロッキング2件（`AuthApplicationService.login`のタイミング副次チャネル／
+ロックアウトのcheck-then-act非原子性）はレビュー指摘そのものではあるが、SMが実コードで検証のうえ
+ユーザー承認を得て「コード修正不要の受容リスク」と判断した設計トレードオフであり、防ぐべき実装ミスの
+再発パターンではないため本セクションでは追跡しない（根拠は「習得したこと」に記録。詳細は
+`backlog/sprint_04/implementation-notes.md`）。
 
 ## 技術的なハマりポイント
 
@@ -62,6 +69,23 @@ DEV自身がTDD・実機検証中に見つけたもので初出＝1回目のた�
   連続する状態変更リクエストのたびに最新の `XSRF-TOKEN` Cookie 値を再取得してヘッダに載せる設計が必要
   （#24 への申し送り事項。`backlog/sprint_03/implementation-notes.md` 参照）。
   発生スプリント: Sprint3（#18、実機疎通確認時に発見）
+- **セキュリティ上意味のある日時比較（ロック期限・有効期限等）はJava側ではなくDB側（`NOW(6)`等）で
+  行うこと。** ロックアウト機能の当初実装（`LoginAttemptCustomEntity`で`lock_until`をJava側に取得し
+  `LocalDateTime.now()`と比較）は、JVM実行環境（JST）とTestcontainers/Docker上のMySQL（UTC）間の
+  クロックスキューによりロック判定が常にfalseになり機能しなかった（IT実行で発覚）。
+  `WHERE lock_until > NOW(6)`のように比較そのものをSQL側（DB自身の時刻基準）で完結させる
+  `LoginAttemptCustomMapper#countActiveLock`に置き換えて解消した。タイムゾーン設定を揃える対症療法
+  ではなく、時刻比較をDB側に寄せる方が環境間のクロックスキューに対して恒久的に頑健。
+  発生スプリント: Sprint4（#20、IT実行で発見）
+- **MySQLの`ON DUPLICATE KEY UPDATE`のSET句は左から右へ評価され、後続の式が同一文内で既に代入済みの
+  列の新しい値を参照できる（ドキュメント化された挙動）。** 単文アトミックな失敗カウンタ更新
+  （`failed_attempt_count = failed_attempt_count + 1, lock_until = IF(...)`）で、`lock_until`の閾値判定式が
+  `failed_attempt_count`のSET句と独立に同じ加算式を再計算していたところ、この評価順の影響で
+  「実際の失敗回数より1回分前倒しでロックする」ズレが生じた（IT実行で発覚）。`lock_until`のSET句を、
+  直前のSET句で更新済みの`failed_attempt_count`（新しい値）をそのまま参照する形に単純化して解消した。
+  複数列を同一`INSERT ... ON DUPLICATE KEY UPDATE`文で更新する際は、この評価順依存の二重計算・
+  ズレに注意する。
+  発生スプリント: Sprint4（#20、IT実行で発見）
 
 ## 習得したこと
 
@@ -114,6 +138,40 @@ DEV自身がTDD・実機検証中に見つけたもので初出＝1回目のた�
   （login/logout=backend）のように、1 Story が DB seed とそれを消費するロジックの両方にまたがる
   場合の標準的な進め方として確立（計画段階でSMが事前に線引きを明示していたため実装時の迷いは無かった）。
   発生スプリント: Sprint3（#18/#19。初のcross-repo実装スプリント）
+- **列挙耐性のあるログインロックアウトは、ロック状態を「username文字列キーの対称テーブル」で持ち、
+  既存のダミーbcryptタイミング均等化（`DaoAuthenticationProvider`の未知ユーザー扱い）と組み合わせることで、
+  タイミングサイドチャネルを列挙オラクル化させずに設計できる。** `t_login_attempt`のPKをFK無しの
+  `username VARCHAR`にし失敗時は実在/非実在を問わず対称に行を作ることで、ロック判定（高速SELECT）が
+  `authenticate()`（低速bcrypt）より前に走ってもタイミングが割れる軸は「ロック中(速い) vs 非ロック(遅い)」
+  のみに閉じ、「ユーザー存在 vs 非存在」の軸とは直交する（ロック状態は攻撃者自身が誘発するもので新情報を
+  与えない）。SecReviewerのレビューで構造的検証を受け、SMがコード修正不要の受容リスクと判断した
+  （`backlog/sprint_04/implementation-notes.md` Finding 1）。
+  発生スプリント: Sprint4（#20）
+- **既存の一律401経路（`BadCredentialsException`→`GlobalExceptionHandler`）は、認証ロジックそのものを
+  変更しなくても前段ゲート（ロックアウト等）から同じ例外型をthrowして再利用できる。** ロックアウトの
+  `assertNotLocked`は独自の例外型・専用ハンドラを新設せず、既存の誤資格ログインと同一の
+  `BadCredentialsException`をauthenticate前に短絡してthrowする設計にした。これにより一律401（SBD-6）・
+  監査記録（SBD-14）の両方が新規コードなしで自動的に適用される（`GlobalExceptionHandler`・監査経路は不変
+  のまま）。認証フローに前段ゲートを追加する際は、新しい失敗系統を作るより既存の失敗経路に正しく合流させる
+  方がsecure-by-defaultの担保（一律応答・監査モレなし）を機械的に維持できる。
+  発生スプリント: Sprint4（#20）
+- **チェック→書き込みが別文（非原子）なゲートは、競合時の失敗モードが「フェイルセーフ（制限が伸びるだけ）」
+  であると確認できれば、悲観ロック等で原子性を強制しなくてよいと判断できる。** `assertNotLocked`と
+  `recordFailure`が別SQL文のため高並列バーストで`lock_until`が都度再計算されロック期限が後ろ倒しに
+  延長され得るが、これはbypass不可（ロックが緩む方向には振れず延びる方向にのみ振れる）フェイルセーフな
+  非原子性であり、DoSモデルの許容範囲内としてSMが受容した（`backlog/sprint_04/implementation-notes.md`
+  Finding 2）。原子性を厳密に守るための悲観ロック導入は軽量設計を損なうため見送った。将来同種の
+  スロットリング/カウンタ機構を非原子ゲートで実装する際、失敗モードの向き（fail-safe/fail-open）を
+  先に評価する判断軸として使える。
+  発生スプリント: Sprint4（#20）
+- **本人スコープ認可の再利用可能ガード（`OwnershipAuthorizationService`）は`CurrentUserProvider`起点で
+  「リソース所有者userId == 現在プリンシパルuserId」のみを判定する薄い部品とし、リソースIDから所有者を
+  DBで解決する処理は各ドメインStory側に委ねる設計にした。** #21実証（`SecuredPingController#myResource`）
+  では対象ドメイン未実装のためパス変数を「サーバー側解決済みの所有者」とみなす形にとどめ、過剰実装を
+  回避した。今後実ドメインへ適用するStoryでは、「リソースIDから所有者を解決する」処理（ドメイン固有）と
+  「解決済み所有者を`CurrentUserProvider`と突き合わせる」処理（`OwnershipAuthorizationService`・再利用）を
+  分離する形で組み込む（`backend-conventions` §9へ即時反映済み。詳細は「Skills更新履歴」）。
+  発生スプリント: Sprint4（#21）
 
 ## Skills更新履歴
 
@@ -151,7 +209,26 @@ DEV自身がTDD・実機検証中に見つけたもので初出＝1回目のた�
     ではないため。いずれも long_term.md「技術的なハマりポイント」に留めた）
 - `#skills-changelog` へ `[DEV]` で投稿済み。
 
+### Sprint 4（#21/#20）
+
+- **`backend-conventions`**: `## 9. jpetstore-backend 固有の注意事項` に
+  「本人スコープ（所有者一致）認可は `OwnershipAuthorizationService` に集約する」を新設し、
+  `assertOwner(Long resourceOwnerUserId)` の使い方（呼び出し元は対象リソースIDからサーバー側で解決した
+  真の所有者userIdを渡す・クライアント入力をそのまま渡さない＝IDOR防止）を追記した。
+  **2回ルールの対象外（即時反映）**: 再発防止のためのチェックリスト項目ではなく、#21で新設した
+  再利用可能コンポーネントを今後のドメインStory（各Story側で対象リソースへ適用）が正しく使うために
+  必要な参照知識・実装パターンのため（hw-hub-backend §5の「リソース認可でクライアント入力の
+  householdIdを信頼しない」と同じ位置づけ）。
+- **`backend-conventions`へ反映しなかったもの**: 実装中に発見した2件の技術的ハマりポイント
+  （日時比較はDB側`NOW(6)`で行う／`ON DUPLICATE KEY UPDATE`のSET句左→右評価順依存の二重計算）は
+  「注意すれば防げる系」の初出（1回目）のため、2回ルールに従い今回はSkillに反映せず
+  `memory/dev/long_term.md`「技術的なハマりポイント」に留めた。Sprint4のセキュリティレビュー
+  非ブロッキング2件（受容リスク）も同様にチェックリスト化はせず「習得したこと」に設計判断の根拠として
+  記録した。
+- `#skills-changelog` へ `[DEV]` で投稿済み。
+
 ## 卒業済みルール
 
 （該当なし。棚卸し対象となるルールが直近15スプリント基準に達していない。
-  jpetstore-backendはSprint2・3の2スプリントのみ、jpetstore-databaseもSprint1・3の実装2スプリントのみのため対象外）
+  jpetstore-backendはSprint2・3・4の3スプリントのみ、jpetstore-databaseもSprint1・3の実装2スプリントのみ
+  のため対象外。Sprint4 Retroでも棚卸しを実施したが同様の理由で卒業候補なし）
