@@ -1,8 +1,26 @@
 # DEV 短期記憶
 
-## Sprint 6 / #1 E1 カタログ階層閲覧（承認済み実装方針・2026-08-16）
+## Sprint 6 / #1 E1 カタログ階層閲覧（実装完了・2026-08-16）
 
-初のドメイン機能。3-repo cross-repo。計画=Opus / 実装=Sonnet。**実装はSonnet再起動後**（本記録時点で未着手）。
+初のドメイン機能。3-repo cross-repo。計画=Opus / 実装=Sonnet。**実装完了**（`feature/1-catalog-browsing`を3 repoに作成しコミット済み: database 619ee95 / backend 653c2ae / frontend 47f27e0(closes #1)）。
+DoD確認済み: database schema/seedテストgreen・backend実機起動+主要EP疎通+spotlessApply+Spock(UT/IT)green・
+frontend npm run build(vue-tsc)+npm run format+Vitest 79件green（AC-neg1含む）。backend+frontend
+実機E2E疎通（bootRun+vite dev、proxy経由）も確認。レビュー待ち。
+
+### 実装で確定した詳細（計画時点からの補足）
+- 在庫m_code: `OUT_OF_STOCK`はcode_value VARCHAR(10)に収まらないため`OUT_STOCK`(9文字)に短縮
+  （Java enum定数名は生成ルールにより`OUT_OF_STOCK`のまま・display_name_en="Out of Stock"由来）。
+  TS/backend双方とも自動生成で一致確認済み。
+- backendのMyBatis XMLマッパーは本プロジェクト初利用。`mybatis.mapper-locations: classpath:mapper/**/*.xml`
+  をapplication.ymlに追加しないと動かない（未設定だとmapperLocations=null相当でXMLが一切ロードされない）。
+- ページングDTOの実クラス名: backend`domain.common.Page`/`PageRequest`(VO)→`presentation.rest.dto.PageResponse<T>`
+  （Application層はPage、Controllerが変換）。frontendは`domain/catalog.ts`の`PageResult<T>`で対応。
+- AC4の405テストは「認証済み+CSRF有」で叩く必要がある（未認証+CSRF無POSTはCSRFフィルタで403になり
+  Spring MVCの405判定まで到達しないため）。
+- i18nの`home.tokens.stockIn/stockLow/stockOut`は`catalog.stockStatus.*`に統合(reconcile)。
+  HomeViewの検証スロットもcatalog側キーを参照するよう変更。
+
+## Sprint 6 / #1（計画メモ・実装完了により参考情報化）
 
 ### ユーザー承認3決定
 1. **残少閾値 N=5**: `qty≤0`=在庫切れ / `0<qty≤5`=残少 / `qty>5`=在庫あり。定数/config化（マジックナンバー禁止）。

@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint 6 Review — #1 カタログ階層閲覧</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #f8f7f5; }
+
+  .page { max-width: 900px; margin: 0 auto; padding: 48px 24px; }
+
+  /* Header */
+  .sprint-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin-bottom: 8px; }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px; }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+  .badge-sprint { background: #e8f0fe; color: #1a56db; }
+  .badge-issue { background: #f0fdf4; color: #166534; }
+  .badge-feature { background: #fdf4ff; color: #7e22ce; }
+  .badge-repo-db { background: #fff7ed; color: #c2410c; }
+  .badge-repo-backend { background: #eff6ff; color: #1d4ed8; }
+  .badge-repo-frontend { background: #f0fdfa; color: #0f766e; }
+
+  /* Sections */
+  section { margin-bottom: 40px; }
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #888; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e5e5e5; }
+
+  /* Problem box */
+  .problem-box { background: #fff8f0; border-left: 3px solid #f59e0b; border-radius: 0 8px 8px 0; padding: 16px 20px; margin-bottom: 16px; }
+  .problem-box .label { font-size: 11px; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .problem-box p { color: #451a03; font-size: 13px; }
+
+  /* Architecture change (3-col: db/backend/frontend) */
+  .arch-grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 8px; }
+  .arch-box { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 14px; }
+  .arch-box .arch-title { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .arch-box.before { border-color: #fca5a5; }
+  .arch-box.after { border-color: #86efac; }
+  .flow-item { font-size: 12px; color: #374151; padding: 3px 0; display: flex; align-items: flex-start; gap: 6px; }
+  .flow-item .dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .dot-red { background: #ef4444; }
+  .dot-green { background: #22c55e; }
+  .repo-heading { font-size: 12px; font-weight: 700; color: #1a1a1a; margin: 18px 0 8px; }
+
+  /* AC cards */
+  .ac-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+  .ac-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid #f0f0f0; }
+  .ac-check { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .ac-check.done { background: #dcfce7; color: #166534; }
+  .ac-num { font-size: 11px; font-weight: 700; color: #888; }
+  .ac-text { font-size: 13px; font-weight: 600; color: #1a1a1a; flex: 1; }
+  .ac-body { padding: 16px 18px; }
+  .ac-body p { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+
+  /* File change */
+  .file-change { margin-bottom: 16px; }
+  .file-name { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; background: #f3f4f6; color: #374151; padding: 5px 10px; border-radius: 4px 4px 0 0; border: 1px solid #e5e5e5; border-bottom: none; display: flex; justify-content: space-between; }
+  .file-name .repo-tag { font-weight: 700; }
+  .diff-stat { color: #888; }
+  .code-block { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.7; background: #1e1e2e; color: #cdd6f4; padding: 14px 16px; border-radius: 0 0 6px 6px; overflow-x: auto; }
+  .code-line { display: flex; }
+  .line-num { color: #45475a; min-width: 32px; user-select: none; }
+  .line-add { background: rgba(166, 227, 161, 0.12); color: #a6e3a1; }
+  .line-del { background: rgba(243, 139, 168, 0.12); color: #f38ba8; }
+  .line-ctx { color: #cdd6f4; }
+  .line-prefix { min-width: 14px; }
+
+  /* Annotation */
+  .annotation { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-size: 12px; color: #78350f; display: flex; gap: 8px; }
+  .annotation-icon { font-size: 14px; flex-shrink: 0; }
+
+  /* Notes (implementation memo) */
+  .note-card { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 14px 18px; margin-bottom: 12px; }
+  .note-card .note-title { font-size: 13px; font-weight: 700; color: #1a1a1a; margin-bottom: 6px; }
+  .note-card p { font-size: 12px; color: #4b5563; }
+  .note-card code { background: #f3f4f6; padding: 1px 5px; border-radius: 3px; font-size: 11px; }
+
+  /* Verify section */
+  .verify-list { list-style: none; }
+  .verify-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; }
+  .verify-item:last-child { border-bottom: none; }
+  .verify-num { width: 22px; height: 22px; background: #e8f0fe; color: #1a56db; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .verify-content { flex: 1; }
+  .verify-content strong { font-size: 13px; color: #1a1a1a; display: block; margin-bottom: 3px; }
+  .verify-content span { font-size: 12px; color: #6b7280; }
+
+  /* Badge preview */
+  .badge-preview { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  .stock-badge { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; border: 1px solid transparent; }
+  .stock-badge.in { background: #dcfce7; color: #166534; border-color: #86efac; }
+  .stock-badge.low { background: #fef9c3; color: #854d0e; border-color: #fde047; }
+  .stock-badge.out { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+
+  /* Scope table */
+  .scope-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .scope-table th { text-align: left; padding: 8px 12px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .scope-table td { padding: 8px 12px; border: 1px solid #e5e5e5; color: #374151; vertical-align: top; }
+  .scope-table tr:hover td { background: #f9fafb; }
+  .tag-repo { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 3px; }
+  .tag-repo.db { background: #fff7ed; color: #c2410c; }
+  .tag-repo.backend { background: #eff6ff; color: #1d4ed8; }
+  .tag-repo.frontend { background: #f0fdfa; color: #0f766e; }
+  .scope-group-header td { background: #f3f4f6; font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="sprint-label">Sprint 6 Review</div>
+  <h1>#1 — [E1] カタログ階層（カテゴリ→商品→在庫アイテム）を<br>閲覧できるようにする</h1>
+  <div class="meta">
+    <span class="badge badge-sprint">Sprint 6</span>
+    <span class="badge badge-issue">#1</span>
+    <span class="badge badge-feature">feature</span>
+    <span class="badge badge-repo-db">jpetstore-database</span>
+    <span class="badge badge-repo-backend">jpetstore-backend</span>
+    <span class="badge badge-repo-frontend">jpetstore-frontend</span>
+  </div>
+
+  <!-- Problem / Architecture -->
+  <section>
+    <h2>なぜこの改修が必要だったか</h2>
+    <div class="problem-box">
+      <div class="label">背景</div>
+      <p>本プロジェクト初の「ドメイン機能」Story。これまでの5スプリントは土台（DB/backend認証・認可/frontend土台）のみで、カタログ機能のアプリコードは3リポジトリすべてでゼロだった（DDL・CSS部品・APIクライアント等の「載せる先」は既に整備済み）。レガシー（Struts1 JSP・セッション保持ページング・<code>escapeXml="false"</code>で<code>product.description</code>を生描画）を、REST API＋Vue3 SPAへ作り替える。</p>
+    </div>
+
+    <div class="repo-heading">jpetstore-database</div>
+    <div class="arch-grid3">
+      <div class="arch-box before">
+        <div class="arch-title">改修前</div>
+        <div class="flow-item"><span class="dot dot-red"></span>DDL(#22)のみ、カタログseedが0件</div>
+        <div class="flow-item"><span class="dot dot-red"></span>在庫ステータスの区分値マスタなし</div>
+      </div>
+      <div class="arch-box after">
+        <div class="arch-title">改修後</div>
+        <div class="flow-item"><span class="dot dot-green"></span>category5/product16/item28/inventory28を[L2]旧同値でFK順投入</div>
+        <div class="flow-item"><span class="dot dot-green"></span>在庫ステータスをm_code区分値として新規登録(code_type=0003)</div>
+      </div>
+    </div>
+
+    <div class="repo-heading">jpetstore-backend</div>
+    <div class="arch-grid3">
+      <div class="arch-box before">
+        <div class="arch-title">改修前</div>
+        <div class="flow-item"><span class="dot dot-red"></span>catalogのdomain/mapper/service/controllerが一切なし</div>
+        <div class="flow-item"><span class="dot dot-red"></span>ページング実装の前例なし</div>
+        <div class="flow-item"><span class="dot dot-red"></span>SecurityConfigにカタログGETの許可なし(401)</div>
+      </div>
+      <div class="arch-box after">
+        <div class="arch-title">改修後</div>
+        <div class="flow-item"><span class="dot dot-green"></span>カスタムXMLマッパー＋Controller 6エンドポイント</div>
+        <div class="flow-item"><span class="dot dot-green"></span><code>Page</code>/<code>PageRequest</code>で1-indexページング先例確立</div>
+        <div class="flow-item"><span class="dot dot-green"></span>GETスコープのpermitAllで未認証到達可(AC4)</div>
+      </div>
+    </div>
+
+    <div class="repo-heading">jpetstore-frontend</div>
+    <div class="arch-grid3">
+      <div class="arch-box before">
+        <div class="arch-title">改修前</div>
+        <div class="flow-item"><span class="dot dot-red"></span>カタログのView/store/apiが一切なし</div>
+        <div class="flow-item"><span class="dot dot-red"></span>Header/Homeの「Catalog」リンクは<code>href="#"</code>ダミー</div>
+        <div class="flow-item"><span class="dot dot-red"></span>商品/カテゴリ画像が未取り込み</div>
+      </div>
+      <div class="arch-box after">
+        <div class="arch-title">改修後</div>
+        <div class="flow-item"><span class="dot dot-green"></span>View4種＋components(既達CSSの薄いラッパー)</div>
+        <div class="flow-item"><span class="dot dot-green"></span><code>/catalog</code>以下の実ルートへ接続</div>
+        <div class="flow-item"><span class="dot dot-green"></span>spec/design/imagesを<code>import.meta.glob(eager)</code>で取り込み</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AC breakdown -->
+  <section>
+    <h2>AC別 実装内容</h2>
+
+    <!-- AC1 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC1</div>
+        <div class="ac-text">カテゴリ一覧／カテゴリ内商品一覧／商品内在庫アイテム一覧／アイテム詳細をREST API＋Vue3 SPAで閲覧できる（JSP廃止）</div>
+      </div>
+      <div class="ac-body">
+        <p>backendに階層3段の参照専用エンドポイントを追加し、frontendにView4種＋公開ルートを追加した。</p>
+        <div class="file-change">
+          <div class="file-name"><span class="repo-tag">[backend]</span><span>presentation/rest/CatalogController.java</span><span class="diff-stat">新規 131行</span></div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">38</span><span class="line-prefix"> </span><span>  @GetMapping("/categories")</span></div>
+            <div class="code-line line-ctx"><span class="line-num">39</span><span class="line-prefix"> </span><span>  public List&lt;CategoryResponse&gt; listCategories() { ... }</span></div>
+            <div class="code-line line-ctx"><span class="line-num">43</span><span class="line-prefix"> </span><span>  @GetMapping("/categories/{categoryId}")</span></div>
+            <div class="code-line line-ctx"><span class="line-num">44</span><span class="line-prefix"> </span><span>  public CategoryResponse getCategory(@PathVariable String categoryId) { ... }</span></div>
+            <div class="code-line line-ctx"><span class="line-num">48</span><span class="line-prefix"> </span><span>  @GetMapping("/categories/{categoryId}/products")</span></div>
+            <div class="code-line line-ctx"><span class="line-num">49</span><span class="line-prefix"> </span><span>  public PageResponse&lt;ProductResponse&gt; listProductsByCategory(...) { ... }</span></div>
+            <div class="code-line line-ctx"><span class="line-num">58</span><span class="line-prefix"> </span><span>  @GetMapping("/products/{productId}")</span></div>
+            <div class="code-line line-ctx"><span class="line-num">63</span><span class="line-prefix"> </span><span>  @GetMapping("/products/{productId}/items")</span></div>
+            <div class="code-line line-ctx"><span class="line-num">73</span><span class="line-prefix"> </span><span>  @GetMapping("/items/{itemId}")</span></div>
+            <div class="code-line line-ctx"><span class="line-num">74</span><span class="line-prefix"> </span><span>  public ItemDetailResponse getItem(@PathVariable String itemId) { ... }</span></div>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name"><span class="repo-tag">[frontend]</span><span>router/index.ts</span><span class="diff-stat">+25</span></div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">32</span><span class="line-prefix">+</span><span>  { path: '/catalog', name: 'catalog', component: CatalogView, ... },</span></div>
+            <div class="code-line line-add"><span class="line-num">38</span><span class="line-prefix">+</span><span>  { path: '/catalog/categories/:categoryId', name: 'catalog-category', component: ProductListView, ... },</span></div>
+            <div class="code-line line-add"><span class="line-num">44</span><span class="line-prefix">+</span><span>  { path: '/catalog/products/:productId', name: 'catalog-product', component: ItemListView, ... },</span></div>
+            <div class="code-line line-add"><span class="line-num">50</span><span class="line-prefix">+</span><span>  { path: '/catalog/items/:itemId', name: 'catalog-item', component: ItemDetailView, ... },</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>URLはbackendのREST階層(<code>/api/categories/{id}/products</code>等)と1:1で対応させ、実装の見通しを揃えた。<code>meta.requiresAuth</code>は付けない(AC4・公開)。</span>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name"><span class="repo-tag">[frontend]</span><span>components/AppHeader.vue</span><span class="diff-stat">+2 / -1</span></div>
+          <div class="code-block">
+            <div class="code-line line-del"><span class="line-num">29</span><span class="line-prefix">-</span><span>&lt;a class="jps-navlink" href="#"&gt;{{ t('app.header.nav.catalog') }}&lt;/a&gt;</span></div>
+            <div class="code-line line-add"><span class="line-num">29</span><span class="line-prefix">+</span><span>&lt;RouterLink to="/catalog" class="jps-navlink" active-class="jps-navlink-active"&gt;</span></div>
+            <div class="code-line line-add"><span class="line-num">30</span><span class="line-prefix">+</span><span>  {{ t('app.header.nav.catalog') }}</span></div>
+            <div class="code-line line-add"><span class="line-num">31</span><span class="line-prefix">+</span><span>&lt;/RouterLink&gt;</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC2 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC2</div>
+        <div class="ac-text">一覧はサーバサイドページング。ページサイズは12件/頁（as-is 4→12）。page/sizeをAPIパラメータで指定、セッション保持ページング廃止</div>
+      </div>
+      <div class="ac-body">
+        <p>backendに1-indexのページングVO/DTOを新設し（#2/#9が再利用する先例規約）、frontendにページ番号ウィンドウ算出のPagination部品を追加した。</p>
+        <div class="file-change">
+          <div class="file-name"><span class="repo-tag">[backend]</span><span>domain/common/PageRequest.java</span><span class="diff-stat">新規 37行</span></div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">10</span><span class="line-prefix"> </span><span>public record PageRequest(int page, int size) {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">12</span><span class="line-prefix"> </span><span>  public static final int DEFAULT_SIZE = 12;</span></div>
+            <div class="code-line line-ctx"><span class="line-num">13</span><span class="line-prefix"> </span><span>  public static final int MAX_SIZE = 100;</span></div>
+            <div class="code-line line-ctx"><span class="line-num">15</span><span class="line-prefix"> </span><span>  public PageRequest {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">16</span><span class="line-prefix"> </span><span>    if (page &lt; 1) { page = 1; }</span></div>
+            <div class="code-line line-ctx"><span class="line-num">19</span><span class="line-prefix"> </span><span>    if (size &lt; 1) { size = DEFAULT_SIZE; }</span></div>
+            <div class="code-line line-ctx"><span class="line-num">22</span><span class="line-prefix"> </span><span>    if (size &gt; MAX_SIZE) { size = MAX_SIZE; }</span></div>
+            <div class="code-line line-ctx"><span class="line-num">25</span><span class="line-prefix"> </span><span>  }</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>[L2]忠実seedだと最大DOGS=6商品・最大product=4itemで全て12未満のため、size=12固定では多頁ページングを実証できない。size をAPIパラメータ化(既定12・cap=100)し、テストは<code>size=2</code>で多頁を強制した(DOGS 6商品→3頁)。不正値は400にせずクランプする。</span>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name"><span class="repo-tag">[frontend]</span><span>utils/pagination.ts</span><span class="diff-stat">新規 33行</span></div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">14</span><span class="line-prefix"> </span><span>export function buildPageWindow(page, totalPages, windowSize = 5): PageWindow {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">19</span><span class="line-prefix"> </span><span>  if (totalPages &lt;= 0) { return { pages: [], hasPrevious: false, ... } }</span></div>
+            <div class="code-line line-ctx"><span class="line-num">23</span><span class="line-prefix"> </span><span>  const half = Math.floor(windowSize / 2)</span></div>
+            <div class="code-line line-ctx"><span class="line-num">24</span><span class="line-prefix"> </span><span>  let start = Math.max(1, page - half)</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC3 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC3</div>
+        <div class="ac-text">アイテム詳細に在庫状況を「在庫あり／残少／在庫切れ」バッジで表示（在庫数の直接露出はしない）</div>
+      </div>
+      <div class="ac-body">
+        <p>在庫ステータスはPOの方針「区分値は基本的にm_codeに登録する」に従いm_code区分値として登録し、閾値算出（N=5）だけを非生成クラスに持たせた。</p>
+        <div class="file-change">
+          <div class="file-name"><span class="repo-tag">[backend]</span><span>domain/catalog/StockStatusCalculator.java</span><span class="diff-stat">新規 30行</span></div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">17</span><span class="line-prefix"> </span><span>  public static final int LOW_STOCK_THRESHOLD = 5;</span></div>
+            <div class="code-line line-ctx"><span class="line-num">21</span><span class="line-prefix"> </span><span>  public static StockStatus of(int quantity) {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">22</span><span class="line-prefix"> </span><span>    if (quantity &lt;= 0) { return StockStatus.OUT_OF_STOCK; }</span></div>
+            <div class="code-line line-ctx"><span class="line-num">25</span><span class="line-prefix"> </span><span>    if (quantity &lt;= LOW_STOCK_THRESHOLD) { return StockStatus.LOW_STOCK; }</span></div>
+            <div class="code-line line-ctx"><span class="line-num">28</span><span class="line-prefix"> </span><span>    return StockStatus.IN_STOCK;</span></div>
+            <div class="code-line line-ctx"><span class="line-num">29</span><span class="line-prefix"> </span><span>  }</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>StockStatus自体は<code>./gradlew generateEnums</code>のm_code生成物(<code>domain/enums/StockStatus.java</code>)。閾値算出ロジックは生成enumに入れると再生成のたびに消えるため、このクラス(非生成)に分離した。</span>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name"><span class="repo-tag">[database]</span><span>flyway/sql/V00_000_009__insert_stock_status_code.sql</span><span class="diff-stat">新規 36行</span></div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">21</span><span class="line-prefix"> </span><span>    ('0003', '在庫ステータス', 'StockStatus', 'IN_STOCK', 'IN_STOCK',</span></div>
+            <div class="code-line line-ctx"><span class="line-num">22</span><span class="line-prefix"> </span><span>     '在庫あり', 'In Stock', ...),</span></div>
+            <div class="code-line line-ctx"><span class="line-num">25</span><span class="line-prefix"> </span><span>    ('0003', '在庫ステータス', 'StockStatus', 'LOW_STOCK', 'LOW_STOCK',</span></div>
+            <div class="code-line line-ctx"><span class="line-num">26</span><span class="line-prefix"> </span><span>     '残少', 'Low Stock', ...),</span></div>
+            <div class="code-line line-ctx"><span class="line-num">29</span><span class="line-prefix"> </span><span>    ('0003', '在庫ステータス', 'StockStatus', 'OUT_STOCK', 'OUT_STOCK',</span></div>
+            <div class="code-line line-ctx"><span class="line-num">30</span><span class="line-prefix"> </span><span>     '在庫切れ', 'Out of Stock', ...);</span></div>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name"><span class="repo-tag">[frontend]</span><span>utils/stockBadge.ts</span><span class="diff-stat">新規 33行</span></div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">15</span><span class="line-prefix"> </span><span>const STOCK_BADGE_MAP: Record&lt;StockStatusCode, StockBadgeInfo&gt; = {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">16</span><span class="line-prefix"> </span><span>  [STOCK_STATUS.IN_STOCK]: { i18nKey: 'catalog.stockStatus.inStock', cssClass: 'badge-jps-stock-in' },</span></div>
+            <div class="code-line line-ctx"><span class="line-num">20</span><span class="line-prefix"> </span><span>  [STOCK_STATUS.LOW_STOCK]: { i18nKey: 'catalog.stockStatus.lowStock', cssClass: 'badge-jps-stock-low' },</span></div>
+            <div class="code-line line-ctx"><span class="line-num">24</span><span class="line-prefix"> </span><span>  [STOCK_STATUS.OUT_OF_STOCK]: { i18nKey: 'catalog.stockStatus.outStock', cssClass: 'badge-jps-stock-out' },</span></div>
+          </div>
+          <div class="badge-preview">
+            <span class="stock-badge in">In Stock</span>
+            <span class="stock-badge low">Low Stock</span>
+            <span class="stock-badge out">Out of Stock</span>
+          </div>
+        </div>
+        <div class="annotation">
+          <span class="annotation-icon">🔒</span>
+          <span><strong>在庫数非露出の確認</strong>: <code>ItemSummaryCustomEntity</code>/<code>ItemDetailCustomEntity</code>の<code>quantity</code>はbackend内部でのみ使い、Controller応答DTO（<code>ItemSummaryResponse</code>/<code>ItemDetailResponse</code>）には<code>stockStatus</code>のみを含める。<code>CatalogControllerSpec</code>で応答JSON文字列に<code>qty</code>/<code>quantity</code>が一切含まれないことを固定した。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC4 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC4</div>
+        <div class="ac-text">カタログは読み取り専用（GETのみ・状態変更なし）。全アクセス未認証で到達可能（公開が正常）</div>
+      </div>
+      <div class="ac-body">
+        <p><code>SecurityConfig</code>にGETメソッドスコープの<code>permitAll</code>を追加した。同一パスへの非GET（POST等）は許可対象外のまま残る。</p>
+        <div class="file-change">
+          <div class="file-name"><span class="repo-tag">[backend]</span><span>config/SecurityConfig.java</span><span class="diff-stat">+11</span></div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">68</span><span class="line-prefix"> </span><span>                    .permitAll()</span></div>
+            <div class="code-line line-add"><span class="line-num">69</span><span class="line-prefix">+</span><span>                    // #1 AC4: カタログは読み取り専用(GETのみ)・全公開(未認証到達可)。</span></div>
+            <div class="code-line line-add"><span class="line-num">72</span><span class="line-prefix">+</span><span>                    .requestMatchers(</span></div>
+            <div class="code-line line-add"><span class="line-num">73</span><span class="line-prefix">+</span><span>                        HttpMethod.GET,</span></div>
+            <div class="code-line line-add"><span class="line-num">74</span><span class="line-prefix">+</span><span>                        "/api/categories", "/api/categories/**",</span></div>
+            <div class="code-line line-add"><span class="line-num">76</span><span class="line-prefix">+</span><span>                        "/api/products/**", "/api/items/**")</span></div>
+            <div class="code-line line-add"><span class="line-num">78</span><span class="line-prefix">+</span><span>                    .permitAll()</span></div>
+            <div class="code-line line-ctx"><span class="line-num">79</span><span class="line-prefix"> </span><span>                    .anyRequest()</span></div>
+            <div class="code-line line-ctx"><span class="line-num">80</span><span class="line-prefix"> </span><span>                    .authenticated())</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>未認証+CSRFトークン無しのPOSTはCSRFフィルタで403（Spring MVCの405判定まで到達しない）。「そもそもPOSTを受理するハンドラが存在しない」ことをより強く示すため、<code>CatalogControllerSpec</code>では「認証済み+CSRF有」でもPOSTが405になることを確認した。</span>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name"><span class="repo-tag">[frontend]</span><span>views/catalog/ItemDetailView.vue</span><span class="diff-stat">L89-94</span></div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">89</span><span class="line-prefix"> </span><span>&lt;button type="button" class="jps-btn jps-btn-primary jps-btn-lg" disabled&gt;</span></div>
+            <div class="code-line line-ctx"><span class="line-num">90</span><span class="line-prefix"> </span><span>  {{ t('catalog.item.addToCart') }}</span></div>
+            <div class="code-line line-ctx"><span class="line-num">92</span><span class="line-prefix"> </span><span>  &gt;({{ t('catalog.item.addToCartComingSoon') }})&lt;/span&gt;</span></div>
+            <div class="code-line line-ctx"><span class="line-num">94</span><span class="line-prefix"> </span><span>&lt;/button&gt;</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>item詳細の「カート追加」は<code>disabled</code>の非活性プレースホルダ。クリックハンドラ・store・API呼び出しは一切無く、状態変更経路がフロント側にも生まれないようにした。実挙動・在庫切れ追加不可（ID-18）は#4へ委譲する。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC5 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC5 (SBD-18)</div>
+        <div class="ac-text">動的出力はフレームワーク既定でエスケープ。product.descriptionはHTMLを継承せずplaintext表示。商品/カテゴリ画像は新規アセットを使用しレガシーの&lt;image&gt;埋め込みHTMLは継承しない</div>
+      </div>
+      <div class="ac-body">
+        <p>seedデータ自体をplaintextで投入し、frontendはテキスト補間のみで描画する。画像はspec/design/imagesの新規アセットを取り込んだ。</p>
+        <div class="file-change">
+          <div class="file-name"><span class="repo-tag">[database]</span><span>flyway/sql/V00_000_008__insert_catalog_master.sql</span><span class="diff-stat">L57-58</span></div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">57</span><span class="line-prefix"> </span><span>    ('FI-SW-01', 'FISH', 'Angelfish', 'Salt Water fish from Australia',</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>レガシーseedは<code>'&lt;image src="../images/fish1.jpg"&gt;Salt Water fish from Australia'</code>のようにHTMLを内包していたが、<code>&lt;image ...&gt;</code>部分を除去しplaintextのみを投入した（承認済の非等価変更・ID-15）。</span>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name"><span class="repo-tag">[frontend]</span><span>views/catalog/ItemDetailView.vue</span><span class="diff-stat">L80-81</span></div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">80</span><span class="line-prefix"> </span><span>&lt;!-- AC5/AC-neg1: 生HTMLを描画しない。productDescriptionは常にテキスト補間で表示する --&gt;</span></div>
+            <div class="code-line line-ctx"><span class="line-num">81</span><span class="line-prefix"> </span><span>&lt;p class="item-detail-view__desc"&gt;{{ catalogStore.currentItem.productDescription }}&lt;/p&gt;</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">🔒</span>
+            <span><code>v-html</code>は本Storyのコードに一切使用していない（レガシーの<code>escapeXml="false"</code>は継承しない）。</span>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name"><span class="repo-tag">[frontend]</span><span>utils/catalogImage.ts</span><span class="diff-stat">新規 30行</span></div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">9</span><span class="line-prefix"> </span><span>const categoryImages = import.meta.glob&lt;string&gt;('../assets/catalog/category_*.png', { eager: true, ... })</span></div>
+            <div class="code-line line-ctx"><span class="line-num">22</span><span class="line-prefix"> </span><span>export function resolveCatalogImage(kind, id): string {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">25</span><span class="line-prefix"> </span><span>  const key = Object.keys(map).find((path) =&gt; path.endsWith(suffix))</span></div>
+            <div class="code-line line-ctx"><span class="line-num">26</span><span class="line-prefix"> </span><span>  return key ? map[key]! : placeholderUrl</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span><code>spec/design/images</code>のcategory5枚/product16枚/placeholder.svgを<code>src/assets/catalog/</code>へ取り込み、<code>import.meta.glob(eager)</code>でバンドル。itemは対応productId画像を流用し、欠落IDはplaceholderへフォールバックする。全<code>&lt;img&gt;</code>に<code>loading="lazy"</code>を付与（Perf）。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- L2 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">[L2] 旧同値</div>
+        <div class="ac-text">categoryX→商品件数／productY→item一覧が旧同値（階層マッピング）。※4→12件/頁はID-20の意図差分</div>
+      </div>
+      <div class="ac-body">
+        <p><code>legacy-jpetstore/db/mysql/jpetstore-mysql-dataload.sql</code>の階層データに忠実に投入し、schema表明テストで件数を固定した。</p>
+        <div class="file-change">
+          <div class="file-name"><span class="repo-tag">[database]</span><span>src/test/groovy/.../CatalogSeedSpec.groovy</span><span class="diff-stat">新規 90行</span></div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">20</span><span class="line-prefix"> </span><span>def "[L2] m_product に16件投入され、カテゴリごとの商品件数が旧同値である"() {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">32</span><span class="line-prefix"> </span><span>  byCategory == [FISH: 4, DOGS: 6, REPTILES: 2, CATS: 2, BIRDS: 2]</span></div>
+            <div class="code-line line-ctx"><span class="line-num">36</span><span class="line-prefix"> </span><span>def "[L2] m_item に28件投入され、K9-RT-02の在庫アイテム数が最多(4件)である"() {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">48</span><span class="line-prefix"> </span><span>  maxProduct.product_id == "K9-RT-02"; maxProduct.cnt == 4</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC-neg1 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC-neg1 (SBD-18)</div>
+        <div class="ac-text">descriptionにHTML/スクリプトを含むデータを与えても、画面に生HTMLが描画されず（plaintext表示）、スクリプトが実行されない</div>
+      </div>
+      <div class="ac-body">
+        <p><code>ItemDetailView</code>にHTML/scriptを含む悪意あるdescriptionを与えても、DOM上に実要素として現れず、文字列がエスケープされてテキスト表示されることを固定した（Viewの例外テスト）。</p>
+        <div class="file-change">
+          <div class="file-name"><span class="repo-tag">[frontend]</span><span>views/catalog/__tests__/ItemDetailView.spec.ts</span><span class="diff-stat">新規 111行</span></div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">57</span><span class="line-prefix"> </span><span>const maliciousDescription =</span></div>
+            <div class="code-line line-ctx"><span class="line-num">58</span><span class="line-prefix"> </span><span>  '&lt;img src=x onerror="window.__xss=true"&gt;&lt;script&gt;window.__xss=true&lt;/script&gt;'</span></div>
+            <div class="code-line line-ctx"><span class="line-num">75</span><span class="line-prefix"> </span><span>expect(globalWindow.__xss).toBeUndefined()</span></div>
+            <div class="code-line line-ctx"><span class="line-num">79</span><span class="line-prefix"> </span><span>expect(wrapper.find('script').exists()).toBe(false)</span></div>
+            <div class="code-line line-ctx"><span class="line-num">80</span><span class="line-prefix"> </span><span>expect(wrapper.findAll('img').every((img) =&gt; img.attributes('onerror') === undefined)).toBe(true)</span></div>
+            <div class="code-line line-ctx"><span class="line-num">85</span><span class="line-prefix"> </span><span>expect(wrapper.html()).toContain('&amp;lt;script&amp;gt;')</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">🔒</span>
+            <span>4段構えで確認: ①グローバルフラグ<code>window.__xss</code>が立たない(スクリプト非実行) ②実DOMに<code>&lt;script&gt;</code>要素が無い ③<code>onerror</code>属性を持つ<code>&lt;img&gt;</code>が無い ④HTMLソース上はエスケープ済み文字列（<code>&amp;lt;script&amp;gt;</code>）として現れる。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Implementation notes -->
+  <section>
+    <h2>実装メモ（仕様外の判断・変更・妥協点）</h2>
+
+    <div class="note-card">
+      <div class="note-title">在庫ステータスのcode_value短縮（OUT_OF_STOCK→OUT_STOCK）</div>
+      <p><code>m_code.code_value</code>はVARCHAR(10)のため、当初想定していた<code>OUT_OF_STOCK</code>(12文字)は収まらない。<code>OUT_STOCK</code>(9文字)に短縮して採用した。Java enum定数名は<code>display_name_en="Out of Stock"</code>由来の自動生成規則により<code>OUT_OF_STOCK</code>のまま保たれるため、コード上の可読性は損なわれない。</p>
+    </div>
+
+    <div class="note-card">
+      <div class="note-title">backendでMyBatis XMLマッパーの mapper-locations を新規追加</div>
+      <p>本プロジェクトで初めてXML形式のカスタムMapperを使用した。<code>mybatis.mapper-locations</code>が未設定だと<code>mapperLocations</code>がnull相当に解決されXMLが一切ロードされないため、<code>application.yml</code>に<code>classpath:mapper/**/*.xml</code>を追加した（既存の<code>generatorConfig.xml</code>の生成先<code>resources/mapper/generated/</code>とも整合する設定）。</p>
+    </div>
+
+    <div class="note-card">
+      <div class="note-title">AC4の405テストは「認証済み+CSRF有」の状態で検証</div>
+      <p>未認証・CSRFトークン無しのPOSTはSpring SecurityのCSRFフィルタが先に403で拒否するため、Spring MVCのメソッド不一致判定(405)まで到達しない。認証済み+CSRF有の状態でもなお405であることを確認することで、「そもそもPOSTを受理するハンドラが存在しない」ことをより強く実証する形にした。</p>
+    </div>
+
+    <div class="note-card">
+      <div class="note-title">i18nキーの重複解消（home.tokens.* → catalog.stockStatus.*）</div>
+      <p>#24で用意されていた「デザイントークン確認スロット」(<code>home.tokens.stockIn/stockLow/stockOut</code>)は、本Storyで新設した<code>catalog.stockStatus.*</code>と表示文言が重複していた。<code>HomeView</code>側を<code>catalog.stockStatus.*</code>参照に統一し、重複キーを整理した（動作・見た目は変更なし）。</p>
+    </div>
+  </section>
+
+  <!-- Verify -->
+  <section>
+    <h2>動作確認ポイント（ユーザー確認用）</h2>
+    <ul class="verify-list">
+      <li class="verify-item">
+        <div class="verify-num">1</div>
+        <div class="verify-content">
+          <strong>トップ画面「Browse Catalog」→カテゴリ一覧→商品一覧→在庫アイテム一覧→アイテム詳細と辿れること</strong>
+          <span>ヘッダーの「Catalog」リンクからも同じ画面に到達できる（未ログインでも表示される）</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">2</div>
+        <div class="verify-content">
+          <strong>Dogsカテゴリの商品一覧で複数頁に分かれてページ送りできること</strong>
+          <span>6商品あるため、頁サイズを小さくすると複数頁になる（開発確認用。本番は12件/頁）</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">3</div>
+        <div class="verify-content">
+          <strong>アイテム詳細で「在庫あり／残少／在庫切れ」のバッジが表示され、具体的な在庫数は画面のどこにも出ていないこと</strong>
+          <span>例: FI-SW-01の商品ページでEST-2が「Low Stock」、EST-3(FI-SW-02)が「Out of Stock」と表示される</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">4</div>
+        <div class="verify-content">
+          <strong>アイテム詳細の説明文が装飾なしのテキストとして表示されること・「Add to Cart」ボタンがクリックできない（非活性）こと</strong>
+          <span>商品画像はカテゴリ/商品ごとの新規アセット画像が表示される（欠けている場合はプレースホルダ画像）</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">5</div>
+        <div class="verify-content">
+          <strong>存在しないカテゴリ/商品/アイテムのURLに直接アクセスするとエラー画面になること</strong>
+          <span>例: <code>/catalog/items/NOPE</code> → 「Something went wrong」表示（内部エラー詳細は出ない）</span>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- Scope -->
+  <section>
+    <h2>改修スコープ確認</h2>
+    <table class="scope-table">
+      <tr>
+        <th>ファイル</th>
+        <th>repo</th>
+        <th>内容</th>
+      </tr>
+      <tr class="scope-group-header"><td colspan="3">データ・区分値</td></tr>
+      <tr>
+        <td><code>flyway/sql/V00_000_008__insert_catalog_master.sql</code></td>
+        <td><span class="tag-repo db">database</span></td>
+        <td>category5/product16/item28/inventory28を新規投入（[L2]旧同値・plaintext・在庫3状態）</td>
+      </tr>
+      <tr>
+        <td><code>flyway/sql/V00_000_009__insert_stock_status_code.sql</code></td>
+        <td><span class="tag-repo db">database</span></td>
+        <td>在庫ステータスm_code新規登録（code_type=0003）</td>
+      </tr>
+      <tr class="scope-group-header"><td colspan="3">backend</td></tr>
+      <tr>
+        <td><code>infrastructure/mybatis/custom/{entity,mapper}/Catalog*</code></td>
+        <td><span class="tag-repo backend">backend</span></td>
+        <td>カスタムXMLマッパー・エンティティ新規（Generator非登録）</td>
+      </tr>
+      <tr>
+        <td><code>domain/catalog/{Category,Product,ItemSummary,ItemDetail,StockStatusCalculator}.java</code></td>
+        <td><span class="tag-repo backend">backend</span></td>
+        <td>参照系ドメインモデル・在庫算出ロジック新規</td>
+      </tr>
+      <tr>
+        <td><code>domain/common/{Page,PageRequest}.java</code></td>
+        <td><span class="tag-repo backend">backend</span></td>
+        <td>1-indexページングVO新規（#2/#9再利用の先例）</td>
+      </tr>
+      <tr>
+        <td><code>application/service/CatalogApplicationService.java</code></td>
+        <td><span class="tag-repo backend">backend</span></td>
+        <td>カタログ閲覧ユースケース新規</td>
+      </tr>
+      <tr>
+        <td><code>presentation/rest/{CatalogController,dto/PageResponse}.java</code></td>
+        <td><span class="tag-repo backend">backend</span></td>
+        <td>REST API 6エンドポイント新規</td>
+      </tr>
+      <tr>
+        <td><code>config/SecurityConfig.java</code></td>
+        <td><span class="tag-repo backend">backend</span></td>
+        <td>GETスコープのpermitAll追加（変更あり）</td>
+      </tr>
+      <tr>
+        <td><code>application.yml</code></td>
+        <td><span class="tag-repo backend">backend</span></td>
+        <td><code>mybatis.mapper-locations</code>追加（変更あり）</td>
+      </tr>
+      <tr class="scope-group-header"><td colspan="3">frontend</td></tr>
+      <tr>
+        <td><code>api/catalogApi.ts</code> / <code>stores/catalog.ts</code> / <code>domain/catalog.ts</code></td>
+        <td><span class="tag-repo frontend">frontend</span></td>
+        <td>APIクライアント・Pinia store・ドメイン型新規</td>
+      </tr>
+      <tr>
+        <td><code>utils/{stockBadge,pagination,catalogImage}.ts</code></td>
+        <td><span class="tag-repo frontend">frontend</span></td>
+        <td>バッジ写像・ページ窓算出・画像解決の純関数新規</td>
+      </tr>
+      <tr>
+        <td><code>views/catalog/*.vue</code>（4画面）／<code>components/catalog/*.vue</code>（5部品）</td>
+        <td><span class="tag-repo frontend">frontend</span></td>
+        <td>カタログ画面・部品新規（CSSは既達クラスの薄いラッパー）</td>
+      </tr>
+      <tr>
+        <td><code>router/index.ts</code></td>
+        <td><span class="tag-repo frontend">frontend</span></td>
+        <td>公開ルート4件追加（変更あり）</td>
+      </tr>
+      <tr>
+        <td><code>components/AppHeader.vue</code> / <code>views/HomeView.vue</code></td>
+        <td><span class="tag-repo frontend">frontend</span></td>
+        <td>ダミーリンクを実ルートへ接続、i18nキー整理（変更あり）</td>
+      </tr>
+      <tr>
+        <td><code>i18n/locales/en.ts</code></td>
+        <td><span class="tag-repo frontend">frontend</span></td>
+        <td><code>catalog.*</code>名前空間新設（変更あり）</td>
+      </tr>
+      <tr>
+        <td><code>assets/catalog/*</code>（画像22点）</td>
+        <td><span class="tag-repo frontend">frontend</span></td>
+        <td>spec/design/imagesから取り込み新規</td>
+      </tr>
+      <tr class="scope-group-header"><td colspan="3">対象外（今回変更していない範囲）</td></tr>
+      <tr>
+        <td>商品検索・複数語LIKE部分一致</td>
+        <td>—</td>
+        <td>#2（F1.2・Sprint7）へ委譲</td>
+      </tr>
+      <tr>
+        <td>不正ID・stale-sessionの集約的404正規化・trace非露出の網羅ハードニング</td>
+        <td>—</td>
+        <td>#3（F1.3・Sprint7）へ委譲（本Storyは最低限のnot-foundのみ）</td>
+      </tr>
+      <tr>
+        <td>カート追加の実挙動・在庫切れ追加不可</td>
+        <td>—</td>
+        <td>#4（E2）へ委譲（本Storyは非活性プレースホルダのみ）</td>
+      </tr>
+    </table>
+  </section>
+
+</div>
+</body>
+</html>
