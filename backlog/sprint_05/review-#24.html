@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint 5 Review — #24 フロントエンド・アーキ土台</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #f8f7f5; }
+
+  .page { max-width: 900px; margin: 0 auto; padding: 48px 24px; }
+
+  /* Header */
+  .sprint-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin-bottom: 8px; }
+  h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px; }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+  .badge-sprint { background: #e8f0fe; color: #1a56db; }
+  .badge-issue { background: #f0fdf4; color: #166534; }
+  .badge-feature { background: #eef2ff; color: #4338ca; }
+  .badge-foundation { background: #fff7ed; color: #c2410c; }
+  .badge-crossrepo { background: #fdf4ff; color: #7e22ce; }
+
+  /* Sections */
+  section { margin-bottom: 40px; }
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #888; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e5e5e5; }
+
+  /* Problem box */
+  .problem-box { background: #fff8f0; border-left: 3px solid #f59e0b; border-radius: 0 8px 8px 0; padding: 16px 20px; margin-bottom: 16px; }
+  .problem-box .label { font-size: 11px; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .problem-box p { color: #451a03; font-size: 13px; }
+
+  /* Architecture change */
+  .arch-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: center; margin-bottom: 8px; }
+  .arch-box { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; }
+  .arch-box .arch-title { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .arch-box.before { border-color: #fca5a5; }
+  .arch-box.after { border-color: #86efac; }
+  .arch-arrow { font-size: 20px; color: #888; text-align: center; }
+  .flow-item { font-size: 12px; color: #374151; padding: 3px 0; display: flex; align-items: flex-start; gap: 6px; }
+  .flow-item .dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .dot-red { background: #ef4444; }
+  .dot-green { background: #22c55e; }
+
+  /* Repo divider */
+  .repo-divider { display: flex; align-items: center; gap: 10px; margin: 28px 0 14px; }
+  .repo-divider .repo-tag { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 999px; }
+  .repo-tag-frontend { background: #eef2ff; color: #4338ca; }
+  .repo-tag-backend { background: #ecfeff; color: #0e7490; }
+  .repo-divider .repo-line { flex: 1; height: 1px; background: #e5e5e5; }
+
+  /* AC cards */
+  .ac-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+  .ac-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid #f0f0f0; }
+  .ac-check { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .ac-check.done { background: #dcfce7; color: #166534; }
+  .ac-check.partial { background: #fef9c3; color: #854d0e; }
+  .ac-num { font-size: 11px; font-weight: 700; color: #888; }
+  .ac-text { font-size: 13px; font-weight: 600; color: #1a1a1a; flex: 1; }
+  .ac-body { padding: 16px 18px; }
+  .ac-body p { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+
+  /* File change */
+  .file-change { margin-bottom: 16px; }
+  .file-name { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; background: #f3f4f6; color: #374151; padding: 5px 10px; border-radius: 4px 4px 0 0; border: 1px solid #e5e5e5; border-bottom: none; display: flex; justify-content: space-between; }
+  .diff-stat { color: #888; }
+  .code-block { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.7; background: #1e1e2e; color: #cdd6f4; padding: 14px 16px; border-radius: 0 0 6px 6px; overflow-x: auto; }
+  .code-line { display: flex; }
+  .line-num { color: #45475a; min-width: 28px; user-select: none; }
+  .line-add { background: rgba(166, 227, 161, 0.12); color: #a6e3a1; }
+  .line-del { background: rgba(243, 139, 168, 0.12); color: #f38ba8; }
+  .line-ctx { color: #cdd6f4; }
+  .line-prefix { min-width: 14px; }
+
+  /* Annotation */
+  .annotation { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-size: 12px; color: #78350f; display: flex; gap: 8px; }
+  .annotation-icon { font-size: 14px; flex-shrink: 0; }
+  .annotation.info { background: #eff6ff; border-color: #bfdbfe; color: #1e40af; }
+
+  /* Note list (implementation-notes.md) */
+  .note-list { list-style: none; }
+  .note-item { padding: 12px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px; color: #374151; }
+  .note-item:last-child { border-bottom: none; }
+  .note-item strong { color: #1a1a1a; }
+
+  /* Verify section */
+  .verify-list { list-style: none; }
+  .verify-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; }
+  .verify-item:last-child { border-bottom: none; }
+  .verify-num { width: 22px; height: 22px; background: #e8f0fe; color: #1a56db; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .verify-content { flex: 1; }
+  .verify-content strong { font-size: 13px; color: #1a1a1a; display: block; margin-bottom: 3px; }
+  .verify-content span { font-size: 12px; color: #6b7280; }
+
+  /* Scope table */
+  .scope-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 20px; }
+  .scope-table th { text-align: left; padding: 8px 12px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .scope-table td { padding: 10px 12px; border: 1px solid #e5e5e5; color: #374151; vertical-align: top; }
+  .scope-table tr:hover td { background: #f9fafb; }
+  .tag-new { font-size: 11px; font-weight: 600; background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 3px; }
+  .tag-changed { font-size: 11px; font-weight: 600; background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 3px; }
+  .tag-unchanged { font-size: 11px; font-weight: 600; background: #f3f4f6; color: #6b7280; padding: 2px 6px; border-radius: 3px; }
+
+  /* Test result grid */
+  .test-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .test-box { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; text-align: center; }
+  .test-box .label { font-size: 11px; color: #888; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+  .test-box .count { font-size: 30px; font-weight: 700; line-height: 1; color: #22c55e; }
+  .test-box .sublabel { font-size: 11px; color: #888; margin-top: 4px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="sprint-label">Sprint 5 Review</div>
+  <h1>#24 — [E6] フロントエンド・アーキ土台<br>（Vue3 SPA / Claude Design / i18n基盤 / 認証UI）</h1>
+  <div class="meta">
+    <span class="badge badge-sprint">Sprint 5</span>
+    <span class="badge badge-issue">#24</span>
+    <span class="badge badge-feature">feature</span>
+    <span class="badge badge-foundation">foundation</span>
+    <span class="badge badge-crossrepo">cross-repo</span>
+  </div>
+
+  <!-- Problem -->
+  <section>
+    <h2>なぜこの改修が必要だったか</h2>
+    <div class="problem-box">
+      <div class="label">問題</div>
+      <p>jpetstore-backend 側は Sprint 2〜4 で REST API・認証（サインオン/サインオフ・bcrypt照合・ロックアウト・本人スコープ認可）が整ったが、フロントは Vue3 の初回雛形（骨格・デザイントークン・Home画面のみ）しか無く、<strong>i18n・共通レイアウト・認証UI（API連携）が丸ごと未実装</strong>だった。これにより #18（サインオン/サインオフUI）・#20（既定資格情報プリフィル廃止）のフロント側責務がスプリントを跨いで未消化のまま残っていた。</p>
+    </div>
+    <div class="arch-grid">
+      <div class="arch-box before">
+        <div class="arch-title">改修前</div>
+        <div class="flow-item"><span class="dot dot-red"></span>HomeView が日本語ハードコード・自前ヘッダーを個別実装</div>
+        <div class="flow-item"><span class="dot dot-red"></span>i18nライブラリ未導入（英語化の仕組みが無い）</div>
+        <div class="flow-item"><span class="dot dot-red"></span>認証UI無し（サインオン/サインオフ画面・APIクライアント・authストアが存在しない）</div>
+        <div class="flow-item"><span class="dot dot-red"></span>リロードすると認証状態が復元できない（backendに /me 相当が無い）</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-box after">
+        <div class="arch-title">改修後</div>
+        <div class="flow-item"><span class="dot dot-green"></span>AppHeader/AppLayout共通部品＋vue-i18n（英語）で統一</div>
+        <div class="flow-item"><span class="dot dot-green"></span>httpClient（CSRF cookie-to-header非XOR・silent refresh）＋Piniaストア</div>
+        <div class="flow-item"><span class="dot dot-green"></span>SignonView（プリフィル廃止）＋router guard（元URL復帰・オープンリダイレクト対策）</div>
+        <div class="flow-item"><span class="dot dot-green"></span>backendに GET /api/auth/me を追加しリロード後もidentityを再水和</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Backend change -->
+  <section>
+    <h2>Backend変更（jpetstore-backend・従リポジトリ）</h2>
+    <p style="font-size:13px; color:#4b5563; margin-bottom:12px;">httpOnly Cookie はリロード後もブラウザが自動送信するが、フロントの Pinia store（username/roles）はリロードで揮発する。フロントが起動時に identity を再水和できるよう、認証済みプリンシパルを返す <code>GET /api/auth/me</code> を新規追加した。</p>
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">backend</div>
+        <div class="ac-text">GET /api/auth/me — 認証済み200 / 未認証401（列挙不可・CSRF不要）</div>
+      </div>
+      <div class="ac-body">
+        <p><code>AuthController</code> に <code>@GetMapping("/me")</code> を追加。<code>CurrentUserProvider.requireCurrentUser()</code> から現在の認証プリンシパルを取得し <code>{username, roles}</code> を200で返す。<code>SecurityConfig</code> は変更なし＝<code>permitAll</code> に加えず <code>anyRequest().authenticated()</code> 配下のまま。未認証は既存の <code>AuditingAuthenticationEntryPoint</code> がコントローラ到達前に401を返す。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../presentation/rest/AuthController.java</span>
+            <span class="diff-stat">+21 / -1</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">31</span><span class="line-prefix"> </span><span>  private final AuthApplicationService authApplicationService;</span></div>
+            <div class="code-line line-add"><span class="line-num">32</span><span class="line-prefix">+</span><span>  private final CurrentUserProvider currentUserProvider;</span></div>
+            <div class="code-line line-ctx"><span class="line-num">…</span><span class="line-prefix"> </span><span></span></div>
+            <div class="code-line line-add"><span class="line-num">76</span><span class="line-prefix">+</span><span>  @GetMapping("/me")</span></div>
+            <div class="code-line line-add"><span class="line-num">77</span><span class="line-prefix">+</span><span>  public ResponseEntity&lt;LoginResponse&gt; me() {</span></div>
+            <div class="code-line line-add"><span class="line-num">78</span><span class="line-prefix">+</span><span>    AuthenticatedUser user = currentUserProvider.requireCurrentUser();</span></div>
+            <div class="code-line line-add"><span class="line-num">79</span><span class="line-prefix">+</span><span>    return ResponseEntity.ok(new LoginResponse(user.username(), user.roles()));</span></div>
+            <div class="code-line line-add"><span class="line-num">80</span><span class="line-prefix">+</span><span>  }</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>レスポンス型は既存の <code>LoginResponse</code>（username/roles）をそのまま再利用。新しい DTO は作らず、フロント側も同じ形として扱える。</span>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/test/groovy/.../presentation/rest/AuthMeSpec.groovy（新規）</span>
+            <span class="diff-stat">+70</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">37</span><span class="line-prefix">+</span><span>def "認証済みでGET /api/auth/meを叩くと200で現在のusername/rolesを返す"() { … }</span></div>
+            <div class="code-line line-add"><span class="line-num">46</span><span class="line-prefix">+</span><span>def "未認証(Cookie無し)でGET /api/auth/meを叩くと401になる"() { … }</span></div>
+            <div class="code-line line-add"><span class="line-num">54</span><span class="line-prefix">+</span><span>def "CSRFトークン無しでもGET /api/auth/meは403にならない(GET=冪等・CSRF不要)"() { … }</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AC breakdown -->
+  <section>
+    <h2>AC別 実装内容（jpetstore-frontend・主リポジトリ）</h2>
+
+    <!-- AC1 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC1</div>
+        <div class="ac-text">Vue 3 / TypeScript / Pinia / Tailwind CSS / Vite / Vitest の SPA 土台</div>
+      </div>
+      <div class="ac-body">
+        <p>骨格自体は初回雛形で導入済み。本スプリントでは i18n ライブラリの追加と、フォーマッタ（Prettier）未整備だった点を土台作業として整備した。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>package.json</span>
+            <span class="diff-stat">+6 / -1</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-del"><span class="line-num">15</span><span class="line-prefix">-</span><span>    "test": "vitest"</span></div>
+            <div class="code-line line-add"><span class="line-num">15</span><span class="line-prefix">+</span><span>    "test": "vitest run",</span></div>
+            <div class="code-line line-add"><span class="line-num">16</span><span class="line-prefix">+</span><span>    "format": "prettier --write \"src/**/*.{ts,vue,json,css}\""</span></div>
+            <div class="code-line line-ctx"><span class="line-num">17</span><span class="line-prefix"> </span><span>  },</span></div>
+            <div class="code-line line-ctx"><span class="line-num">18</span><span class="line-prefix"> </span><span>  "dependencies": {</span></div>
+            <div class="code-line line-add"><span class="line-num">20</span><span class="line-prefix">+</span><span>    "vue-i18n": "^11.4.8",</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span><code>.claude/rules/git.md</code> のコミット前必須作業（<code>npm run format</code>）を満たすため Prettier（+prettier-plugin-tailwindcss）を新規導入。<code>test</code> は watch モードから単発実行（<code>vitest run</code>）に変更した。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC2 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC2</div>
+        <div class="ac-text">Claude Design の全体デザインを適用。ヘッダ/カード/フォーム/ボタンを one system で統一（ライト/ダーク対応）</div>
+      </div>
+      <div class="ac-body">
+        <p>既存の <code>.jps-*</code> デザイントークン（ライト/ダーク対応済）を活用しつつ、新規共通コンポーネントは <code>AppHeader.vue</code>／<code>AppLayout.vue</code> の2つのみに限定（土台の過剰実装回避）。HomeView が個別に持っていたヘッダーをこれらへ集約した。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/components/AppHeader.vue（新規）</span>
+            <span class="diff-stat">+79</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">18</span><span class="line-prefix"> </span><span>&lt;header class="jps-header"&gt;</span></div>
+            <div class="code-line line-ctx"><span class="line-num">33</span><span class="line-prefix"> </span><span>  &lt;div class="app-header__account"&gt;</span></div>
+            <div class="code-line line-ctx"><span class="line-num">34</span><span class="line-prefix"> </span><span>    &lt;template v-if="authStore.isAuthenticated"&gt;</span></div>
+            <div class="code-line line-ctx"><span class="line-num">38</span><span class="line-prefix"> </span><span>      &lt;button type="button" class="jps-btn jps-btn-ghost jps-btn-sm" @click="handleSignOff"&gt;</span></div>
+            <div class="code-line line-ctx"><span class="line-num">42</span><span class="line-prefix"> </span><span>    &lt;RouterLink v-else to="/signon" class="jps-btn jps-btn-secondary jps-btn-sm"&gt;</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>認証状態（<code>authStore.isAuthenticated</code>）で Sign In / Sign Out を出し分ける。サインオフは <code>&lt;a href&gt;</code> の GET リンクではなく <code>&lt;button&gt;</code> + クリックハンドラ（POST）＝AC5 の「GETリンクで確定しない」を満たす。</span>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/components/AppLayout.vue（新規）</span>
+            <span class="diff-stat">+26</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">7</span><span class="line-prefix"> </span><span>&lt;div class="app-layout"&gt;</span></div>
+            <div class="code-line line-ctx"><span class="line-num">8</span><span class="line-prefix"> </span><span>  &lt;AppHeader /&gt;</span></div>
+            <div class="code-line line-ctx"><span class="line-num">9</span><span class="line-prefix"> </span><span>  &lt;main class="app-layout__main"&gt;</span></div>
+            <div class="code-line line-ctx"><span class="line-num">10</span><span class="line-prefix"> </span><span>    &lt;slot /&gt;</span></div>
+            <div class="code-line line-ctx"><span class="line-num">11</span><span class="line-prefix"> </span><span>  &lt;/main&gt;</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC3 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check partial">◐</div>
+        <div class="ac-num">AC3</div>
+        <div class="ac-text">画像は nano banana 生成の新規アセットを使用。レガシーの JSP/埋め込み画像・HTML は継承しない</div>
+      </div>
+      <div class="ac-body">
+        <p><strong>計画フェーズでユーザー承認済みのスコープ縮小</strong>：本スプリントの土台では <code>hero.png</code> / <code>logo.svg</code> の使用に限定する（<code>spec/design/images/</code> の product/category 系24枚は各ドメイン Story（E1/E2）へ委譲）。</p>
+        <p>確認の結果、初回雛形の時点で <code>src/assets/hero.png</code> / <code>logo.svg</code> は <code>spec/design/images/</code> と<strong>バイト完全一致</strong>だったため、本スプリントでの追加取り込み作業は無し。HomeView / AppHeader から参照を継続している。</p>
+        <div class="annotation info">
+          <span class="annotation-icon">ℹ️</span>
+          <span>レガシー（Struts/JSP）の画像・HTML は一切参照していない（新規生成アセットのみ・SBD-18）。foundation スコープでの達成として ◐（部分達成・計画承認済み）とする。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC4 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC4</div>
+        <div class="ac-text">i18n 基盤（キー構造）を用意。翻訳は英語のみ・日本語は将来</div>
+      </div>
+      <div class="ac-body">
+        <p>vue-i18n v11 を新規導入。<code>domain.context.key</code> 構造（<code>frontend-conventions</code> 準拠）で英語メッセージのみを定義し、HomeView の日本語ハードコードをすべて置換した。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/i18n/locales/en.ts（新規）</span>
+            <span class="diff-stat">+46</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">4</span><span class="line-prefix"> </span><span>  app: { header: { logoAlt: 'JPetStore', nav: { home: 'Home', catalog: 'Catalog', … } } },</span></div>
+            <div class="code-line line-ctx"><span class="line-num">20</span><span class="line-prefix"> </span><span>  home: { hero: { title: 'Bringing you closer to the pets you love.', … } },</span></div>
+            <div class="code-line line-ctx"><span class="line-num">36</span><span class="line-prefix"> </span><span>  auth: { signon: { error: 'Invalid username or password.', … } },</span></div>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/views/HomeView.vue</span>
+            <span class="diff-stat">+38 / -22</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-del"><span class="line-num">30</span><span class="line-prefix">-</span><span>&lt;h1 class="hero__title"&gt;ペットとの暮らしを、&lt;br /&gt;もっと身近に。&lt;/h1&gt;</span></div>
+            <div class="code-line line-add"><span class="line-num">21</span><span class="line-prefix">+</span><span>&lt;h1 class="hero__title"&gt;{{ t('home.hero.title') }}&lt;/h1&gt;</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>見出しの改行（<code>&lt;br /&gt;</code>）は撤去し1文に統一。i18n メッセージに生HTMLを混ぜず <code>v-html</code> を使わずに済ませるため（AC-neg1）。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC5 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC5</div>
+        <div class="ac-text">トークンを JS に持たない（localStorage 禁止・httpOnly Cookie 前提）。状態変更は明示ボタン＋CSRF</div>
+      </div>
+      <div class="ac-body">
+        <p>Pinia の <code>auth</code> ストアは <code>{username, roles}</code> のみをメモリ保持し、アクセス/リフレッシュトークンには一切触れない（backend が httpOnly Cookie で保持）。<code>localStorage</code>/<code>sessionStorage</code> への書き込みが無いことを Vitest で固定。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/stores/__tests__/auth.spec.ts</span>
+            <span class="diff-stat">抜粋</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">106</span><span class="line-prefix">+</span><span>it('signon成功時にlocalStorage/sessionStorageへ一切書き込まない(AC5)', async () => {</span></div>
+            <div class="code-line line-add"><span class="line-num">107</span><span class="line-prefix">+</span><span>  const localSetItemSpy = vi.spyOn(Storage.prototype, 'setItem')</span></div>
+            <div class="code-line line-add"><span class="line-num">111</span><span class="line-prefix">+</span><span>  expect(localSetItemSpy).not.toHaveBeenCalled()</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC6 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC6</div>
+        <div class="ac-text">ログイン失敗は一律メッセージ表示（ユーザ名を推測させない）</div>
+      </div>
+      <div class="ac-body">
+        <p>失敗理由（未知ユーザー / 誤パスワード / その他）を問わず <code>hasSignonError</code> フラグのみをセットし、SignonView は常に同一メッセージ「Invalid username or password.」を表示する。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/stores/auth.ts</span>
+            <span class="diff-stat">L25-39</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">26</span><span class="line-prefix"> </span><span>async signon(username: string, password: string): Promise&lt;boolean&gt; {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">32</span><span class="line-prefix"> </span><span>  } catch {</span></div>
+            <div class="code-line line-add"><span class="line-num">33</span><span class="line-prefix">+</span><span>    this.user = null</span></div>
+            <div class="code-line line-add"><span class="line-num">34</span><span class="line-prefix">+</span><span>    this.hasSignonError = true</span></div>
+            <div class="code-line line-ctx"><span class="line-num">35</span><span class="line-prefix"> </span><span>    return false</span></div>
+            <div class="code-line line-ctx"><span class="line-num">36</span><span class="line-prefix"> </span><span>  }</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC7 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC7</div>
+        <div class="ac-text">認証UI（サインオン/サインオフ）を Vue3 SPA で提供。API クライアント＋Pinia auth ストア。CSRF は cookie-to-header で送出</div>
+      </div>
+      <div class="ac-body">
+        <p><code>httpClient.ts</code> が CSRF cookie-to-header（非XOR・生値をそのまま <code>X-XSRF-TOKEN</code> へ）・<code>GET /api/ping</code> による prime（起動時＋非冪等リクエスト時の自己修復）・401 時の silent refresh 1回リトライを担う。<code>authApi.ts</code> が login/logout/me を呼び、<code>stores/auth.ts</code> の <code>signon</code>/<code>signoff</code>/<code>fetchCurrentUser</code> がそれを利用する。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/api/httpClient.ts</span>
+            <span class="diff-stat">+97（新規）</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">47</span><span class="line-prefix"> </span><span>if (NON_IDEMPOTENT_METHODS.has(method)) {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">48</span><span class="line-prefix"> </span><span>  let token = readCsrfCookie()</span></div>
+            <div class="code-line line-ctx"><span class="line-num">49</span><span class="line-prefix"> </span><span>  if (token === null) {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">52</span><span class="line-prefix"> </span><span>    await primeCsrfToken()</span></div>
+            <div class="code-line line-ctx"><span class="line-num">53</span><span class="line-prefix"> </span><span>    token = readCsrfCookie()</span></div>
+            <div class="code-line line-ctx"><span class="line-num">56</span><span class="line-prefix"> </span><span>  headers[CSRF_HEADER_NAME] = token</span></div>
+            <div class="code-line line-ctx"><span class="line-num">77</span><span class="line-prefix"> </span><span>if (response.status === 401 && !options.skipAuthRetry) {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">78</span><span class="line-prefix"> </span><span>  const refreshed = await tryRefresh()</span></div>
+            <div class="code-line line-ctx"><span class="line-num">80</span><span class="line-prefix"> </span><span>    response = await rawFetch(path, options)</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>「CSRF Cookie が無ければ送信直前に自己 prime する」ロジックはACに明記された「起動時prime」を超えた追加実装。Sprint 3 の申し送り（状態変更成功のたびに XSRF-TOKEN が consume-then-regenerate される）を踏まえ、2回目以降の状態変更（signoff等）でヘッダが欠落しないための対応。</span>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/stores/auth.ts</span>
+            <span class="diff-stat">+59（新規）</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">50</span><span class="line-prefix"> </span><span>/** #24 論点①: 起動時に呼び、identity を再水和する。 */</span></div>
+            <div class="code-line line-ctx"><span class="line-num">51</span><span class="line-prefix"> </span><span>async fetchCurrentUser(): Promise&lt;void&gt; {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">53</span><span class="line-prefix"> </span><span>  this.user = await authApi.fetchCurrentUser()</span></div>
+          </div>
+        </div>
+        <div class="annotation">
+          <span class="annotation-icon">💡</span>
+          <span>ストアのaction名はドメイン用語（<code>signon</code>/<code>signoff</code>・<code>spec/behavior/auth.md</code>準拠）に合わせ、backend REST route名（<code>login</code>/<code>logout</code>）とは意図的に分離した。<code>authApi.ts</code> の <code>login</code>/<code>logout</code> をストアの <code>signon</code>/<code>signoff</code> が呼ぶ構成。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC8 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC8</div>
+        <div class="ac-text">保護ルート要求→サインオン→元URLへ復帰。復帰先は相対パスのみ許可（オープンリダイレクト防止）</div>
+      </div>
+      <div class="ac-body">
+        <p><code>router/authGuard.ts</code>（<code>createAuthGuard</code>）が <code>meta.requiresAuth</code> を持つルートへの未認証アクセスを検知し、要求元 URL を <code>redirect</code> クエリへ退避して signon へ誘導する。SignonView は認証成功時に <code>sanitizeRedirectTarget(route.query.redirect)</code> で検証してから復帰する。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/router/authGuard.ts（新規）</span>
+            <span class="diff-stat">+20</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">13</span><span class="line-prefix"> </span><span>return (to) => {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">15</span><span class="line-prefix"> </span><span>  if (to.meta.requiresAuth && !authStore.isAuthenticated) {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">16</span><span class="line-prefix"> </span><span>    return { name: SIGNON_ROUTE_NAME, query: { redirect: to.fullPath } }</span></div>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/views/SignonView.vue</span>
+            <span class="diff-stat">L21-26</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">21</span><span class="line-prefix"> </span><span>async function handleSubmit() {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">22</span><span class="line-prefix"> </span><span>  const success = await authStore.signon(username.value, password.value)</span></div>
+            <div class="code-line line-ctx"><span class="line-num">23</span><span class="line-prefix"> </span><span>  if (success) {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">24</span><span class="line-prefix"> </span><span>    router.push(sanitizeRedirectTarget(route.query.redirect))</span></div>
+          </div>
+        </div>
+        <div class="annotation info">
+          <span class="annotation-icon">ℹ️</span>
+          <span><code>router.beforeEach(createAuthGuard())</code> は組み込み済みだが、本スプリントでは <code>meta.requiresAuth: true</code> を持つルートが1つも無い（保護対象のドメイン画面が未実装のため。計画承認済み論点②）。ガード自体は純粋関数として Vitest で網羅検証済み。各ドメイン Story が <code>meta: { requiresAuth: true }</code> を付けるだけで接続できる。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC9 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC9</div>
+        <div class="ac-text">ログインフォームは既定資格情報（j2ee/j2ee 等）をプリフィルしない。初期表示は空</div>
+      </div>
+      <div class="ac-body">
+        <p>SignonView の <code>username</code>/<code>password</code> は <code>ref('')</code> で初期化。Vitest で初期表示が空であることを固定。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/views/SignonView.vue</span>
+            <span class="diff-stat">L17-19</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">17</span><span class="line-prefix"> </span><span>// AC9: 既定資格情報を初期値にプリフィルしない(空文字で開始)。</span></div>
+            <div class="code-line line-add"><span class="line-num">18</span><span class="line-prefix">+</span><span>const username = ref('')</span></div>
+            <div class="code-line line-add"><span class="line-num">19</span><span class="line-prefix">+</span><span>const password = ref('')</span></div>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/views/__tests__/SignonView.spec.ts</span>
+            <span class="diff-stat">抜粋</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">31</span><span class="line-prefix">+</span><span>it('初期表示でusername/passwordフィールドが空である(AC9)', async () => {</span></div>
+            <div class="code-line line-add"><span class="line-num">36</span><span class="line-prefix">+</span><span>  expect((usernameInput.element as HTMLInputElement).value).toBe('')</span></div>
+            <div class="code-line line-add"><span class="line-num">37</span><span class="line-prefix">+</span><span>  expect((passwordInput.element as HTMLInputElement).value).toBe('')</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC-neg1 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC-neg1</div>
+        <div class="ac-text">レガシー由来の生HTML描画面が存在しない</div>
+      </div>
+      <div class="ac-body">
+        <p><code>v-html</code> は新規実装のいずれのファイルでも使用していない（<code>src/</code> 配下を grep で確認）。i18n メッセージも常に <code>{{ t(...) }}</code>（自動エスケープ）で描画する。</p>
+      </div>
+    </div>
+
+    <!-- AC-neg2 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC-neg2</div>
+        <div class="ac-text">復帰先に外部URL/プロトコル相対（//evil・https://evil・/\evil）を与えても外部遷移しない</div>
+      </div>
+      <div class="ac-body">
+        <p><code>sanitizeRedirectTarget</code> が単一の <code>/</code> で始まり直後が <code>/</code>・<code>\</code> でない文字列のみを許可し、それ以外は既定値 <code>/</code> にフォールバックする。レビューで発見された「制御文字混入（<code>/\t/evil.com</code> 等）が先頭以外だと素通りする」不備も対応済み。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/utils/redirectValidator.ts</span>
+            <span class="diff-stat">レビュー修正込み</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">15</span><span class="line-prefix"> </span><span>const RELATIVE_PATH_ONLY = /^\/(?!\/|\\)/</span></div>
+            <div class="code-line line-add"><span class="line-num">19</span><span class="line-prefix">+</span><span>function containsControlCharacter(value: string): boolean {</span></div>
+            <div class="code-line line-add"><span class="line-num">20</span><span class="line-prefix">+</span><span>  for (const char of value) {</span></div>
+            <div class="code-line line-add"><span class="line-num">22</span><span class="line-prefix">+</span><span>    if (codePoint !== undefined && codePoint &lt;= MAX_CONTROL_CHARACTER_CODE_POINT) return true</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>初回実装は先頭1文字目のみの制御文字判定だったため、レビュー指摘で「文字列全体を code point 走査」する形に拡張（<code>/\t/evil.com</code> 等のバイパスを解消）。テストに <code>/\t/evil.com</code>・<code>/\n//evil</code>・<code>/\r/evil</code>・URLデコード相当の4ケースを追加。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Implementation notes -->
+  <section>
+    <h2>実装メモ（仕様外の判断・変更・妥協点）</h2>
+    <ul class="note-list">
+      <li class="note-item"><strong>vue-i18nメッセージ内の<code>@</code>はlinked message構文として解釈される。</strong> <code>home.tokens.desc</code>に含めていた<code>@layer</code>という技術用語がvue-i18nのメッセージコンパイラに誤解釈され構文エラーになった。<code>\@layer</code>とエスケープして解消。</li>
+      <li class="note-item"><strong>AppHeader/AppLayoutは新規共通コンポーネントとして<code>src/components/</code>に配置</strong>（既存の<code>.jps-*</code> CSSを活用しつつ、独自スタイルのみBEM風クラスで追加）。新規共通コンポーネントはこの2つに限定し、カタログ/カートナビは<code>href="#"</code>の仮リンクのままとした（土台の過剰実装回避、各ドメインStoryで実ルートに接続）。</li>
+      <li class="note-item"><strong>authストアのaction名はドメイン用語（<code>signon</code>/<code>signoff</code>）に統一し、backend REST route名（<code>login</code>/<code>logout</code>）とは分離した。</strong> <code>spec/behavior/auth.md</code>・Issue AC7の表記に合わせた。</li>
+      <li class="note-item"><strong>httpClientにCSRF Cookie自己修復ロジックを追加。</strong> 計画の「起動時にGET /api/pingでprime」に加え、非冪等リクエスト時にCookieが無ければ送信前に自動再primeする。Sprint 3の申し送り（consume-then-regenerate）を踏まえた対応。</li>
+      <li class="note-item"><strong>main.tsはmount前にCSRF primeとidentity再水和をawaitする。</strong> 起動時のヘッダちらつき・router guard誤判定を防ぐため。レビュー指摘を受け、独立した2処理は<code>Promise.all</code>で並列化した。</li>
+      <li class="note-item"><strong>redirectValidatorの制御文字判定は正規表現の文字クラスに頼らず<code>codePointAt</code>によるcode point走査で実装。</strong> 編集ツール側で正規表現の文字クラス表記が意図しない文字に置き換わる現象が発生したため、曖昧な表現を避けた。</li>
+      <li class="note-item"><strong>AC3（新規画像アセット）はhero.png/logo.svgに限定。</strong> 初回雛形時点で<code>spec/design/images/</code>と同一内容で取り込み済みだったため追加作業は無し。product/category系24枚は各ドメインStoryへ委譲。</li>
+    </ul>
+  </section>
+
+  <!-- Verify -->
+  <section>
+    <h2>動作確認ポイント（ユーザー確認用）</h2>
+    <ul class="verify-list">
+      <li class="verify-item">
+        <div class="verify-num">1</div>
+        <div class="verify-content">
+          <strong>トップ画面（/）が英語のヒーロー文言・共通ヘッダーで表示されること</strong>
+          <span>「Bringing you closer to the pets you love.」等の英語テキストとロゴ・ナビが表示される</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">2</div>
+        <div class="verify-content">
+          <strong>ヘッダーの「Sign In」→サインオン画面でusername/passwordが空欄であること</strong>
+          <span>既定資格情報（j2ee/j2ee等）が入力済みになっていないことを確認</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">3</div>
+        <div class="verify-content">
+          <strong>誤った資格情報でサインオンすると「Invalid username or password.」の一律メッセージが出ること</strong>
+          <span>未知ユーザー・誤パスワードのどちらでも同じ文言になる</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">4</div>
+        <div class="verify-content">
+          <strong>正しい資格情報でサインオンすると成功し、ヘッダーに「Hi, {username}」＋「Sign Out」が表示されること</strong>
+          <span>サインオフを押すと再び「Sign In」に戻る</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">5</div>
+        <div class="verify-content">
+          <strong>サインオン済み状態でブラウザをリロードしても、ヘッダーのユーザー名表示が維持されること</strong>
+          <span>backendの GET /api/auth/me による identity 再水和が効いていることの確認</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">6</div>
+        <div class="verify-content">
+          <strong>ライト/ダーク（OS設定 or ブラウザの強制ダーク）でヘッダー・カード・ボタンの配色が破綻しないこと</strong>
+          <span>既存デザイントークン（.jps-*）が one system 全体に効いていることの確認</span>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- Scope -->
+  <section>
+    <h2>改修スコープ確認</h2>
+
+    <div class="repo-divider">
+      <span class="repo-tag repo-tag-frontend">jpetstore-frontend（主）</span>
+      <span class="repo-line"></span>
+    </div>
+    <table class="scope-table">
+      <tr>
+        <th>ファイル</th>
+        <th>変更</th>
+        <th>内容</th>
+      </tr>
+      <tr>
+        <td><code>src/i18n/</code>（index.ts・locales/en.ts）</td>
+        <td><span class="tag-new">新規</span></td>
+        <td>vue-i18n v11 セットアップ（英語のみ・domain.context.key構造）</td>
+      </tr>
+      <tr>
+        <td><code>src/components/AppHeader.vue</code>／<code>AppLayout.vue</code></td>
+        <td><span class="tag-new">新規</span></td>
+        <td>one-system共通ヘッダー・レイアウト（新規共通コンポーネントはこの2つのみ）</td>
+      </tr>
+      <tr>
+        <td><code>src/api/httpClient.ts</code>／<code>authApi.ts</code></td>
+        <td><span class="tag-new">新規</span></td>
+        <td>CSRF cookie-to-header・prime自己修復・silent refresh／login・logout・fetchCurrentUser</td>
+      </tr>
+      <tr>
+        <td><code>src/stores/auth.ts</code></td>
+        <td><span class="tag-new">新規</span></td>
+        <td>Piniaストア（signon/signoff/fetchCurrentUser、{username,roles}のみメモリ保持）</td>
+      </tr>
+      <tr>
+        <td><code>src/utils/redirectValidator.ts</code></td>
+        <td><span class="tag-new">新規</span></td>
+        <td>相対パスのみ許可の復帰先バリデータ（レビュー指摘で制御文字判定を拡張）</td>
+      </tr>
+      <tr>
+        <td><code>src/router/authGuard.ts</code>／<code>index.ts</code></td>
+        <td><span class="tag-new">新規</span> / <span class="tag-changed">変更あり</span></td>
+        <td>未認証→signon誘導ガード。signonルート追加・ガード接続</td>
+      </tr>
+      <tr>
+        <td><code>src/views/SignonView.vue</code></td>
+        <td><span class="tag-new">新規</span></td>
+        <td>サインオン画面（プリフィル廃止・一律エラー表示・復帰先検証）</td>
+      </tr>
+      <tr>
+        <td><code>src/views/HomeView.vue</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>i18n英語化・AppLayout適用（自前ヘッダーを撤去しAppHeaderへ集約）</td>
+      </tr>
+      <tr>
+        <td><code>src/main.ts</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>i18nプラグイン登録、mount前にCSRF prime＋identity再水和を並列await</td>
+      </tr>
+      <tr>
+        <td><code>.prettierrc.json</code>／<code>package.json</code></td>
+        <td><span class="tag-new">新規</span> / <span class="tag-changed">変更あり</span></td>
+        <td>Prettier導入・formatスクリプト追加・testをvitest run化</td>
+      </tr>
+      <tr>
+        <td><code>src/assets/hero.png</code>／<code>logo.svg</code></td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td>初回雛形時点でspec/design/images/と同一内容だったため取り込み不要（AC3）</td>
+      </tr>
+      <tr>
+        <td>カタログ/カート/注文/アカウント編集などドメイン画面</td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td>本スプリントの土台規律によりスコープ外（各ドメインStoryへ委譲）</td>
+      </tr>
+    </table>
+
+    <div class="repo-divider">
+      <span class="repo-tag repo-tag-backend">jpetstore-backend（従）</span>
+      <span class="repo-line"></span>
+    </div>
+    <table class="scope-table">
+      <tr>
+        <th>ファイル</th>
+        <th>変更</th>
+        <th>内容</th>
+      </tr>
+      <tr>
+        <td><code>presentation/rest/AuthController.java</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>GET /api/auth/me を追加（CurrentUserProviderからusername/rolesを200で返す）</td>
+      </tr>
+      <tr>
+        <td><code>presentation/rest/AuthMeSpec.groovy</code></td>
+        <td><span class="tag-new">新規</span></td>
+        <td>認証済み200／未認証401／CSRF無しでも403にならない、の3ケース</td>
+      </tr>
+      <tr>
+        <td><code>config/SecurityConfig.java</code></td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td>/me はpermitAllに追加せずanyRequest().authenticated()配下のまま（未認証は自動401）</td>
+      </tr>
+      <tr>
+        <td>login/logout/refresh エンドポイント</td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td>Sprint 3（#18）で確立済みの契約をそのまま利用</td>
+      </tr>
+    </table>
+  </section>
+
+  <!-- Test results -->
+  <section>
+    <h2>テスト結果</h2>
+    <div class="test-grid">
+      <div class="test-box">
+        <div class="label">frontend: Vitest</div>
+        <div class="count">51 / 51</div>
+        <div class="sublabel">green（httpClient/authストア/redirectValidator/routerガード/i18n/SignonView/HomeView）</div>
+      </div>
+      <div class="test-box">
+        <div class="label">backend: Spock（integrationTest + test）</div>
+        <div class="count">green</div>
+        <div class="sublabel">AuthMeSpec含め全件green・spotlessApply済</div>
+      </div>
+    </div>
+    <p style="font-size:12px; color:#888; margin-top:12px;"><code>npm run build</code>（vue-tsc型チェック）green・<code>npm run format</code>実行済み（差分無し）。</p>
+  </section>
+
+</div>
+</body>
+</html>

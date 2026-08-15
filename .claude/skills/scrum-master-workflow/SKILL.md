@@ -167,6 +167,13 @@ git diff [sprint-start-commit]^...HEAD --name-only
 > ⚠️ **reviewerへのプロンプトにコードを渡す場合、省略記法（`...` など）を絶対に使わないこと（Sprint 52で発生）。**
 > 省略コードを実際のコードと誤認識したreviewerが「テスト未実装」と誤判断するリスクがある。
 > `git show [ブランチ名]:[ファイルパス]` で取得した実際のコードをそのまま渡すこと。
+>
+> ⚠️ **【JPetStore 固有・最優先】JPetStore の3 reviewer（convention/security/performance）は Bash 非搭載（Read/Glob/Grep/discord のみ）＝`git show`・`git diff` を実行できない（Sprint 3/4/5 で確立）。**
+> よって上の `git show` 前提は JPetStore には当てはまらない。SM は代わりに次の運用を使う：
+> 1. **対象 repo の working dir を feature ブランチにチェックアウト済みにする**（DEV はそのブランチにコミットするので通常は既にその状態。cross-repo なら**各 repo** で確認）。
+> 2. reviewer の起動プロンプトに**変更ファイルを絶対パスで列挙**する。
+> 3. 「**working dir は対象ブランチ `[ブランチ名]` にチェックアウト済み。git は使えないので下記の絶対パスを Read ツールで直接読んでレビューすること**」と明示する（`git show` を指示しない）。
+> Read で見える内容＝レビュー対象になる（working dir が feature ブランチのため）。省略記法は使わない（上の Sprint 52 教訓と同じ）。
 
 4. **3つのreviewerを並列でteammateとして起動する：**
 
