@@ -376,6 +376,35 @@ hw-hub-backendの`infrastructure.mybatis.custom.{entity,mapper}`慣習をjpetsto
 > ユーザーからの配置に関する質問を受けて`infrastructure.mybatis.custom.{entity,mapper}`へ
 > `AuditLogCustomEntity`/`AuditLogCustomMapper`として改名移設した。
 
-> Swagger UIのpermitAll・`server.error.*`→`spring.web.error.*`・依存更新後のIDE lint staleness は
-> Sprint 2で初出（1回目）のため、2回ルールに従い本Skillには未反映（`memory/dev/long_term.md`
-> 「技術的なハマりポイント」参照）。2回目の発生でSkill昇格を検討する。
+### PasswordEncoderはDelegatingPasswordEncoderを使い、ハッシュに`{bcrypt}`等のプレフィックスを含める
+
+パスワードのハッシュ化・照合は Spring Security 標準の
+`PasswordEncoderFactories.createDelegatingPasswordEncoder()`（既定bcrypt）を `PasswordEncoder` Bean として使う。
+
+- エンコード結果は `{bcrypt}$2a$10$...` のようにアルゴリズムIDプレフィックス付きの文字列になる
+- **プレフィックス無しの生bcrypt文字列を`matches()`に渡すと失敗する**（`DelegatingPasswordEncoder`は既定で
+  `defaultPasswordEncoderForMatches`が未設定のため、プレフィックスからアルゴリズムを解決できない）
+- DB seed・テストフィクスチャで bcrypt ハッシュを直接書く場合も、必ず `{bcrypt}` プレフィックスを含めること
+- 将来 argon2 等へ移行する場合も、プレフィックス判定により既存ハッシュを壊さず段階移行できる
+
+> **背景（Sprint 3 #19）**: `jpetstore-backend`の`PasswordEncoderConfig`で採用。デモシード
+> （`jpetstore-database`の`R__test_user.sql`）の`password_hash`にも`{bcrypt}`プレフィックスを付与した。
+
+### DaoAuthenticationProviderの`hideUserNotFoundExceptions`既定動作を壊さない（列挙不可・SBD-6）
+
+`UserDetailsService#loadUserByUsername`が投げた`UsernameNotFoundException`は、`DaoAuthenticationProvider`が
+既定（`hideUserNotFoundExceptions=true`）で誤パスワードと同一の`BadCredentialsException`に正規化する。
+
+- 未知ユーザーのログイン失敗と誤パスワードのログイン失敗を同一の401（ユーザ列挙不可）にするための
+  Spring Security標準機能。カスタム`UserDetailsService`実装がこの既定動作を意識せず壊す
+  （例外を個別にキャッチして別メッセージ・別ステータスを返す等）と列挙攻撃を許してしまう
+- ログイン系エンドポイントの例外処理は、`AuthenticationException`（`BadCredentialsException`含む）を
+  一律同一の401レスポンスにマッピングする既存の`GlobalExceptionHandler`にそのまま委譲すればよい
+
+> **背景（Sprint 3 #18）**: `jpetstore-backend`の`JdbcUserDetailsService`で採用。
+
+> Swagger UIのpermitAll・`server.error.*`→`spring.web.error.*`・依存更新後のIDE lint staleness・
+> `@RestControllerAdvice`のcatch-allがフレームワーク例外（`HttpRequestMethodNotSupportedException`等）を
+> 意図しないステータスに丸める問題・CSRFトークンのconsume-then-regenerate挙動は、いずれも初出（1回目）
+> のため、2回ルールに従い本Skillには未反映（`memory/dev/long_term.md`「技術的なハマりポイント」参照）。
+> 2回目の発生でSkill昇格を検討する。

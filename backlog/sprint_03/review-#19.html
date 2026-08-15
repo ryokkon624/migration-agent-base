@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint 3 Review — #19 パスワードをハッシュ＋ソルトで保存・照合する</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #f8f7f5; }
+
+  .page { max-width: 860px; margin: 0 auto; padding: 48px 24px; }
+
+  /* Header */
+  .sprint-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin-bottom: 8px; }
+  h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px; }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+  .badge-sprint { background: #e8f0fe; color: #1a56db; }
+  .badge-issue { background: #f0fdf4; color: #166534; }
+  .badge-feature { background: #f0fdf4; color: #166534; }
+  .badge-security { background: #fef2f2; color: #b91c1c; }
+  .badge-backend { background: #eff6ff; color: #1d4ed8; }
+
+  /* Sections */
+  section { margin-bottom: 40px; }
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #888; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e5e5e5; }
+
+  /* Problem box */
+  .problem-box { background: #fff8f0; border-left: 3px solid #f59e0b; border-radius: 0 8px 8px 0; padding: 16px 20px; margin-bottom: 16px; }
+  .problem-box .label { font-size: 11px; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .problem-box p { color: #451a03; font-size: 13px; }
+
+  /* Architecture change */
+  .arch-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: center; margin-bottom: 8px; }
+  .arch-box { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; }
+  .arch-box .arch-title { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .arch-box.before { border-color: #fca5a5; }
+  .arch-box.after { border-color: #86efac; }
+  .arch-arrow { font-size: 20px; color: #888; text-align: center; }
+  .flow-item { font-size: 12px; color: #374151; padding: 3px 0; display: flex; align-items: flex-start; gap: 6px; }
+  .flow-item .dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .dot-red { background: #ef4444; }
+  .dot-green { background: #22c55e; }
+
+  /* AC cards */
+  .ac-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+  .ac-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid #f0f0f0; }
+  .ac-check { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .ac-check.done { background: #dcfce7; color: #166534; }
+  .ac-num { font-size: 11px; font-weight: 700; color: #888; }
+  .ac-text { font-size: 13px; font-weight: 600; color: #1a1a1a; flex: 1; }
+  .ac-body { padding: 16px 18px; }
+  .ac-body p { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+
+  /* File change */
+  .file-change { margin-bottom: 16px; }
+  .file-name { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; background: #f3f4f6; color: #374151; padding: 5px 10px; border-radius: 4px 4px 0 0; border: 1px solid #e5e5e5; border-bottom: none; display: flex; justify-content: space-between; }
+  .diff-stat { color: #888; }
+  .code-block { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.7; background: #1e1e2e; color: #cdd6f4; padding: 14px 16px; border-radius: 0 0 6px 6px; overflow-x: auto; }
+  .code-line { display: flex; }
+  .line-num { color: #45475a; min-width: 28px; user-select: none; }
+  .line-add { background: rgba(166, 227, 161, 0.12); color: #a6e3a1; }
+  .line-del { background: rgba(243, 139, 168, 0.12); color: #f38ba8; }
+  .line-ctx { color: #cdd6f4; }
+  .line-prefix { min-width: 14px; }
+
+  /* Annotation */
+  .annotation { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-size: 12px; color: #78350f; display: flex; gap: 8px; }
+  .annotation-icon { font-size: 14px; flex-shrink: 0; }
+
+  /* Verify section */
+  .verify-list { list-style: none; }
+  .verify-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; }
+  .verify-item:last-child { border-bottom: none; }
+  .verify-num { width: 22px; height: 22px; background: #e8f0fe; color: #1a56db; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .verify-content { flex: 1; }
+  .verify-content strong { font-size: 13px; color: #1a1a1a; display: block; margin-bottom: 3px; }
+  .verify-content span { font-size: 12px; color: #6b7280; }
+  .verify-content code { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; background: #f3f4f6; padding: 1px 4px; border-radius: 3px; }
+
+  /* Scope table */
+  .scope-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .scope-table th { text-align: left; padding: 8px 12px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .scope-table td { padding: 10px 12px; border: 1px solid #e5e5e5; color: #374151; vertical-align: top; }
+  .scope-table tr:hover td { background: #f9fafb; }
+  .tag-changed { font-size: 11px; font-weight: 600; background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 3px; }
+  .tag-unchanged { font-size: 11px; font-weight: 600; background: #f3f4f6; color: #6b7280; padding: 2px 6px; border-radius: 3px; }
+  .tag-repo { font-size: 10px; font-weight: 700; background: #eef2ff; color: #4338ca; padding: 2px 6px; border-radius: 3px; text-transform: uppercase; letter-spacing: 0.03em; }
+
+  /* Note box */
+  .note-box { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 14px 18px; margin-bottom: 16px; font-size: 13px; color: #0c4a6e; }
+  .note-box strong { color: #075985; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="sprint-label">Sprint 3 Review</div>
+  <h1>#19 — パスワードをハッシュ＋ソルトで保存・照合する</h1>
+  <div class="meta">
+    <span class="badge badge-sprint">Sprint 3</span>
+    <span class="badge badge-issue">#19</span>
+    <span class="badge badge-feature">feature</span>
+    <span class="badge badge-security">security</span>
+    <span class="badge badge-backend">jpetstore-backend / jpetstore-database</span>
+  </div>
+
+  <!-- Problem -->
+  <section>
+    <h2>なぜこの改修が必要だったか</h2>
+    <div class="problem-box">
+      <div class="label">問題（S7 是正）</div>
+      <p>legacy-jpetstore の認証は <code>where account.userid=#username# and signon.password=#password#</code> という<strong>平文パスワードの直接比較</strong>だった。DB が漏えいすると全ユーザーのパスワードがそのまま漏れる。新スキーマでは <code>m_signon.password_hash varchar(255)</code>（#22 で確保済み）にハッシュを格納する土台はあったが、実際にハッシュ化・照合する仕組み（<code>PasswordEncoder</code>）と、ログイン実証用の「既知PW＋実bcryptハッシュ」のデモユーザーがまだ無かった。</p>
+    </div>
+    <div class="arch-grid">
+      <div class="arch-box before">
+        <div class="arch-title">改修前</div>
+        <div class="flow-item"><span class="dot dot-red"></span>as-is: <code>signon.password</code> 平文保存・平文比較</div>
+        <div class="flow-item"><span class="dot dot-red"></span><code>m_signon.password_hash</code> 列は存在するが埋める仕組みが無い</div>
+        <div class="flow-item"><span class="dot dot-red"></span>ログイン実証用のデモユーザーが無い（弱資格情報は入れられない）</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-box after">
+        <div class="arch-title">改修後</div>
+        <div class="flow-item"><span class="dot dot-green"></span><code>PasswordEncoderConfig</code>（DelegatingPasswordEncoder・既定bcrypt）を Bean 化</div>
+        <div class="flow-item"><span class="dot dot-green"></span><code>{bcrypt}$2a$10$...</code> 形式でハッシュ＋ソルト保存・照合</div>
+        <div class="flow-item"><span class="dot dot-green"></span><code>demo_user</code>（実bcryptハッシュ・弱資格情報なし）をデモシードに追加</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AC breakdown -->
+  <section>
+    <h2>AC別 実装内容</h2>
+
+    <!-- AC1 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC1 (SBD-5)</div>
+        <div class="ac-text">パスワードは bcrypt/argon2 等でハッシュ＋ソルト保存・比較（平文保存/平文比較しない）</div>
+      </div>
+      <div class="ac-body">
+        <p>Spring Security 標準の <code>PasswordEncoderFactories.createDelegatingPasswordEncoder()</code> を採用。既定アルゴリズムは bcrypt（ソルトは bcrypt 内部に自動生成・格納される）で、<code>{bcrypt}</code> プレフィックス付きでエンコードする。将来アルゴリズムを移行する場合も、プレフィックスから判定して既存ハッシュを壊さず段階移行できる Spring Security 公式の推奨方式。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>jpetstore-backend/src/main/java/.../config/PasswordEncoderConfig.java <span class="tag-repo">new</span></span>
+            <span class="diff-stat">+25</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">1</span><span class="line-prefix">+</span><span>package com.example.jpetstore.backend.config;</span></div>
+            <div class="code-line line-add"><span class="line-num">2</span><span class="line-prefix">+</span><span></span></div>
+            <div class="code-line line-add"><span class="line-num">3</span><span class="line-prefix">+</span><span>import org.springframework.security.crypto.factory.PasswordEncoderFactories;</span></div>
+            <div class="code-line line-add"><span class="line-num">6</span><span class="line-prefix">+</span><span>import org.springframework.security.crypto.password.PasswordEncoder;</span></div>
+            <div class="code-line line-add"><span class="line-num">7</span><span class="line-prefix">+</span><span>...</span></div>
+            <div class="code-line line-add"><span class="line-num">15</span><span class="line-prefix">+</span><span>@Configuration</span></div>
+            <div class="code-line line-add"><span class="line-num">16</span><span class="line-prefix">+</span><span>public class PasswordEncoderConfig {</span></div>
+            <div class="code-line line-add"><span class="line-num">17</span><span class="line-prefix">+</span><span></span></div>
+            <div class="code-line line-add"><span class="line-num">18</span><span class="line-prefix">+</span><span>  @Bean</span></div>
+            <div class="code-line line-add"><span class="line-num">19</span><span class="line-prefix">+</span><span>  public PasswordEncoder passwordEncoder() {</span></div>
+            <div class="code-line line-add"><span class="line-num">20</span><span class="line-prefix">+</span><span>    return PasswordEncoderFactories.createDelegatingPasswordEncoder();</span></div>
+            <div class="code-line line-add"><span class="line-num">21</span><span class="line-prefix">+</span><span>  }</span></div>
+            <div class="code-line line-add"><span class="line-num">22</span><span class="line-prefix">+</span><span>}</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>DelegatingPasswordEncoder を選んだのは、平文比較を排除できれば良いだけなら素の <code>BCryptPasswordEncoder</code> でも足りるが、アルゴリズムIDをハッシュ自体に埋め込む Spring Security 標準方式にしておくと将来 argon2 等へ移行する際にプレフィックス判定だけで段階移行できるため。</span>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>jpetstore-backend/src/test/groovy/.../config/PasswordEncoderConfigSpec.groovy <span class="tag-repo">new</span></span>
+            <span class="diff-stat">+65</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">14</span><span class="line-prefix">+</span><span>def "encodeした結果は平文と一致しない(AC1: 平文保存しない)"() { ... }</span></div>
+            <div class="code-line line-add"><span class="line-num">22</span><span class="line-prefix">+</span><span>def "encodeした結果はbcrypt形式である(AC1: bcryptでハッシュ)"() { ... }</span></div>
+            <div class="code-line line-add"><span class="line-num">36</span><span class="line-prefix">+</span><span>def "同じ平文でも呼ぶたびに異なるハッシュになる(ソルト付与の確認)"() { ... }</span></div>
+            <div class="code-line line-add"><span class="line-num">44</span><span class="line-prefix">+</span><span>def "matchesは正しい平文に対してtrueを返す(照合の往復確認)"() { ... }</span></div>
+            <div class="code-line line-add"><span class="line-num">52</span><span class="line-prefix">+</span><span>def "matchesは誤った平文に対してfalseを返す"() { ... }</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC2 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC2</div>
+        <div class="ac-text">既定弱資格情報（j2ee/j2ee 等）をシードに残さない</div>
+      </div>
+      <div class="ac-body">
+        <p>ログインを実証するには「既知PW＋実bcryptハッシュ」のユーザーが1件必要（DoDの実機疎通確認のため）。ただし j2ee/j2ee のような弱い既定資格情報は使えない（SBD-6）。<code>flyway/sql-test/R__test_user.sql</code>（repeatable・冪等）に <code>demo_user</code> を追加し、<code>password_hash</code> には実際に <code>PasswordEncoderConfig</code> で <code>encode()</code> した値をそのまま貼り付けた（捏造リテラルではない）。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>jpetstore-database/flyway/sql-test/R__test_user.sql <span class="tag-repo">jpetstore-database</span></span>
+            <span class="diff-stat">+45</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">61</span><span class="line-prefix">+</span><span>/* demo_user : ログイン実証用フィクスチャ（#19 AC2/AC-neg1）</span></div>
+            <div class="code-line line-add"><span class="line-num">64</span><span class="line-prefix">+</span><span>   既定弱資格情報（j2ee/j2ee 等・SBD-6）は使わない。</span></div>
+            <div class="code-line line-add"><span class="line-num">68</span><span class="line-prefix">+</span><span>   開発用の既知平文（ローカル動作確認専用）: Sprint3-DemoLogin!26 */</span></div>
+            <div class="code-line line-add"><span class="line-num">76</span><span class="line-prefix">+</span><span>SELECT 'demo_user', 'demo-user@example.com', 'Demo', 'User', 'OK',</span></div>
+            <div class="code-line line-add"><span class="line-num">80</span><span class="line-prefix">+</span><span> WHERE NOT EXISTS (SELECT 1 FROM m_account WHERE username = 'demo_user');</span></div>
+            <div class="code-line line-add"><span class="line-num">87</span><span class="line-prefix">+</span><span>SELECT a.user_id, '{bcrypt}$2a$10$VlmAJIY/yuCIOupZCz4wHeciXuLjUyXLR4.aXxvack9pjjfBF0Hfq',</span></div>
+            <div class="code-line line-add"><span class="line-num">92</span><span class="line-prefix">+</span><span>   AND NOT EXISTS (SELECT 1 FROM m_signon s WHERE s.user_id = a.user_id);</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>各 INSERT は <code>WHERE NOT EXISTS</code> で冪等化（repeatable migration は内容変更のたびに再適用されるため）。既存の <code>ac_neg1_user</code>（ダミーハッシュ・JOIN検証用フィクスチャ）はそのまま維持し、<code>demo_user</code> を追加のみ。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC-neg1 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC-neg1（否定AC / SBD-5）</div>
+        <div class="ac-text">DB 内に平文パスワードが存在しない。既定弱資格情報でログインできない</div>
+      </div>
+      <div class="ac-body">
+        <p><code>jpetstore-database</code> 側で DB レベルの否定ACを、<code>jpetstore-backend</code> 側でログイン試行レベルの否定ACをそれぞれ自動テスト化した。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>jpetstore-database/src/test/groovy/.../schema/DemoUserFixtureSpec.groovy <span class="tag-repo">new</span></span>
+            <span class="diff-stat">+59</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">21</span><span class="line-prefix">+</span><span>def "demo_userのpassword_hashはbcrypt形式であり平文ではない(AC1・SBD-5)"() {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">27</span><span class="line-prefix"> </span><span>    row.password_hash.startsWith("{bcrypt}\$2")</span></div>
+            <div class="code-line line-ctx"><span class="line-num">28</span><span class="line-prefix"> </span><span>    row.password_hash != "Sprint3-DemoLogin!26"  // 平文非保存の直接確認</span></div>
+            <div class="code-line line-add"><span class="line-num">33</span><span class="line-prefix">+</span><span>def "既定弱資格情報(j2ee等)のusernameはシードに存在しない(AC2/AC-neg1・SBD-6)"() {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">35</span><span class="line-prefix"> </span><span>    def weakUsernames = ["j2ee", "admin", "test", "guest"]</span></div>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>jpetstore-backend/src/test/groovy/.../AuthLoginLogoutSpec.groovy（#18 実装, AC-neg1 検証を兼ねる） <span class="tag-repo">jpetstore-backend</span></span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">-</span><span class="line-prefix"> </span><span>def "j2ee/j2eeでログインすると401になる(#19 AC-neg1・弱資格情報は存在しない)"() {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">-</span><span class="line-prefix"> </span><span>    mockMvc.perform(post("/api/auth/login")...content(loginBody("j2ee", "j2ee")))</span></div>
+            <div class="code-line line-ctx"><span class="line-num">-</span><span class="line-prefix"> </span><span>            .andExpect(status().isUnauthorized())</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>j2ee ユーザー自体が存在しないため、<code>DaoAuthenticationProvider</code> が <code>UsernameNotFoundException</code>→<code>BadCredentialsException</code> に正規化し401を返す（#18 で実装。詳細は #18 レビュー参照）。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Implementation notes -->
+  <section>
+    <h2>実装メモ（仕様外の判断・変更・妥協点）</h2>
+    <div class="note-box">
+      <strong>PasswordEncoder方式の選定:</strong> 素の <code>BCryptPasswordEncoder</code> ではなく <code>DelegatingPasswordEncoder</code>（Spring Security標準・{bcrypt}プレフィックス付き）を採用。理由は「AC別 実装内容 AC1」参照。
+    </div>
+    <div class="note-box">
+      <strong>実bcryptハッシュの生成手順:</strong> デモシードの password_hash は捏造した文字列ではなく、実装した <code>PasswordEncoderConfig.passwordEncoder().encode("Sprint3-DemoLogin!26")</code> を一時テストで実際に実行して得た値をそのまま <code>R__test_user.sql</code> に貼り付けている。
+    </div>
+  </section>
+
+  <!-- Verify -->
+  <section>
+    <h2>動作確認ポイント（ユーザー確認用）</h2>
+    <ul class="verify-list">
+      <li class="verify-item">
+        <div class="verify-num">1</div>
+        <div class="verify-content">
+          <strong>DB内のdemo_userのpassword_hashがbcrypt形式であること</strong>
+          <span><code>SELECT password_hash FROM m_signon s JOIN m_account a ON a.user_id=s.user_id WHERE a.username='demo_user';</code> の結果が <code>{bcrypt}$2a$...</code> で始まり、平文 <code>Sprint3-DemoLogin!26</code> のままではないこと</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">2</div>
+        <div class="verify-content">
+          <strong>j2ee/j2ee ではログインできないこと</strong>
+          <span>curl で <code>POST /api/auth/login</code> に <code>{"username":"j2ee","password":"j2ee"}</code> を送ると401が返ること（j2eeユーザーはシードに存在しない）</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">3</div>
+        <div class="verify-content">
+          <strong>demo_user / Sprint3-DemoLogin!26 で正しくログインできること</strong>
+          <span>実機確認手順は #18 レビューHTMLの「動作確認ポイント」参照（login→保護resource→logoutの一連疎通）</span>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- Scope -->
+  <section>
+    <h2>改修スコープ確認</h2>
+    <table class="scope-table">
+      <tr>
+        <th>リポジトリ</th>
+        <th>ファイル</th>
+        <th>変更</th>
+        <th>内容</th>
+      </tr>
+      <tr>
+        <td>jpetstore-backend</td>
+        <td><code>config/PasswordEncoderConfig.java</code></td>
+        <td><span class="tag-changed">新規</span></td>
+        <td>DelegatingPasswordEncoder（bcrypt既定）のBean定義</td>
+      </tr>
+      <tr>
+        <td>jpetstore-backend</td>
+        <td><code>config/PasswordEncoderConfigSpec.groovy</code></td>
+        <td><span class="tag-changed">新規</span></td>
+        <td>単体テスト（平文非一致・bcrypt形式・ソルト・matches往復）</td>
+      </tr>
+      <tr>
+        <td>jpetstore-database</td>
+        <td><code>flyway/sql-test/R__test_user.sql</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>demo_user（実bcryptハッシュ）追加。既存ac_neg1_userは維持</td>
+      </tr>
+      <tr>
+        <td>jpetstore-database</td>
+        <td><code>schema/DemoUserFixtureSpec.groovy</code></td>
+        <td><span class="tag-changed">新規</span></td>
+        <td>demo_userの平文非保存・弱資格情報不在・冪等性を検証</td>
+      </tr>
+      <tr>
+        <td>jpetstore-database</td>
+        <td><code>flyway/sql/*.sql</code>（スキーマ定義）</td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td><code>m_signon.password_hash varchar(255)</code> は #22 で確保済み</td>
+      </tr>
+    </table>
+  </section>
+
+</div>
+</body>
+</html>
