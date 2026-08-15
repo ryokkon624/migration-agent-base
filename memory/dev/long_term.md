@@ -22,6 +22,22 @@ Sprint4のセキュリティ非ブロッキング2件（`AuthApplicationService.
 再発パターンではないため本セクションでは追跡しない（根拠は「習得したこと」に記録。詳細は
 `backlog/sprint_04/implementation-notes.md`）。
 
+### jpetstore-frontend
+Sprint5（#24）が初のフロントエンド実装スプリント。3観点レビューでパフォーマンス1件・セキュリティ1件の
+指摘があった（規約は指摘なし）。いずれも初出（1回目）のため、2回ルールに従いSkillのチェックリストへは
+まだ昇格させず、本セクションで発生スプリントを記録して待機する。
+
+- [パフォーマンス] **互いに独立した非同期初期化処理を直列awaitしていた**。`main.ts`で
+  `primeCsrfToken()`→`fetchCurrentUser()`を直列に`await`していたが、両者は依存関係が無い
+  （`/me`はGETでCSRF非依存）ため`Promise.all([...])`で並列化すべきだった。
+  発生スプリント: Sprint5（#24）
+- [セキュリティ] **オープンリダイレクト対策バリデータの制御文字判定が先頭1文字目のみだった**。
+  `sanitizeRedirectTarget`が`codePointAt(0)`のみで制御文字を判定していたため、`/\t/evil.com`
+  （2文字目にタブ）のように先頭以外に制御文字が混入するケースを素通りさせていた
+  （WHATWG URLパーサはタブ/改行を位置問わず除去して正規化するため将来的なバイパス経路になりうる）。
+  文字列全体をcode point走査する`containsControlCharacter`に拡張して解消した。
+  発生スプリント: Sprint5（#24）
+
 ## 技術的なハマりポイント
 
 ### jpetstore-database
@@ -86,6 +102,25 @@ Sprint4のセキュリティ非ブロッキング2件（`AuthApplicationService.
   複数列を同一`INSERT ... ON DUPLICATE KEY UPDATE`文で更新する際は、この評価順依存の二重計算・
   ズレに注意する。
   発生スプリント: Sprint4（#20、IT実行で発見）
+
+### jpetstore-frontend
+- **vue-i18n（v11・Composition API）のメッセージ文字列中の`@`はlinked message構文（`@:key`形式）として
+  解釈される。** `home.tokens.desc`に含めていた`@layer`（main.cssのCSS層を指す技術用語）がメッセージ
+  コンパイラに誤解釈され、Vitest実行時に`SyntaxError: Message compilation error: Invalid linked format`
+  で落ちた。`\@layer`とエスケープして解消。実行時ではなくビルド/テスト実行時に初めて顕在化するため、
+  `@`を含む文言をi18nメッセージに書く際は要注意（`frontend-conventions`へ即時反映済み・参照知識の
+  例外のため2回ルール対象外）。
+  発生スプリント: Sprint5（#24）
+- **正規表現の文字クラス表現（`\s`・`\uXXXX`範囲指定等）を含むコードを編集ツールで書くと、書き込み後の
+  内容が意図しない別の文字列に置き換わる現象が本セッションで複数回発生した。** 例:
+  `/^[\s -]/`のような表現を書いたつもりが、実際にファイルへ書き込まれた内容は`/^[ -]/`のような
+  別物になっていた（原因不明。Write/Editツール側かエディタ層の問題と推測）。1回目はcode point比較
+  （`codePointAt(0) <= 32`）で回避したが、2回目（セキュリティレビュー対応で制御文字判定を拡張した際）
+  にも同じ現象が再発した。正規表現の文字クラスを使わず、`for (const char of value)`で1文字ずつ
+  code pointを走査するループに統一して最終的に回避した。**同種の編集をする際は、正規表現リテラルを
+  含む変更を書いた直後に必ずReadツールで実際の書き込み内容を確認すること**（テストが green でも
+  意図と異なるロジックがコミットされるリスクがあるため、テストケースの網羅性だけに頼らない）。
+  発生スプリント: Sprint5（#24。1回目・2回目とも同一セッション内で発生）
 
 ## 習得したこと
 
@@ -173,6 +208,36 @@ Sprint4のセキュリティ非ブロッキング2件（`AuthApplicationService.
   分離する形で組み込む（`backend-conventions` §9へ即時反映済み。詳細は「Skills更新履歴」）。
   発生スプリント: Sprint4（#21）
 
+### jpetstore-frontend
+- **backendのSpring Security 7 CSRF設定（非XOR `CsrfTokenRequestAttributeHandler`・consume-then-
+  regenerate）とフロントのAPIクライアントは対で設計しないと機能しない。** backendが非XORを選んで
+  いる以上、フロント側でXORマスク等の「独自の安全策のつもりの実装」を足すと即座に全POSTが403になる
+  （マスクの有無はプロトコルの一致・不一致の話であり、フロント単独の判断で強化できるものではない）。
+  加えて、Sprint3で判明していたCSRF Cookieのconsume-then-regenerate挙動（状態変更成功のたびに失効し
+  次のGETまで再発行されない）を踏まえ、APIクライアント層に「送信直前にCookieが無ければ自己prime」の
+  自己修復ロジックを持たせる設計とした。呼び出し側（store等）にprime処理を書かせない一箇所集約により、
+  2回目以降の状態変更（signon成功後のsignoff等）でもCSRFヘッダの欠落を防げる。
+  発生スプリント: Sprint5（#24）
+- **httpOnly Cookie認証のSPAでは、「Piniaストアはメモリ保持のみ・リロードで揮発」と「Cookieはリロード
+  後も自動送信される」の非対称を、backendの`/me`相当エンドポイント＋起動時fetchで埋める設計パターンが
+  再利用可能。** CSRF prime（`GET /api/ping`）と`/me`取得は依存関係が無い独立処理のため`Promise.all`で
+  並列化してよい（直列にすると起動が不必要に遅延する。パフォーマンスレビュー指摘で気づいた観点だが、
+  今後は独立な起動時初期化を書く時点で最初から並列化を検討すべき一般則として意識する）。
+  発生スプリント: Sprint5（#24）
+- **オープンリダイレクト対策バリデータは、ライブの保護画面が無くても純関数として単体でAC実証できる。**
+  `router.beforeEach`ガード自体・復帰先バリデータ（`sanitizeRedirectTarget`）をどちらも独立した
+  純関数として実装し、Pinia storeやVue Routerの実インスタンスへの依存を最小化した状態でVitestの
+  否定ケース網羅（`//evil`・`https://evil`・`/\evil`・制御文字混入等）を書けた。保護対象のドメイン画面
+  が実装されていない土台スプリントでも、メカニズム自体は先に作り切り検証できる（消費側は
+  `meta.requiresAuth: true`を付けるだけで接続できる設計）。
+  発生スプリント: Sprint5（#24）
+- **backend+frontendのcross-repo（主=frontend／従=backend）を実運用し、従リポジトリの変更を
+  「1エンドポイント追加のみ」に最小化する設計判断が機能した。** 既にbackend+database間のcross-repo
+  パターン（Sprint3）は確立済みだったが、今回はfrontendが主体となる初のパターン。backend側の変更を
+  `GET /api/auth/me`追加のみに絞り、`SecurityConfig`は無変更で済ませたことで、cross-repoでも
+  レビュー対象・コンフリクトリスクを小さく保てた。
+  発生スプリント: Sprint5（#24）
+
 ## Skills更新履歴
 
 ### Sprint 2（#23）
@@ -227,8 +292,34 @@ Sprint4のセキュリティ非ブロッキング2件（`AuthApplicationService.
   記録した。
 - `#skills-changelog` へ `[DEV]` で投稿済み。
 
+### Sprint 5（#24・初のフロントエンド実装スプリント）
+
+- **`frontend-conventions`**: `## 7. jpetstore-frontend 固有の注意事項（Vue 3 / vue-i18n / Spring
+  Security 7 backend連携）` を新設し、以下を反映（初出だが「知らないと書けない参照知識・実装パターン」
+  の2回ルール例外として即時反映。`backend-conventions` §9の運用を踏襲）:
+  - CSRF cookie-to-header は非XOR・生値をそのまま送る（+ 送信直前の自己修復prime）
+  - トークンはhttpOnly Cookie前提。Piniaストアは非機密な識別情報のみメモリ保持
+  - 認証状態のリロード再水和（`/me`パターン）と独立初期化処理の`Promise.all`並列化
+  - 401時のsilent refreshは「1回だけ・オプトアウト可能」に設計する
+  - ログイン失敗は一律メッセージ（HTTPステータス・エラー内容をUIへ生で渡さない）
+  - オープンリダイレクト対策バリデータは制御文字を文字列全体で走査する
+  - i18n（vue-i18n v11・`domain.context.key`・メッセージ内`@`のエスケープ）
+  - frontmatterの`description`と冒頭にjpetstore-frontendも対象である旨を追記（§1〜6はhw-hub由来のまま維持）
+  - レビュー指摘2件（初期化の直列実行・バリデータの制御文字判定漏れ）は**今回は反映せず**（初出＝1回目
+    のため2回ルールの原則どおりlong_term.md「繰り返し指摘されるパターン」に留めた。ただし対応後の
+    「あるべき実装パターン」自体は上記の参照知識としてSkillへ前向きに反映した）
+- **`backend-conventions`**: `## 9. jpetstore-backend 固有の注意事項` に「『現在の自分』を返す自己識別
+  エンドポイント（`/me`パターン）は`permitAll`に入れない」を追記した。**2回ルールの対象外（即時反映）**:
+  再発防止のためのチェックリスト項目ではなく、フロント側の認証状態再水和という具体的なユースケースに
+  対応するための実装パターン（今後同種のエンドポイントを作る際に必要な参照知識）のため。
+- 正規表現の文字クラス表現が編集ツールで意図せず置き換わる現象（技術的なハマりポイント参照）は、
+  Skillのチェックリストではなくツール利用時の作業手順の注意点のため、Skillには反映せず
+  `memory/dev/long_term.md`に留めた。
+- `#skills-changelog` へ `[DEV]` で投稿済み。
+
 ## 卒業済みルール
 
 （該当なし。棚卸し対象となるルールが直近15スプリント基準に達していない。
-  jpetstore-backendはSprint2・3・4の3スプリントのみ、jpetstore-databaseもSprint1・3の実装2スプリントのみ
-  のため対象外。Sprint4 Retroでも棚卸しを実施したが同様の理由で卒業候補なし）
+  jpetstore-backendはSprint2・3・4の3スプリントのみ、jpetstore-databaseもSprint1・3の実装2スプリントのみ、
+  jpetstore-frontendはSprint5の1スプリントのみのため、いずれも対象外。Sprint4・Sprint5 Retroでも棚卸しを
+  実施したが同様の理由で卒業候補なし）

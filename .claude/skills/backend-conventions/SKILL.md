@@ -429,6 +429,33 @@ ownershipAuthorizationService.assertOwner(request.getUserId());
 > 本Storyでは対象ドメインリソースが未実装のため`SecuredPingController#myResource`での実証にとどめ、
 > 各ドメインへの適用（リソースIDから所有者を解決する処理）は各Storyへ委譲した。
 
+### 「現在の自分」を返す自己識別エンドポイント（`/me`パターン）は`permitAll`に入れない
+
+フロントのクライアント状態（Pinia/Reduxストア等）はページリロードで揮発するが、httpOnly Cookieで
+保持するトークンはリロード後もブラウザが自動送信する。フロントが起動時に identity を再水和するための
+「現在の自分」エンドポイント（例: `GET /api/auth/me`）は、以下のパターンで実装する。
+
+- **`SecurityConfig`の`permitAll`には追加しない**。既存の`anyRequest().authenticated()`配下に置けば、
+  未認証リクエストはコントローラに到達する前に既存の`AuthenticationEntryPoint`が401を返す
+  （新規の認証チェックを自前で書く必要が無い）
+- 実装は`CurrentUserProvider.requireCurrentUser()`から取得した`AuthenticatedUser`をそのまま返すだけでよい。
+  **クエリ/パスパラメータで対象ユーザーを指定させない**（他人のidentityを引けると列挙・なりすまし調査の
+  オラクルになる。常に「認証プリンシパル自身」のみを返す）
+- GET＝冪等のためCSRFトークンは不要（Spring SecurityのCSRF保護は既定で非GETのみ対象）
+
+```java
+// OK: 自分自身のidentityのみを返す。permitAllに入れない
+@GetMapping("/me")
+public ResponseEntity<LoginResponse> me() {
+  AuthenticatedUser user = currentUserProvider.requireCurrentUser();
+  return ResponseEntity.ok(new LoginResponse(user.username(), user.roles()));
+}
+```
+
+> **背景（Sprint 5 #24）**: フロント（jpetstore-frontend）のリロード後identity再水和のため
+> `AuthController`に`GET /api/auth/me`を追加。既存の`login`応答DTO（`LoginResponse`）をそのまま
+> 再利用し新規DTOを増やさなかった。
+
 > Swagger UIのpermitAll・`server.error.*`→`spring.web.error.*`・依存更新後のIDE lint staleness・
 > `@RestControllerAdvice`のcatch-allがフレームワーク例外（`HttpRequestMethodNotSupportedException`等）を
 > 意図しないステータスに丸める問題・CSRFトークンのconsume-then-regenerate挙動・セキュリティ上意味のある
