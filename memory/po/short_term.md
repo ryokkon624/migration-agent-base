@@ -1,19 +1,21 @@
 # PO 短期記憶（今スプリント）
 
-## Sprint 2 Retro（2026-08-14）で棚卸し済み
+## Sprint 3 Retro（2026-08-15）で棚卸し済み
 
-Sprint 1 Retro以降の文脈（Sprint2計画フェーズでのDEV→ユーザー質問6件〔#23 スコープ境界・実証手段・監査ログ範囲・秘密管理・他repo Flyway適用・jjwt版〕）はSprint 2 Retroで棚卸し済み。要点は `memory/po/long_term.md`（質問傾向へ追記・先回りチェックリストへ正式昇格・意思決定ログ追記）に反映済み。GitHub Issue（#23）本体への反映は次回Refinementでユーザーに確認のうえ実施する。
+Sprint 2 Retro以降の文脈（Sprint3計画フェーズでのDEV→ユーザー質問1件〔#18 backend/frontend責務またぎのスコープ境界〕）はSprint 3 Retroで棚卸し済み。要点は `memory/po/long_term.md`（質問傾向へ追記・意思決定ログ追記。今回は初出のためチェックリスト昇格は見送り、傾向記録に留めた）に反映済み。
 
 ### 未解決の判断事項
 
 - 確認メール（#8備考）を独立の将来Feature Issue として NotReady で track するか（現状は #8 備考に記録のみ）。
 - #23のAC/備考への先回り明記（スコープ境界・実証手段・監査ログ範囲・秘密管理方針・他repo連携方式）は次回Refinementでユーザーに確認のうえ反映する。
+- #18のAC1/AC3をbackendスコープに絞る文言へ修正し、フロント責務（サインオン/サインオフUI・元URL復帰）は#24へ委譲済みである旨を備考に明記する（次回Refinement）。
 
 ### 次回PO稼働時のTODO
 
 - #1〜#17 の Ready昇格＋SP付与（次バッチ）。
 - 確認メール（#8備考）の将来Feature化（Issue起票 or ドロップ）の判断。
 - #23のAC/備考へ、Sprint2質問ログで判明した5観点（スコープ境界・実証手段・監査ログ範囲・秘密管理・他repo連携）を反映。
+- #18のAC1/AC3をbackendスコープに絞る文言へ修正し、フロント責務（サインオン/サインオフUI・元URL復帰）は#24へ委譲済みである旨を備考に明記する。
 - 振る舞いを変える新判断が出たら `spec/intended-diff-ledger.md` に追記。
 
 ## SMやDevから受けた質問ログ

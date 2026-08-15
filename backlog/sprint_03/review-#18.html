@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint 3 Review — #18 サインオン/サインオフを提供する</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #f8f7f5; }
+
+  .page { max-width: 860px; margin: 0 auto; padding: 48px 24px; }
+
+  /* Header */
+  .sprint-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin-bottom: 8px; }
+  h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px; }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+  .badge-sprint { background: #e8f0fe; color: #1a56db; }
+  .badge-issue { background: #f0fdf4; color: #166534; }
+  .badge-feature { background: #f0fdf4; color: #166534; }
+  .badge-backend { background: #eff6ff; color: #1d4ed8; }
+  .badge-scope { background: #fff7ed; color: #c2410c; }
+
+  /* Sections */
+  section { margin-bottom: 40px; }
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #888; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e5e5e5; }
+
+  /* Problem box */
+  .problem-box { background: #fff8f0; border-left: 3px solid #f59e0b; border-radius: 0 8px 8px 0; padding: 16px 20px; margin-bottom: 16px; }
+  .problem-box .label { font-size: 11px; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .problem-box p { color: #451a03; font-size: 13px; }
+
+  /* Scope callout (backend-only) */
+  .scope-callout { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px 20px; margin-bottom: 16px; }
+  .scope-callout .label { font-size: 11px; font-weight: 700; color: #1d4ed8; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .scope-callout p { color: #1e3a5f; font-size: 13px; margin-bottom: 6px; }
+  .scope-callout ul { margin: 6px 0 0 18px; font-size: 13px; color: #1e3a5f; }
+  .scope-callout li { margin-bottom: 4px; }
+
+  /* Architecture change */
+  .arch-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: center; margin-bottom: 8px; }
+  .arch-box { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; }
+  .arch-box .arch-title { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .arch-box.before { border-color: #fca5a5; }
+  .arch-box.after { border-color: #86efac; }
+  .arch-arrow { font-size: 20px; color: #888; text-align: center; }
+  .flow-item { font-size: 12px; color: #374151; padding: 3px 0; display: flex; align-items: flex-start; gap: 6px; }
+  .flow-item .dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .dot-red { background: #ef4444; }
+  .dot-green { background: #22c55e; }
+
+  /* AC cards */
+  .ac-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+  .ac-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid #f0f0f0; }
+  .ac-check { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .ac-check.done { background: #dcfce7; color: #166534; }
+  .ac-check.partial { background: #fef9c3; color: #854d0e; }
+  .ac-num { font-size: 11px; font-weight: 700; color: #888; }
+  .ac-text { font-size: 13px; font-weight: 600; color: #1a1a1a; flex: 1; }
+  .ac-body { padding: 16px 18px; }
+  .ac-body p { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+  .ac-scope-note { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 12px; margin-bottom: 12px; font-size: 12px; color: #78350f; }
+
+  /* File change */
+  .file-change { margin-bottom: 16px; }
+  .file-name { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; background: #f3f4f6; color: #374151; padding: 5px 10px; border-radius: 4px 4px 0 0; border: 1px solid #e5e5e5; border-bottom: none; display: flex; justify-content: space-between; }
+  .diff-stat { color: #888; }
+  .code-block { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.7; background: #1e1e2e; color: #cdd6f4; padding: 14px 16px; border-radius: 0 0 6px 6px; overflow-x: auto; }
+  .code-line { display: flex; }
+  .line-num { color: #45475a; min-width: 28px; user-select: none; }
+  .line-add { background: rgba(166, 227, 161, 0.12); color: #a6e3a1; }
+  .line-del { background: rgba(243, 139, 168, 0.12); color: #f38ba8; }
+  .line-ctx { color: #cdd6f4; }
+  .line-prefix { min-width: 14px; }
+
+  /* Annotation */
+  .annotation { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-size: 12px; color: #78350f; display: flex; gap: 8px; }
+  .annotation-icon { font-size: 14px; flex-shrink: 0; }
+
+  /* Verify section */
+  .verify-list { list-style: none; }
+  .verify-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; }
+  .verify-item:last-child { border-bottom: none; }
+  .verify-num { width: 22px; height: 22px; background: #e8f0fe; color: #1a56db; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .verify-content { flex: 1; }
+  .verify-content strong { font-size: 13px; color: #1a1a1a; display: block; margin-bottom: 3px; }
+  .verify-content span { font-size: 12px; color: #6b7280; }
+  .verify-content code { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; background: #f3f4f6; padding: 1px 4px; border-radius: 3px; }
+  .curl-block { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11.5px; line-height: 1.6; background: #1e1e2e; color: #cdd6f4; padding: 12px 14px; border-radius: 6px; overflow-x: auto; margin-top: 8px; white-space: pre; }
+
+  /* Scope table */
+  .scope-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .scope-table th { text-align: left; padding: 8px 12px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .scope-table td { padding: 10px 12px; border: 1px solid #e5e5e5; color: #374151; vertical-align: top; }
+  .scope-table tr:hover td { background: #f9fafb; }
+  .tag-changed { font-size: 11px; font-weight: 600; background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 3px; }
+  .tag-unchanged { font-size: 11px; font-weight: 600; background: #f3f4f6; color: #6b7280; padding: 2px 6px; border-radius: 3px; }
+  .tag-deferred { font-size: 11px; font-weight: 600; background: #fef3c7; color: #92400e; padding: 2px 6px; border-radius: 3px; }
+
+  /* Note box */
+  .note-box { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 14px 18px; margin-bottom: 16px; font-size: 13px; color: #0c4a6e; }
+  .note-box strong { color: #075985; }
+  .note-box.warn { background: #fffbeb; border-color: #fde68a; color: #78350f; }
+  .note-box.warn strong { color: #92400e; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="sprint-label">Sprint 3 Review</div>
+  <h1>#18 — サインオン/サインオフ（セッション再生成・元URL復帰）を提供する</h1>
+  <div class="meta">
+    <span class="badge badge-sprint">Sprint 3</span>
+    <span class="badge badge-issue">#18</span>
+    <span class="badge badge-feature">feature</span>
+    <span class="badge badge-backend">jpetstore-backend</span>
+    <span class="badge badge-scope">backend REST + Security のみ</span>
+  </div>
+
+  <!-- Scope callout -->
+  <div class="scope-callout">
+    <div class="label">今スプリントのスコープ（重要）</div>
+    <p>本 Issue は <strong>backend（REST API + Spring Security）のみ</strong>実装しました。Vue3 SPA のログイン画面・Pinia authストア・ルーターガードでの元URL復帰UXは<strong>フロント責務のため今スプリント対象外</strong>です。</p>
+    <ul>
+      <li><strong>backend で充足済み</strong>：login/logout/refresh REST・UserDetailsServiceのDB結線・CSRF・セッション固定化対策・弱資格情報の排除</li>
+      <li><strong>#24（E6 フロント土台・Sprint 5予定）へ持ち越し</strong>：Vue ログイン画面、login/logout/refresh呼び出し＋CSRF cookie→header、元URL復帰UX（AC7/AC8として反映済み）</li>
+    </ul>
+  </div>
+
+  <!-- Problem -->
+  <section>
+    <h2>なぜこの改修が必要だったか</h2>
+    <div class="problem-box">
+      <div class="label">問題</div>
+      <p>#23（Sprint 2）で JWT httpOnly Cookie・CSRF・認可の「土台」は整備済みだったが、<code>AuthController</code> には <code>POST /api/auth/refresh</code> しか無く、<strong>credential（username/password）を交換して最初にログインする入口が存在しなかった</strong>。また <code>UserDetailsService</code> がDBに結線されておらず、Spring Securityの標準的な認証フロー（<code>AuthenticationManager</code>）も未配線だった。</p>
+    </div>
+    <div class="arch-grid">
+      <div class="arch-box before">
+        <div class="arch-title">改修前（#23時点）</div>
+        <div class="flow-item"><span class="dot dot-red"></span>AuthController: refreshのみ（login/logout無し）</div>
+        <div class="flow-item"><span class="dot dot-red"></span>UserDetailsServiceがDBに未結線</div>
+        <div class="flow-item"><span class="dot dot-red"></span>AuthenticationManager未定義</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-box after">
+        <div class="arch-title">改修後</div>
+        <div class="flow-item"><span class="dot dot-green"></span>POST /api/auth/login・/logout を追加</div>
+        <div class="flow-item"><span class="dot dot-green"></span>JdbcUserDetailsServiceがm_account×m_signonを参照</div>
+        <div class="flow-item"><span class="dot dot-green"></span>AuthenticationManager(DaoAuthenticationProvider)を結線</div>
+        <div class="flow-item"><span class="dot dot-green"></span>ログイン成功=新規access/refresh発行(固定化対策)</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AC breakdown -->
+  <section>
+    <h2>AC別 実装内容</h2>
+
+    <!-- AC1 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check partial">◐</div>
+        <div class="ac-num">AC1</div>
+        <div class="ac-text">サインオン/サインオフを Spring Security 標準＋REST で提供（JSP廃止）。認証＝JWT httpOnly Cookie＋refresh</div>
+      </div>
+      <div class="ac-body">
+        <div class="ac-scope-note">backend側（REST API・Spring Security標準実装）は充足。「JSP廃止・Vue3 SPA配送」のフロント分は greenfield backend では自明達成／SPA自体は #24 で構築。</div>
+        <p><code>AuthenticationManager</code>（<code>DaoAuthenticationProvider</code>）に <code>JdbcUserDetailsService</code> と #19 の <code>PasswordEncoder</code> を結線し、<code>AuthApplicationService.login()</code> が Spring Security 標準の <code>authenticationManager.authenticate()</code> で credential を照合する。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>config/SecurityConfig.java</span>
+            <span class="diff-stat">+33 / -3</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">65</span><span class="line-prefix"> </span><span>                        "/api/auth/refresh",</span></div>
+            <div class="code-line line-add"><span class="line-num">66</span><span class="line-prefix">+</span><span>                        "/api/auth/login",</span></div>
+            <div class="code-line line-add"><span class="line-num">67</span><span class="line-prefix">+</span><span>                        "/api/auth/logout")</span></div>
+            <div class="code-line line-ctx"><span class="line-num">68</span><span class="line-prefix"> </span><span>                    .permitAll()</span></div>
+            <div class="code-line line-ctx"><span class="line-num">...</span><span class="line-prefix"> </span><span></span></div>
+            <div class="code-line line-add"><span class="line-num">97</span><span class="line-prefix">+</span><span>  @Bean</span></div>
+            <div class="code-line line-add"><span class="line-num">98</span><span class="line-prefix">+</span><span>  public AuthenticationManager authenticationManager(</span></div>
+            <div class="code-line line-add"><span class="line-num">99</span><span class="line-prefix">+</span><span>      UserDetailsService userDetailsService, PasswordEncoder passwordEncoder) {</span></div>
+            <div class="code-line line-add"><span class="line-num">100</span><span class="line-prefix">+</span><span>    DaoAuthenticationProvider provider = new DaoAuthenticationProvider(userDetailsService);</span></div>
+            <div class="code-line line-add"><span class="line-num">101</span><span class="line-prefix">+</span><span>    provider.setPasswordEncoder(passwordEncoder);</span></div>
+            <div class="code-line line-add"><span class="line-num">102</span><span class="line-prefix">+</span><span>    return new ProviderManager(provider);</span></div>
+            <div class="code-line line-add"><span class="line-num">103</span><span class="line-prefix">+</span><span>  }</span></div>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>infrastructure/security/JdbcUserDetailsService.java <span class="diff-stat">new</span></span>
+            <span class="diff-stat">+38</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">18</span><span class="line-prefix">+</span><span>public class JdbcUserDetailsService implements UserDetailsService {</span></div>
+            <div class="code-line line-add"><span class="line-num">19</span><span class="line-prefix">+</span><span></span></div>
+            <div class="code-line line-add"><span class="line-num">21</span><span class="line-prefix">+</span><span>  private static final List&lt;String&gt; DEFAULT_ROLES = List.of("USER");</span></div>
+            <div class="code-line line-add"><span class="line-num">26</span><span class="line-prefix">+</span><span>  public UserDetails loadUserByUsername(String username) {</span></div>
+            <div class="code-line line-add"><span class="line-num">27</span><span class="line-prefix">+</span><span>    AccountAuthCustomEntity entity = mapper.findByUsername(username);</span></div>
+            <div class="code-line line-add"><span class="line-num">28</span><span class="line-prefix">+</span><span>    if (entity == null) {</span></div>
+            <div class="code-line line-add"><span class="line-num">29</span><span class="line-prefix">+</span><span>      throw new UsernameNotFoundException("User not found: " + username);</span></div>
+            <div class="code-line line-add"><span class="line-num">30</span><span class="line-prefix">+</span><span>    }</span></div>
+            <div class="code-line line-add"><span class="line-num">31</span><span class="line-prefix">+</span><span>    ... return new AuthenticatedUserDetails(user, entity.getPasswordHash());</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>ロールはスキーマにrole/authority表が無いため既定 <code>["USER"]</code> を付与。role表導入時にここを差し替える想定。</span>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>infrastructure/mybatis/custom/{entity,mapper}/AccountAuth* <span class="diff-stat">new</span></span>
+            <span class="diff-stat">+38 / +28</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">-</span><span class="line-prefix">+</span><span>@Select("""</span></div>
+            <div class="code-line line-add"><span class="line-num">-</span><span class="line-prefix">+</span><span>  SELECT a.user_id AS userId, a.username AS username, s.password_hash AS passwordHash</span></div>
+            <div class="code-line line-add"><span class="line-num">-</span><span class="line-prefix">+</span><span>    FROM m_account a JOIN m_signon s ON s.user_id = a.user_id</span></div>
+            <div class="code-line line-add"><span class="line-num">-</span><span class="line-prefix">+</span><span>   WHERE a.username = #{username}""")</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">⚠️</span>
+            <span>auth.md §4 の罠（as-is の認証クエリが bannerdata と INNER JOIN しており該当行が無いとログイン失敗）は新スキーマで bannerdata 自体が廃止済みのため再発しない。本クエリでも bannerdata を参照していない。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC2 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC2 (SBD-4)</div>
+        <div class="ac-text">ログイン成功時にセッション/認証状態を再生成（固定化防止）、サインオフで無効化</div>
+      </div>
+      <div class="ac-body">
+        <div class="ac-scope-note">JWT httpOnly Cookie方式（HttpSessionを使わない）への翻訳: 「ログイン成功＝新規access/refresh発行」「ログアウト＝両Cookie失効」として実装。</div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>application/service/AuthApplicationService.java</span>
+            <span class="diff-stat">+47 / -1</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">53</span><span class="line-prefix">+</span><span>  public AuthenticatedUser login(</span></div>
+            <div class="code-line line-add"><span class="line-num">54</span><span class="line-prefix">+</span><span>      String username, String rawPassword, HttpServletResponse response) {</span></div>
+            <div class="code-line line-add"><span class="line-num">55</span><span class="line-prefix">+</span><span>    Authentication authResult =</span></div>
+            <div class="code-line line-add"><span class="line-num">56</span><span class="line-prefix">+</span><span>        authenticationManager.authenticate(</span></div>
+            <div class="code-line line-add"><span class="line-num">57</span><span class="line-prefix">+</span><span>            new UsernamePasswordAuthenticationToken(username, rawPassword));</span></div>
+            <div class="code-line line-add"><span class="line-num">61</span><span class="line-prefix">+</span><span>    String accessToken = jwtService.generateAccessToken(user);</span></div>
+            <div class="code-line line-add"><span class="line-num">62</span><span class="line-prefix">+</span><span>    String refreshToken = jwtService.generateRefreshToken(user);</span></div>
+            <div class="code-line line-add"><span class="line-num">63</span><span class="line-prefix">+</span><span>    cookieSupport.writeAccessTokenCookie(response, accessToken, ...);</span></div>
+            <div class="code-line line-add"><span class="line-num">64</span><span class="line-prefix">+</span><span>    cookieSupport.writeRefreshTokenCookie(response, refreshToken, ...);</span></div>
+            <div class="code-line line-add"><span class="line-num">65</span><span class="line-prefix">+</span><span>    return user;</span></div>
+            <div class="code-line line-add"><span class="line-num">66</span><span class="line-prefix">+</span><span>  }</span></div>
+            <div class="code-line line-ctx"><span class="line-num">...</span><span class="line-prefix"> </span><span></span></div>
+            <div class="code-line line-add"><span class="line-num">74</span><span class="line-prefix">+</span><span>  public void logout(HttpServletResponse response) {</span></div>
+            <div class="code-line line-add"><span class="line-num">75</span><span class="line-prefix">+</span><span>    cookieSupport.clearAuthCookies(response);</span></div>
+            <div class="code-line line-add"><span class="line-num">76</span><span class="line-prefix">+</span><span>  }</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>呼び出し元が事前に（攻撃者由来等の）ACCESS_TOKEN Cookieを保持していても、loginは常に新規署名のトークンを発行し、供給されたトークンをそのまま再利用・エコーしない＝固定化を構造的に防止。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC3 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check partial">◐</div>
+        <div class="ac-num">AC3</div>
+        <div class="ac-text">保護ページ要求→ログイン→元URLへ復帰</div>
+      </div>
+      <div class="ac-body">
+        <div class="ac-scope-note">backend側は「保護resourceは401 JSONを返すのみ」で充足（SBD-9: リダイレクトsinkを新設しないことで構造的にオープンリダイレクト対策済み）。元URL復帰の実UX（SPAが遷移先を保持し復帰させる処理）は<strong>#24（フロント）で対応</strong>。</div>
+        <p>Cookie/未ログインで保護resourceへアクセスすると、backendは<code>sendRedirect</code>相当を一切持たず401 JSONを返すのみ。これはSBD-9（オープンリダイレクト）が backend にリダイレクトsink自体が存在しないことで構造的に解消されていることを意味する。</p>
+      </div>
+    </div>
+
+    <!-- AC4 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC4 (SBD-3)</div>
+        <div class="ac-text">ログイン/ログアウトは CSRF 前提・非冪等POST</div>
+      </div>
+      <div class="ac-body">
+        <p>#23で整備済みのCSRF基盤（<code>CookieCsrfTokenRepository</code>）が login/logout にもそのまま適用される。GET/DELETE等は一切マッピングしていないため到達不可。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>presentation/rest/AuthController.java</span>
+            <span class="diff-stat">+40 / -1</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">41</span><span class="line-prefix">+</span><span>  @PostMapping("/login")</span></div>
+            <div class="code-line line-add"><span class="line-num">42</span><span class="line-prefix">+</span><span>  public ResponseEntity&lt;LoginResponse&gt; login(</span></div>
+            <div class="code-line line-add"><span class="line-num">43</span><span class="line-prefix">+</span><span>      @Valid @RequestBody LoginRequest request, HttpServletResponse response) {</span></div>
+            <div class="code-line line-add"><span class="line-num">44</span><span class="line-prefix">+</span><span>    AuthenticatedUser user =</span></div>
+            <div class="code-line line-add"><span class="line-num">45</span><span class="line-prefix">+</span><span>        authApplicationService.login(request.username(), request.password(), response);</span></div>
+            <div class="code-line line-add"><span class="line-num">46</span><span class="line-prefix">+</span><span>    return ResponseEntity.ok(new LoginResponse(user.username(), user.roles()));</span></div>
+            <div class="code-line line-add"><span class="line-num">47</span><span class="line-prefix">+</span><span>  }</span></div>
+            <div class="code-line line-ctx"><span class="line-num">...</span><span class="line-prefix"> </span><span></span></div>
+            <div class="code-line line-add"><span class="line-num">50</span><span class="line-prefix">+</span><span>  @PostMapping("/logout")</span></div>
+            <div class="code-line line-add"><span class="line-num">51</span><span class="line-prefix">+</span><span>  public ResponseEntity&lt;Void&gt; logout(HttpServletResponse response) {</span></div>
+            <div class="code-line line-add"><span class="line-num">63</span><span class="line-prefix">+</span><span>  public record LoginRequest(@NotBlank String username, @NotBlank String password) {}</span></div>
+            <div class="code-line line-add"><span class="line-num">67</span><span class="line-prefix">+</span><span>  public record LoginResponse(String username, List&lt;String&gt; roles) {}</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>資格情報は <code>@RequestBody</code>（JSON body）のみで受理し、query/GETでは一切受け付けない（SBD-6のGET認証廃止）。<code>LoginResponse</code> は httpOnly CookieがJSから読めないため、SPA表示用の最小限の識別情報（username・roles）のみ返す。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC-neg1 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC-neg1（否定AC / SBD-4）</div>
+        <div class="ac-text">ログイン前後で session/認証識別子が変わる（固定化不可）</div>
+      </div>
+      <div class="ac-body">
+        <p>攻撃者が事前に細工した ACCESS_TOKEN Cookie をログインリクエストに付けても、応答は新規発行トークン（sub=認証されたユーザー）に置き換わり、供給トークンは破棄されることをテストで確認。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/test/groovy/.../AuthLoginLogoutSpec.groovy</span>
+            <span class="diff-stat">+232 <span class="diff-stat">new / 11 cases</span></span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">175</span><span class="line-prefix"> </span><span>def "ログイン成功時に発行されるACCESS_TOKENは新規トークンであり、</span></div>
+            <div class="code-line line-ctx"><span class="line-num">176</span><span class="line-prefix"> </span><span>事前に付与されたCookieは再利用されない(AC2/AC-neg1・SBD-4固定化対策)"() {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">177</span><span class="line-prefix"> </span><span>    given: def attacker = new AuthenticatedUser(999999L, "attacker", ["USER"])</span></div>
+            <div class="code-line line-ctx"><span class="line-num">178</span><span class="line-prefix"> </span><span>    def plantedToken = jwtService.generateAccessToken(attacker)</span></div>
+            <div class="code-line line-ctx"><span class="line-num">190</span><span class="line-prefix"> </span><span>    then: newAccessToken != plantedToken</span></div>
+            <div class="code-line line-ctx"><span class="line-num">193</span><span class="line-prefix"> </span><span>    newUser.userId() != attacker.userId()</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC-neg2 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check partial">◐</div>
+        <div class="ac-num">AC-neg2（否定AC / SBD-3）</div>
+        <div class="ac-text">外部オリジンからのログイン/ログアウト（状態変更）が拒否される。GETでの認証・状態変更リンクが存在しない</div>
+      </div>
+      <div class="ac-body">
+        <div class="ac-scope-note">backend側（CSRF拒否・GET非対応）は充足。「外部オリジン」の厳密なブラウザ検証（SPAからのfetch）は#24のE2Eで最終確認予定。</div>
+        <p>実装中に、GET等の未マッピングメソッドへのアクセスが <code>GlobalExceptionHandler</code> の <code>Exception</code> catch-all に落ちて500に丸められるバグを発見（405期待値と不整合）。<code>HttpRequestMethodNotSupportedException</code> 専用ハンドラを追加して修正した（下記「実装メモ」参照）。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>presentation/rest/exception/GlobalExceptionHandler.java</span>
+            <span class="diff-stat">+12</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">79</span><span class="line-prefix">+</span><span>  @ExceptionHandler(HttpRequestMethodNotSupportedException.class)</span></div>
+            <div class="code-line line-add"><span class="line-num">80</span><span class="line-prefix">+</span><span>  public ResponseEntity&lt;ErrorResponse&gt; handleMethodNotAllowed(</span></div>
+            <div class="code-line line-add"><span class="line-num">81</span><span class="line-prefix">+</span><span>      HttpRequestMethodNotSupportedException e, HttpServletRequest request) {</span></div>
+            <div class="code-line line-add"><span class="line-num">82</span><span class="line-prefix">+</span><span>    return build(</span></div>
+            <div class="code-line line-add"><span class="line-num">83</span><span class="line-prefix">+</span><span>        HttpStatus.METHOD_NOT_ALLOWED, "METHOD_NOT_ALLOWED", "Method not allowed", request);</span></div>
+            <div class="code-line line-add"><span class="line-num">84</span><span class="line-prefix">+</span><span>  }</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Implementation notes -->
+  <section>
+    <h2>実装メモ（仕様外の判断・変更・妥協点）</h2>
+    <div class="note-box">
+      <strong>syncTestSeedタスクの新設を見送り:</strong> 計画時は「新規gradle syncTestSeedタスク」を想定していたが、<code>jpetstore-backend/src/test/resources/flyway/sql/README.md</code>に「flyway/sql-testはbackendの統合テストへ同期しない・各テストが自己完結でフィクスチャをINSERTする」という既存方針が確立済みだったため、それに合わせた。#19のデモシード検証は<code>jpetstore-database</code>側のTestcontainersテストに、#18のlogin/logoutテストはbackend側で自己完結のフィクスチャINSERTにした。
+    </div>
+    <div class="note-box">
+      <strong>HttpRequestMethodNotSupportedExceptionのバグ修正:</strong> AC-neg2の自動テスト作成中に、GET等の未マッピングメソッドが500に丸められる既存バグ（#23由来）を発見し、本Issueのスコープで修正した（詳細は「AC-neg2」参照）。
+    </div>
+    <div class="note-box warn">
+      <strong>申し送り: CSRFトークンのconsume-then-regenerate挙動</strong>（#24フロント実装時に要考慮）<br>
+      手動動作確認で、CSRF（<code>XSRF-TOKEN</code>）Cookieが状態変更（非GET）リクエスト成功のたびにサーバー側で失効し、次のGETリクエストで新しいトークンが再発行される挙動を発見した。<code>/api/auth/refresh</code>（#23由来の既存エンドポイント）でも同一現象を確認済みのため、#18/#19で新規に混入したものではない。SPA実装（#24）側は、連続してPOST/PUT/DELETEする場合に毎回最新の<code>XSRF-TOKEN</code>Cookie値をヘッダへ載せる、または各POST前にGETでトークンを再取得する設計が必要。
+    </div>
+  </section>
+
+  <!-- Verify -->
+  <section>
+    <h2>動作確認ポイント（ユーザー確認用）</h2>
+    <ul class="verify-list">
+      <li class="verify-item">
+        <div class="verify-num">1</div>
+        <div class="verify-content">
+          <strong>curlでlogin→保護resource→logoutの一連が疎通すること</strong>
+          <span>demo_user（#19で追加したデモシード）／パスワード <code>Sprint3-DemoLogin!26</code> でログインできる</span>
+          <div class="curl-block"># 1) CSRFトークン取得
+curl -c cookies.txt http://localhost:8080/api/ping
+
+# 2) ログイン（CSRFヘッダ必須）
+CSRF=$(grep XSRF-TOKEN cookies.txt | awk '{print $NF}')
+curl -b cookies.txt -c cookies.txt -X POST http://localhost:8080/api/auth/login \
+  -H "X-XSRF-TOKEN: $CSRF" -H "Content-Type: application/json" \
+  -d '{"username":"demo_user","password":"Sprint3-DemoLogin!26"}'
+# => 200 {"username":"demo_user","roles":["USER"]}
+
+# 3) 保護resourceへアクセス（USERロールのためADMIN限定resourceは403=認証は通っている証跡）
+curl -b cookies.txt http://localhost:8080/api/secured/ping
+# => 403 FORBIDDEN（未ログイン時は401になることと比較すると認証チェーンが機能している）
+
+# 4) ログアウト（CSRFヘッダ必須）
+curl -b cookies.txt -c cookies.txt -X POST http://localhost:8080/api/auth/logout \
+  -H "X-XSRF-TOKEN: $CSRF"
+# => 204、ACCESS_TOKEN/REFRESH_TOKENがMax-Age=0で失効
+
+# 5) ログアウト後は401に戻ることを確認
+curl -b cookies.txt http://localhost:8080/api/secured/ping
+# => 401 UNAUTHORIZED</div>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">2</div>
+        <div class="verify-content">
+          <strong>誤ったパスワード・未知ユーザーで同一の401が返ること（列挙不可）</strong>
+          <span>手順2で <code>password</code> を間違えた場合と、存在しない<code>username</code>を送った場合で、レスポンスの<code>code</code>/<code>message</code>が同一であること</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">3</div>
+        <div class="verify-content">
+          <strong>CSRFヘッダ無しでログインすると403になること</strong>
+          <span>手順2で <code>-H "X-XSRF-TOKEN: ..."</code> を外して実行すると403 FORBIDDENが返る</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">4</div>
+        <div class="verify-content">
+          <strong>GET /api/auth/login が405になること</strong>
+          <span><code>curl http://localhost:8080/api/auth/login</code>（GET）で405 METHOD_NOT_ALLOWEDが返る</span>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- Scope -->
+  <section>
+    <h2>改修スコープ確認</h2>
+    <table class="scope-table">
+      <tr>
+        <th>ファイル</th>
+        <th>変更</th>
+        <th>内容</th>
+      </tr>
+      <tr>
+        <td><code>infrastructure/mybatis/custom/entity/AccountAuthCustomEntity.java</code></td>
+        <td><span class="tag-changed">新規</span></td>
+        <td>m_account×m_signon JOIN結果の受け皿（手書きカスタムentity）</td>
+      </tr>
+      <tr>
+        <td><code>infrastructure/mybatis/custom/mapper/AccountAuthCustomMapper.java</code></td>
+        <td><span class="tag-changed">新規</span></td>
+        <td>username→user_id/username/password_hash 参照専用Mapper</td>
+      </tr>
+      <tr>
+        <td><code>infrastructure/security/AuthenticatedUserDetails.java</code></td>
+        <td><span class="tag-changed">新規</span></td>
+        <td>AuthenticatedUserをUserDetailsとして表す認証専用アダプタ</td>
+      </tr>
+      <tr>
+        <td><code>infrastructure/security/JdbcUserDetailsService.java</code></td>
+        <td><span class="tag-changed">新規</span></td>
+        <td>DB結線されたUserDetailsService実装（既定ロールUSER付与）</td>
+      </tr>
+      <tr>
+        <td><code>config/SecurityConfig.java</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>AuthenticationManager Bean追加、login/logoutをpermitAllに追加、staleコメント是正</td>
+      </tr>
+      <tr>
+        <td><code>application/service/AuthApplicationService.java</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>login()/logout()追加、staleコメント是正</td>
+      </tr>
+      <tr>
+        <td><code>presentation/rest/AuthController.java</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>POST /login・/logout追加、LoginRequest/LoginResponse DTO、staleコメント是正</td>
+      </tr>
+      <tr>
+        <td><code>presentation/rest/exception/GlobalExceptionHandler.java</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>HttpRequestMethodNotSupportedException専用ハンドラ追加（405正規化バグ修正）</td>
+      </tr>
+      <tr>
+        <td><code>infrastructure/security/JwtService.java</code> / <code>AuthCookieSupport.java</code></td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td>#23の既存資産をそのまま再利用（typ claim区別・httpOnly Cookie読み書き）</td>
+      </tr>
+      <tr>
+        <td>Vue ログイン画面 / Pinia authストア / ルーターガード</td>
+        <td><span class="tag-deferred">#24へ持ち越し</span></td>
+        <td>Sprint 5予定。AC1/AC3のフロントUX分</td>
+      </tr>
+    </table>
+  </section>
+
+</div>
+</body>
+</html>

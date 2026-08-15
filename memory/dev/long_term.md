@@ -9,9 +9,11 @@
   発生スプリント: Sprint1（#22）
 
 ### jpetstore-backend
-（今スプリントが本リポジトリ初のDEV実装スプリントのため、繰り返し指摘はまだ無し。以下の指摘はいずれも
-初出＝1回目のため、2回ルールに従い本セクションではなく「習得したこと」「技術的なハマりポイント」に
-記録する。ただし一部は参照知識/実装パターンとして初出からSkillへ即時反映した（詳細は「Skills更新履歴」）。）
+Sprint2（#23）・Sprint3（#18/#19）とも実装スプリントを終えたが、3観点レビュー（規約/セキュリティ/パフォーマンス）
+での**指摘は今のところ0件の繰り返しも無し**（Sprint3はレビュー指摘自体が0件だった）。以下の発見はいずれも
+DEV自身がTDD・実機検証中に見つけたもので初出＝1回目のため、2回ルールに従い本セクションではなく「習得したこと」
+「技術的なハマりポイント」に記録する。ただし一部は参照知識/実装パターンとして初出からSkillへ即時反映した
+（詳細は「Skills更新履歴」）。
 
 ## 技術的なハマりポイント
 
@@ -43,6 +45,23 @@
   切り分けは`./gradlew compileJava`が green かどうか（greenなら実装は正しくIDE表示のみの問題）。
   VSCodeでは `Java: Clean Java Language Server Workspace` またはGradle拡張の再読み込みで解消する。
   発生スプリント: Sprint2（#23、jjwt 0.11.5→0.12.6更新後に発生）
+- **`@RestControllerAdvice` の catch-all（`@ExceptionHandler(Exception.class)`）は、専用ハンドラの無い
+  フレームワーク例外を意図しないステータスに丸めてしまう。** `HttpRequestMethodNotSupportedException`
+  （未マッピングHTTPメソッドへのアクセス）は本来 405 だが、専用ハンドラが無いと catch-all に落ちて 500 に
+  なっていた。AC-neg2（GETでの状態変更不可＝405期待）の自動テストで顕在化。`GlobalExceptionHandler` に
+  `@ExceptionHandler(HttpRequestMethodNotSupportedException.class)` を追加して 405 に正規化した。
+  catch-all を持つ例外ハンドラを書く/レビューする際は、Spring MVC が個別ステータスに自動マッピングする
+  はずの例外（405/415等）を横取りして握りつぶしていないか確認する必要がある。
+  発生スプリント: Sprint3（#18）
+- **Spring Security の CSRF（`XSRF-TOKEN` Cookie・`CookieCsrfTokenRepository`）は、状態変更（非GET）
+  リクエストが成功するたびにサーバー側で Cookie を失効させ、次の GET リクエストで新しいトークンが
+  再発行される（consume-then-regenerate）。** `/api/auth/login`（新規）だけでなく `/api/auth/refresh`
+  （#23由来・未変更）でも同一現象を確認したため、#18/#19 で新規に混入した挙動ではなく Spring Security 7
+  の既存動作。手動での実機疎通確認（curlでの連続POST）で初めて気づいた。自動テスト（`.with(csrf())`
+  postprocessor でトークンを直接注入）ではこの挙動を経由しないため検知できなかった。フロント実装時は
+  連続する状態変更リクエストのたびに最新の `XSRF-TOKEN` Cookie 値を再取得してヘッダに載せる設計が必要
+  （#24 への申し送り事項。`backlog/sprint_03/implementation-notes.md` 参照）。
+  発生スプリント: Sprint3（#18、実機疎通確認時に発見）
 
 ## 習得したこと
 
@@ -76,6 +95,25 @@
   例: 監査ログ）はMyBatis Generatorの対象外とし、意図しないupdate/delete系メソッドを生成させない
   （architecture-conventions.md §4.4として新設・明文化）。ユーザーからの配置に関する質問で判明。
   発生スプリント: Sprint2（#23）→ backend-conventionsへ即時反映（配置規約はJIT調整の一環）
+- **パスワードの `PasswordEncoder` は Spring Security 標準の `PasswordEncoderFactories.
+  createDelegatingPasswordEncoder()`（既定bcrypt）を使い、ハッシュ値には `{bcrypt}` 等のアルゴリズムID
+  プレフィックスを含めて保存する。** プレフィックス無しの生bcrypt文字列（`$2a$10$...`）を
+  `matches()` に渡すとアルゴリズムIDが解決できず失敗する（`DelegatingPasswordEncoder` は既定で
+  `defaultPasswordEncoderForMatches` が未設定のため）。DB seed・テストフィクスチャで bcrypt ハッシュを
+  直接書く場合も必ずこのプレフィックスを含めること。
+  発生スプリント: Sprint3（#19）→ backend-conventionsへ即時反映（参照知識の例外・2回ルール対象外）
+- **`DaoAuthenticationProvider` は `UserDetailsService#loadUserByUsername` が投げた
+  `UsernameNotFoundException` を、既定（`hideUserNotFoundExceptions=true`）で誤パスワードと同一の
+  `BadCredentialsException` に正規化する。** 未知ユーザーと誤パスワードのログイン失敗を同一の401
+  （SBD-6・列挙不可）にするための Spring Security 標準機能であり、カスタム `UserDetailsService` 側で
+  この既定動作を壊す実装（例外を個別にキャッチして別メッセージを返す等）をしないよう注意する。
+  発生スプリント: Sprint3（#18）→ backend-conventionsへ即時反映（secure-by-defaultパターンの例外）
+- **cross-repo（`jpetstore-backend`＋`jpetstore-database`）で同名の feature ブランチを切り、
+  1つの Issue の実装を Issue単位のコミットとして両リポジトリに分けて積むパターンを実際に運用し、
+  問題なく機能することを確認した。** #19（PasswordEncoder=backend／デモシード=database）・#18
+  （login/logout=backend）のように、1 Story が DB seed とそれを消費するロジックの両方にまたがる
+  場合の標準的な進め方として確立（計画段階でSMが事前に線引きを明示していたため実装時の迷いは無かった）。
+  発生スプリント: Sprint3（#18/#19。初のcross-repo実装スプリント）
 
 ## Skills更新履歴
 
@@ -99,7 +137,21 @@
   この一手順で防げたという定量的根拠が強く、かつSMから即時反映の要否を明示的に検討するよう指示があったため。
 - `#skills-changelog` へ `[DEV]` で投稿済み。
 
+### Sprint 3（#18/#19）
+
+- **`backend-conventions`**: `## 9. jpetstore-backend 固有の注意事項` に以下2点を追記
+  （初出だが「知らないと書けない参照知識・実装パターン」の2回ルール例外として即時反映）:
+  - `PasswordEncoder` は `PasswordEncoderFactories.createDelegatingPasswordEncoder()`（既定bcrypt）を使い、
+    ハッシュ値に `{bcrypt}` 等のアルゴリズムIDプレフィックスを含めて保存する
+  - `DaoAuthenticationProvider` の `hideUserNotFoundExceptions` 既定動作（未知ユーザーも誤PWと同一の
+    `BadCredentialsException` に正規化＝SBD-6列挙不可）を壊さない
+  - `HttpRequestMethodNotSupportedException→500問題` と `CSRF consume-then-regenerate挙動` の2件は
+    **今回は反映せず**（前者は同一の共有 `GlobalExceptionHandler` 内で既に修正済みのため再発リスクが無く、
+    後者はSpring Security自体の既存挙動でありbackend側の実装パターンとして「書き方」を変える性質のもの
+    ではないため。いずれも long_term.md「技術的なハマりポイント」に留めた）
+- `#skills-changelog` へ `[DEV]` で投稿済み。
+
 ## 卒業済みルール
 
 （該当なし。棚卸し対象となるルールが直近15スプリント基準に達していない。
-  jpetstore-backendはSprint2が初実装スプリント、jpetstore-databaseもSprint1のみのため対象外）
+  jpetstore-backendはSprint2・3の2スプリントのみ、jpetstore-databaseもSprint1・3の実装2スプリントのみのため対象外）
