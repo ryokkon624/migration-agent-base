@@ -11,13 +11,16 @@
   3観点レビュー指摘0件だった。要因は下記「横断（database＋backend＋frontend）」参照。
 
 ### jpetstore-backend
-Sprint2（#23）・Sprint3（#18/#19）・Sprint4（#21/#20）・Sprint6（#1）とも実装スプリントを終えたが、3観点
-レビュー（規約/セキュリティ/パフォーマンス）での**指摘は今のところ0件の繰り返しも無し**（Sprint3はレビュー
-指摘自体が0件、Sprint4は規約/パフォーマンスが0件・セキュリティは非ブロッキング2件、Sprint6は3観点とも
-0件＝カタログAPIをゼロから新規実装したスプリントとしては初のクリーン達成）。以下の発見はいずれもDEV自身が
-TDD・実機検証中に見つけたもので初出＝1回目のため、2回ルールに従い本セクションではなく「習得したこと」
-「技術的なハマりポイント」に記録する。ただし一部は参照知識/実装パターンとして初出からSkillへ即時反映した
-（詳細は「Skills更新履歴」）。
+Sprint2（#23）・Sprint3（#18/#19）・Sprint4（#21/#20）・Sprint6（#1）・Sprint7（#2/#3）とも実装スプリントを
+終えたが、3観点レビュー（規約/セキュリティ/パフォーマンス）での**指摘は今のところ0件の繰り返しも無し**
+（Sprint3はレビュー指摘自体が0件、Sprint4は規約/パフォーマンスが0件・セキュリティは非ブロッキング2件、
+Sprint6は3観点とも0件、Sprint7はconvention/securityが0件・performanceのみ非ブロッキング1件で再修正不要）。
+以下の発見はいずれもDEV自身がTDD・実機検証中に見つけたもので初出＝1回目のため、2回ルールに従い本セクション
+ではなく「習得したこと」「技術的なハマりポイント」に記録する。ただし一部は参照知識/実装パターンとして
+初出からSkillへ即時反映した（詳細は「Skills更新履歴」）。
+
+Sprint7の`@RestControllerAdvice`catch-all問題（後述「技術的なハマりポイント」）はSprint3に続く2回目の
+発生のため、本スプリントでSkill（`backend-conventions`§9）へ昇格した（唯一の2回ルール昇格ケース）。
 
 Sprint4のセキュリティ非ブロッキング2件（`AuthApplicationService.login`のタイミング副次チャネル／
 ロックアウトのcheck-then-act非原子性）はレビュー指摘そのものではあるが、SMが実コードで検証のうえ
@@ -68,6 +71,15 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   後続Storyでも、計画フェーズのAC整備でこの3点（土台再利用の徹底／レビュー観点の先回りAC化／設計論点の
   事前確定）を意識する。
   発生スプリント: Sprint6（#1）
+- **Sprint7（#2/#3）はSprint6の3点（土台再利用／レビュー観点の先回りAC化／設計論点の事前確定）を
+  そのまま適用し、convention/securityは指摘0件・performanceのみ軽微な非ブロッキング1件（再修正不要）で
+  完走した。** 加えてSprint7固有の要因として、**Sprint6で新設した再利用資産（`Page`/`PageRequest`/
+  `PageResponse<T>`・カスタムXMLマッパー方式・`ProductCard`/`Pagination`/`CatalogBreadcrumb`等のUI部品・
+  `.jps-search`未配線CSS）を#2/#3が計画通り再利用し、手戻りゼロで実装できた**（Sprint6時点で「#2/#9が
+  再利用する先例規約」と明記していた設計が実際に機能した＝C1チャレンジの実証）。2スプリント連続の
+  クリーン実装により、「secure-by-defaultな土台の上に積む」「先例を再利用する」パターンが偶然ではなく
+  再現可能な設計原則であることが確認できた。
+  発生スプリント: Sprint7（#2/#3）
 
 ## 技術的なハマりポイント
 
@@ -112,7 +124,10 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   `@ExceptionHandler(HttpRequestMethodNotSupportedException.class)` を追加して 405 に正規化した。
   catch-all を持つ例外ハンドラを書く/レビューする際は、Spring MVC が個別ステータスに自動マッピングする
   はずの例外（405/415等）を横取りして握りつぶしていないか確認する必要がある。
-  発生スプリント: Sprint3（#18）
+  発生スプリント: Sprint3（#18）→ **Sprint7で2回目発生**（`MethodArgumentTypeMismatchException`＝
+  `?page=abc`等の型不一致／`MissingServletRequestParameterException`＝必須パラメータ欠落／
+  `NoResourceFoundException`＝未知パスへのアクセス、の3例外が同じ理由で500に落ちていた）ため、
+  backend-conventionsへ即時反映（2回ルール昇格。既知の該当例外一覧としてSkillに表化）。
 - **Spring Security の CSRF（`XSRF-TOKEN` Cookie・`CookieCsrfTokenRepository`）は、状態変更（非GET）
   リクエストが成功するたびにサーバー側で Cookie を失効させ、次の GET リクエストで新しいトークンが
   再発行される（consume-then-regenerate）。** `/api/auth/login`（新規）だけでなく `/api/auth/refresh`
@@ -181,6 +196,16 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   `resolveCatalogImage(kind, id)`で解決・未存在はplaceholderへフォールバックする実装で採用した
   （実装パターン自体はfrontend-conventions §7へ即時反映）。
   発生スプリント: Sprint6（#1）→ frontend-conventionsへ即時反映（参照知識の例外・2回ルール対象外）
+- **共通レイアウトコンポーネント（`AppHeader.vue`等）に新規のインタラクティブ要素（`<form>`等）を
+  追加すると、そのレイアウトを使う既存Viewのテストで汎用セレクタが意図しない要素にヒットする。**
+  ヘッダに検索用`<form class="jps-search">`を追加したところ、`SignonView.spec.ts`の
+  `wrapper.find('form').trigger('submit.prevent')`が（DOM順序上先に現れる）検索フォームにヒットし、
+  signonフォームの送信テストが誤動作した（`router.push`が未定義routeへ飛びエラーになり顕在化）。
+  `wrapper.find('form.signon__form')`のようにView固有のクラス名でセレクタを明示化して解消した。
+  共通レイアウト（`AppHeader`/`AppLayout`等）へ新規のフォーム・ボタン等を追加する際は、そのレイアウトを
+  使う既存View群のテストで`find('form')`/`find('button')`のような汎用セレクタが使われていないか
+  確認すること。
+  発生スプリント: Sprint7（#2、ヘッダ検索バー追加時に発覚）
 
 ## 習得したこと
 
@@ -279,6 +304,22 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   Application層はDomainの`Page<T>`のみを扱い、Presentation層のController側で`PageResponse<T>`へ変換する
   分離を維持している（backend-conventions §9へ即時反映。詳細は「Skills更新履歴」）。
   発生スプリント: Sprint6（#1）→ backend-conventionsへ即時反映（参照知識の例外・2回ルール対象外）
+- **Sprint6で「#2/#9が再利用できる」と見込んで設計した資産（ページングDTO3型構成・カスタムXMLマッパー
+  方式・`CatalogController`のDTOレコード）が、実際に#2（商品検索）で無改造のまま再利用でき、手戻りが
+  一切発生しなかった。** `searchProducts`/`countSearchProducts`は既存の`CatalogCustomMapper.xml`に
+  追記するだけで済み、新規マッパーファイル・新規Application層パターンを起こす必要が無かった。一覧系
+  APIを設計する際、将来の類似機能（検索・履歴一覧等）を見込んで「先例規約」を明文化しておくと、後続
+  StoryのDEV計画フェーズでの設計論点が実質ゼロになる（確認すべき論点が「再利用するか／差分は何か」に
+  縮小する）。
+  発生スプリント: Sprint7（#2）
+- **`HttpMethod.GET`スコープでワイルドカード（例: `/api/products/**`）のpermitAllを設計しておくと、
+  同じリソース配下に新設する新規サブエンドポイント（検索等）も自動的にカバーされ、`SecurityConfig`の
+  変更が不要になる。** #2（`GET /api/products/search`）は新規エンドポイントだが、Sprint6で確立済みの
+  `/api/products/**`（GETスコープpermitAll）にそのまま含まれたため、新規APIを追加したにもかかわらず
+  `SecurityConfig`の変更ゼロで完結した。新規エンドポイントを追加する際は、まず既存のpermitAll
+  ワイルドカードパターンでカバーされていないかを確認してから追加要否を判断すると、Security設定の
+  肥大化・レビュー対象の増加を避けられる。
+  発生スプリント: Sprint7（#2）
 
 ### jpetstore-frontend
 - **backendのSpring Security 7 CSRF設定（非XOR `CsrfTokenRequestAttributeHandler`・consume-then-
@@ -315,6 +356,14 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   `StockBadge.vue`等）はロジック（props/イベント）に集中して実装できた。#2（検索）・#9（注文履歴）でも
   同じ既達クラスを再利用できる見込み（frontend-conventions §7へ即時反映。詳細は「Skills更新履歴」）。
   発生スプリント: Sprint6（#1）→ frontend-conventionsへ即時反映（参照知識の例外・2回ルール対象外）
+- **Sprint6見込み通り、`ProductCard.vue`/`Pagination.vue`/`CatalogBreadcrumb.vue`/画像アセット解決
+  （`resolveCatalogImage`）を#2（検索結果画面）にそのまま再利用でき、`SearchResultView.vue`の実装は
+  検索固有ロジック（キーワード/カテゴリフィルタのquery同期・空ガード）だけに集中できた。** 加えて
+  Sprint5（#24）で先行して用意されていた未配線CSS（`.jps-search`）も、マークアップを載せるだけで
+  意図通りのヘッダレイアウト（`flex:1;max-width`と`margin-left:auto`の組み合わせで検索バーがナビ/
+  アカウント欄を右寄せに保つ）になった。**将来使う想定のCSS/コンポーネントを先行スプリントで
+  「未配線のまま」用意しておく設計は、実装コストをほぼゼロで後続Storyに前借りできる。**
+  発生スプリント: Sprint7（#2）
 
 ### 横断（database＋backend＋frontend）
 - **区分値をm_codeに新規登録する際の3-repo横断フロー**を在庫ステータスで実地確認した:
@@ -431,9 +480,29 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   `memory/dev/long_term.md`「繰り返し指摘されるパターン」の「横断」に記録した。
 - `#skills-changelog` へ `[DEV]` で投稿済み。
 
+### Sprint 7（#2/#3・E1完成・Sprint6先例の再利用検証）
+
+- **`backend-conventions`**: `## 9. jpetstore-backend 固有の注意事項` に以下2点を追記:
+  - **catch-allの`@ExceptionHandler(Exception.class)`はフレームワーク例外を横取りする**（新規エンドポイント
+    追加時は都度棚卸し）。**2回ルールによる昇格**: Sprint3で`HttpRequestMethodNotSupportedException`の
+    catch-all混入が初出（当時は1回目のためSkill未反映）。Sprint7で`MethodArgumentTypeMismatchException`・
+    `MissingServletRequestParameterException`・`NoResourceFoundException`の3例外が同じ理由で500に落ちる
+    穴が見つかり2回目の発生と判断、Skillへ昇格した（既知の該当例外を表で明文化）。
+  - **LIKE等のSQL用サニタイズ・エスケープ処理はSQL文字列非依存の純VOに隔離する**（`ProductSearchTerms`の
+    実装パターン）。初出だが「知らないと書けない参照知識・実装パターン」の2回ルール例外として即時反映
+    （Sprint6のMyBatisカスタムXMLマッパー導入時と同じ位置づけ）。
+- **`frontend-conventions`へは反映しなかったもの**: 共通レイアウトコンポーネントへの新規フォーム追加が
+  既存Viewテストの汎用セレクタと衝突する問題（`SignonView.spec.ts`）は「注意すれば防げる系」の初出
+  （1回目）のため、2回ルールに従い今回はSkillに反映せず`memory/dev/long_term.md`「技術的なハマりポイント」
+  に留めた。
+- Sprint6先例（ページングDTO・カスタムXMLマッパー・UI部品・未配線CSS）の再利用が#2/#3で手戻りゼロ・
+  レビュー指摘ほぼゼロ（perfのみ軽微1件）で完走した要因分析は、チェックリスト項目ではなくプロセス上の
+  教訓のためSkillには反映せず`memory/dev/long_term.md`「繰り返し指摘されるパターン」の「横断」に記録した。
+- `#skills-changelog` へ `[DEV]` で投稿済み。
+
 ## 卒業済みルール
 
 （該当なし。棚卸し対象となるルールが直近15スプリント基準に達していない。
-  jpetstore-backendはSprint2・3・4・6の4スプリントのみ、jpetstore-databaseはSprint1・3・6の3スプリントのみ、
-  jpetstore-frontendはSprint5・6の2スプリントのみのため、いずれも対象外。Sprint4・Sprint5・Sprint6 Retroでも
-  棚卸しを実施したが同様の理由で卒業候補なし）
+  jpetstore-backendはSprint2・3・4・6・7の5スプリントのみ、jpetstore-databaseはSprint1・3・6の3スプリントのみ、
+  jpetstore-frontendはSprint5・6・7の3スプリントのみのため、いずれも対象外。Sprint4・Sprint5・Sprint6・
+  Sprint7 Retroでも棚卸しを実施したが同様の理由で卒業候補なし）
