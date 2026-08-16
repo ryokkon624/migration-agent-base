@@ -504,11 +504,52 @@ public ResponseEntity<LoginResponse> me() {
 > **背景（Sprint 6 #1）**: カタログ一覧API（category内product一覧・product内item一覧）で確立。
 > #2（商品検索）・#9（注文履歴一覧）が再利用する先例規約として明文化。
 
+### catch-allの`@ExceptionHandler(Exception.class)`はフレームワーク例外を横取りする（新規エンドポイント追加時は都度棚卸し）
+
+`GlobalExceptionHandler`のような catch-all（`@ExceptionHandler(Exception.class)`）を持つ
+`@RestControllerAdvice`は、専用ハンドラの無いフレームワーク例外まで拾って意図しないステータス
+（多くは500）に丸めてしまう。Spring MVCが個別ステータスへ自動マッピングするはずの例外は、
+新規エンドポイント・パラメータを追加するたびに横取りされていないか棚卸しし、必要な専用ハンドラを
+明示的に追加すること。
+
+これまでに顕在化した該当例外（見つかり次第このリストへ追記する）:
+
+| 例外 | 本来のステータス | 発生条件 |
+|---|---|---|
+| `HttpRequestMethodNotSupportedException` | 405 | 未マッピングHTTPメソッドへのアクセス |
+| `MethodArgumentTypeMismatchException` | 400 | クエリ/パスパラメータの型変換失敗（非数値・桁あふれ等） |
+| `MissingServletRequestParameterException` | 400 | 必須クエリパラメータの欠落 |
+| `NoResourceFoundException` | 404 | どのハンドラマッピング・静的リソースにも一致しない未知パス |
+
+> **背景（Sprint 3 #18・Sprint 7 #3）**: Sprint 3で`HttpRequestMethodNotSupportedException`が
+> catch-allに落ちて500になる問題が初めて発覚（自動テストで顕在化）。当時は初出のためSkill未反映
+> だったが、Sprint 7で`?page=abc`のような型不一致・未知パスへのアクセスが同じ理由で500に落ちる
+> 穴が再発したため、2回目としてSkillへ昇格した。新規`@RequestParam`・新規エンドポイントを追加する際は
+> 上表の例外が発生しうるケース（非数値パラメータ・存在しないパス等）を実機/自動テストの両方で確認する。
+
+### LIKE等のSQL用サニタイズ・エスケープ処理はSQL文字列非依存の純VOに隔離する
+
+検索語のLIKEメタ文字（`%`/`_`/`\`）エスケープのような「入力文字列を安全な形へ変換するだけ」の
+ロジックは、SQL文字列の組み立てや`#{}`バインドとは完全に分離した純粋なドメインVO（record等）に
+実装する。
+
+- VOはトークン分割・エスケープ後の文字列（例: `%esc%`パターン列）のみを返し、SQL文字列そのものは
+  一切組み立てない（呼び出し側のMyBatis `#{}` バインドに委譲する）
+- こうすることで、VO単体のロジック（境界値・メタ文字混入等）をDB接続（Testcontainers）を必要としない
+  高速な単体テストで検証できる。DB統合テストは「VOが返したパターンをSQLに渡した結果が正しいか」の
+  確認のみに絞れる
+- MySQLの`LIKE ... ESCAPE '\\'`句は、SQLテキスト中に**2つのバックスラッシュ文字**を書く
+  （MySQL文字列リテラルの規則でエスケープされ実際には1文字の`\`になる。`generatorConfig.xml`の
+  `LIKE 'm\_%' ESCAPE '\\'`が先例）
+
+> **背景（Sprint 7 #2・ID-29）**: 検索語の`%`/`_`をLIKEワイルドカードとして機能させずリテラル化する
+> ハードニングを`domain.catalog.ProductSearchTerms`に実装。SQL非依存の`ProductSearchTermsSpec`
+> （Spock・DBなし）でエスケープ境界値を実証し、`CatalogCustomMapperSpec`（Testcontainers）は
+> 実際のLIKE一致結果の確認のみに絞れた。
+
 > Swagger UIのpermitAll・`server.error.*`→`spring.web.error.*`・依存更新後のIDE lint staleness・
-> `@RestControllerAdvice`のcatch-allがフレームワーク例外（`HttpRequestMethodNotSupportedException`等）を
-> 意図しないステータスに丸める問題・CSRFトークンのconsume-then-regenerate挙動・セキュリティ上意味のある
-> 日時比較はDB側`NOW(6)`で行うべき問題（Sprint4）・`ON DUPLICATE KEY UPDATE`のSET句左→右評価順依存の
-> 二重計算（Sprint4）・`syncTestSchema`が`flyway/sql-test`を同期対象外とする点（Sprint6）・
-> `m_code.code_value`のVARCHAR(10)制約（Sprint6）は、いずれも初出（1回目）のため、2回ルールに従い
-> 本Skillには未反映（`memory/dev/long_term.md`「技術的なハマりポイント」参照）。2回目の発生でSkill昇格を
-> 検討する。
+> CSRFトークンのconsume-then-regenerate挙動・セキュリティ上意味のある日時比較はDB側`NOW(6)`で
+> 行うべき問題（Sprint4）・`ON DUPLICATE KEY UPDATE`のSET句左→右評価順依存の二重計算（Sprint4）・
+> `syncTestSchema`が`flyway/sql-test`を同期対象外とする点（Sprint6）・`m_code.code_value`の
+> VARCHAR(10)制約（Sprint6）は、いずれも初出（1回目）のため、2回ルールに従い本Skillには未反映
+> （`memory/dev/long_term.md`「技術的なハマりポイント」参照）。2回目の発生でSkill昇格を検討する。

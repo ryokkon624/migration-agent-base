@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint 7 Review — #3 カタログ参照の不正入力・stale-session を正規化し出力を安全化する</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #f8f7f5; }
+
+  .page { max-width: 900px; margin: 0 auto; padding: 48px 24px; }
+
+  /* Header */
+  .sprint-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin-bottom: 8px; }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px; }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+  .badge-sprint { background: #e8f0fe; color: #1a56db; }
+  .badge-issue { background: #f0fdf4; color: #166534; }
+  .badge-security { background: #fee2e2; color: #b91c1c; }
+  .badge-backend { background: #eef2ff; color: #4338ca; }
+  .badge-frontend { background: #fff7ed; color: #c2410c; }
+  .badge-done { background: #f3f4f6; color: #374151; }
+
+  /* Sections */
+  section { margin-bottom: 40px; }
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #888; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e5e5e5; }
+
+  /* Problem box */
+  .problem-box { background: #fff8f0; border-left: 3px solid #f59e0b; border-radius: 0 8px 8px 0; padding: 16px 20px; margin-bottom: 16px; }
+  .problem-box .label { font-size: 11px; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .problem-box p { color: #451a03; font-size: 13px; }
+  .problem-box p + p { margin-top: 8px; }
+
+  /* Architecture change */
+  .arch-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: center; margin-bottom: 8px; }
+  .arch-box { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; }
+  .arch-box .arch-title { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .arch-box.before { border-color: #fca5a5; }
+  .arch-box.after { border-color: #86efac; }
+  .arch-arrow { font-size: 20px; color: #888; text-align: center; }
+  .flow-item { font-size: 12px; color: #374151; padding: 3px 0; display: flex; align-items: flex-start; gap: 6px; }
+  .flow-item .dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .dot-red { background: #ef4444; }
+  .dot-green { background: #22c55e; }
+
+  /* AC cards */
+  .ac-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+  .ac-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid #f0f0f0; }
+  .ac-check { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .ac-check.done { background: #dcfce7; color: #166534; }
+  .ac-num { font-size: 11px; font-weight: 700; color: #888; }
+  .ac-text { font-size: 13px; font-weight: 600; color: #1a1a1a; flex: 1; }
+  .ac-status { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .ac-status.new { background: #dbeafe; color: #1d4ed8; }
+  .ac-status.existing { background: #f3f4f6; color: #6b7280; }
+  .ac-body { padding: 16px 18px; }
+  .ac-body p { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+
+  /* File change */
+  .file-change { margin-bottom: 16px; }
+  .file-name { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; background: #f3f4f6; color: #374151; padding: 5px 10px; border-radius: 4px 4px 0 0; border: 1px solid #e5e5e5; border-bottom: none; display: flex; justify-content: space-between; }
+  .diff-stat { color: #888; }
+  .code-block { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.7; background: #1e1e2e; color: #cdd6f4; padding: 14px 16px; border-radius: 0 0 6px 6px; overflow-x: auto; }
+  .code-line { display: flex; white-space: pre; }
+  .line-num { color: #45475a; min-width: 30px; user-select: none; }
+  .line-add { background: rgba(166, 227, 161, 0.12); color: #a6e3a1; }
+  .line-del { background: rgba(243, 139, 168, 0.12); color: #f38ba8; }
+  .line-ctx { color: #cdd6f4; }
+  .line-prefix { min-width: 14px; }
+
+  /* Annotation */
+  .annotation { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-size: 12px; color: #78350f; display: flex; gap: 8px; }
+  .annotation-icon { font-size: 14px; flex-shrink: 0; }
+
+  /* Verify section */
+  .verify-list { list-style: none; }
+  .verify-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; }
+  .verify-item:last-child { border-bottom: none; }
+  .verify-num { width: 22px; height: 22px; background: #e8f0fe; color: #1a56db; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .verify-content { flex: 1; }
+  .verify-content strong { font-size: 13px; color: #1a1a1a; display: block; margin-bottom: 3px; }
+  .verify-content span { font-size: 12px; color: #6b7280; }
+
+  /* Scope table */
+  .scope-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .scope-table th { text-align: left; padding: 8px 12px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .scope-table td { padding: 10px 12px; border: 1px solid #e5e5e5; color: #374151; vertical-align: top; }
+  .scope-table tr:hover td { background: #f9fafb; }
+  .tag-changed { font-size: 11px; font-weight: 600; background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 3px; }
+  .tag-test { font-size: 11px; font-weight: 600; background: #e8f0fe; color: #1a56db; padding: 2px 6px; border-radius: 3px; }
+  .tag-unchanged { font-size: 11px; font-weight: 600; background: #f3f4f6; color: #6b7280; padding: 2px 6px; border-radius: 3px; }
+  .tag-repo { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 3px; margin-right: 4px; }
+  .tag-repo.be { background: #eef2ff; color: #4338ca; }
+  .tag-repo.fe { background: #fff7ed; color: #c2410c; }
+
+  a.pr-link { color: #1a56db; text-decoration: none; font-weight: 600; }
+  a.pr-link:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="sprint-label">Sprint 7 Review</div>
+  <h1>#3 — カタログ参照の不正入力・stale-session を正規化し、<br>出力を安全化する</h1>
+  <div class="meta">
+    <span class="badge badge-sprint">Sprint 7</span>
+    <span class="badge badge-issue">#3</span>
+    <span class="badge badge-security">security</span>
+    <span class="badge badge-backend">backend（主）</span>
+    <span class="badge badge-frontend">frontend（従・回帰）</span>
+  </div>
+  <p style="font-size:12px; color:#6b7280; margin-bottom: 24px;">
+    PR: <a class="pr-link" href="https://github.com/ryokkon624/jpetstore-backend/pull/6" target="_blank">jpetstore-backend #6</a>
+    ／ <a class="pr-link" href="https://github.com/ryokkon624/jpetstore-frontend/pull/3" target="_blank">jpetstore-frontend #3</a>（Related）
+  </p>
+
+  <!-- Problem -->
+  <section>
+    <h2>なぜこの改修が必要だったか</h2>
+    <div class="problem-box">
+      <div class="label">問題</div>
+      <p>Sprint 6（#1）でカタログ階層閲覧APIを作った際、存在しない categoryId/productId/itemId は 404 に正規化する仕組みと、想定外の例外を固定文言に丸める <code>GlobalExceptionHandler</code> の土台は整備済みだった。しかし <strong>「page/size に非数値・桁あふれ値を渡した場合」の型不一致例外（<code>MethodArgumentTypeMismatchException</code>）専用のハンドラが無く</strong>、catch-all（<code>Exception</code> → 500）に落ちてスタックトレースを含む可能性のある応答を返してしまう穴が残っていた。同様に、どのルートにも一致しない未知パスへのアクセス（<code>NoResourceFoundException</code>）も同じ穴を通っていた。</p>
+      <p>また SBD-18（<code>description</code> の plaintext 化・<code>v-html</code> 不使用）自体は Sprint 6 で実装済みだったが、それを固定する回帰テストが無く「実装したこと」の証跡が無い状態だった。</p>
+    </div>
+    <div class="arch-grid">
+      <div class="arch-box before">
+        <div class="arch-title">改修前</div>
+        <div class="flow-item"><span class="dot dot-red"></span><code>?page=abc</code> → 型変換失敗 → catch-all <code>Exception</code> → <strong>500</strong></div>
+        <div class="flow-item"><span class="dot dot-red"></span>未知パスへのアクセス → <code>NoResourceFoundException</code> → catch-all → <strong>500</strong></div>
+        <div class="flow-item"><span class="dot dot-red"></span>SBD-18（plaintext化・v-html不使用）は実装済みだが未実証</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-box after">
+        <div class="arch-title">改修後</div>
+        <div class="flow-item"><span class="dot dot-green"></span><code>?page=abc</code> → 専用ハンドラ → <strong>400</strong>（固定文言のみ）</div>
+        <div class="flow-item"><span class="dot dot-green"></span>未知パスへのアクセス → 専用ハンドラ → <strong>404</strong>（固定文言のみ）</div>
+        <div class="flow-item"><span class="dot dot-green"></span>範囲外の有効なpage（例: 9999）は従来通りクランプし空200を維持</div>
+        <div class="flow-item"><span class="dot dot-green"></span>SBD-18を回帰テストで実証・固定</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AC breakdown -->
+  <section>
+    <h2>AC別 実装内容</h2>
+
+    <!-- AC1 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC1 (SBD-10)</div>
+        <div class="ac-text">不正/存在しない categoryId/productId/itemId は 404 または空へ正規化。trace露出3経路を解消</div>
+        <span class="ac-status existing">Sprint 6で既達</span>
+      </div>
+      <div class="ac-body">
+        <p>as-is（Struts版）の trace 露出3経路（<code>viewCategory</code>=<code>IllegalStateException</code>／<code>viewProduct</code>/<code>viewItem</code>=<code>NPE</code>）は、after 側では ID を <code>@PathVariable String</code> で受けるアーキ自体が非数値/巨大値/存在しないIDでも型変換例外を起こさず「DB未ヒット→404」に一本化されているため、Sprint 6（#1）の <code>CatalogApplicationService</code>（各 <code>getXxx</code> が <code>ResourceNotFoundException</code> を投げる）と <code>GlobalExceptionHandler</code>（→404正規化）で既に解消済み。本スプリントは新規コード無しで「解消済みであること」の実証（下記 AC-neg1 の回帰テストに含む）に留める。</p>
+      </div>
+    </div>
+
+    <!-- AC2 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC2 (SBD-18)</div>
+        <div class="ac-text">description は plaintext 化（HTML非継承）、商品画像は新規アセット。全動的出力を文脈エスケープ</div>
+        <span class="ac-status existing">Sprint 6で既達・本スプリントで回帰実証</span>
+      </div>
+      <div class="ac-body">
+        <p><code>m_product.description</code> は Sprint 6 の seed（<code>V00_000_008</code>）で plaintext のみ投入済み（legacy の <code>&lt;image src=...&gt;</code> 埋め込みHTMLは非継承）。frontend は全体で <code>v-html</code>/<code>innerHTML</code> を一切使わず <code>{{ }}</code> 補間のみで描画している。商品画像も DB にパスを持たせず新規アセット（<code>assets/catalog/product_*.png</code>）として別管理。</p>
+        <p>本スプリントは新規実装ではなく、既存の <code>ItemDetailView.spec.ts</code>（frontend・変更なし）が「HTML/scriptタグを与えても生描画・実行されない」ことを実証済みであることを確認し、Sprint 7 の DoD として「解消済み」を固定した。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span class="tag-repo fe">FE</span>src/views/catalog/__tests__/ItemDetailView.spec.ts <span style="color:#9ca3af;">(既存・変更なし)</span>
+            <span class="diff-stat">L56-87</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">56</span><span class="line-prefix"> </span><span>it('AC-neg1(SBD-18): descriptionにHTML/scriptタグを与えても生描画されず実行されない(v-html不使用)', async () =&gt; {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">57</span><span class="line-prefix"> </span><span>  const maliciousDescription =</span></div>
+            <div class="code-line line-ctx"><span class="line-num">58</span><span class="line-prefix"> </span><span>    '&lt;img src=x onerror="window.__xss=true"&gt;&lt;script&gt;window.__xss=true&lt;/script&gt;'</span></div>
+            <div class="code-line line-ctx"><span class="line-num">…</span><span class="line-prefix"> </span><span>  // ...</span></div>
+            <div class="code-line line-ctx"><span class="line-num">75</span><span class="line-prefix"> </span><span>  expect(wrapper.find('script').exists()).toBe(false)</span></div>
+            <div class="code-line line-ctx"><span class="line-num">85</span><span class="line-prefix"> </span><span>  expect(wrapper.html()).toContain('&amp;lt;script&amp;gt;')</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>この回帰テストは Sprint 6 由来で今回は変更していないが、「テストが存在し green である」こと自体が AC2/AC-neg2 の実証になるため Sprint 7 の DoD 判定に採用した。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC-neg1 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC-neg1 (否定AC / SBD-10)</div>
+        <div class="ac-text">非数値/巨大値/存在しないID・セッション切れ頁送りを与えても、500・trace が発生しない</div>
+        <span class="ac-status new">本スプリントで新規実装</span>
+      </div>
+      <div class="ac-body">
+        <p>ID系（存在しない/非数値/巨大値のID）は Sprint 6 で既に解消済みだったが、<strong>page/size に非数値・桁あふれ値を渡すケースだけ</strong> catch-all（500）に落ちる穴が残っていた。<code>GlobalExceptionHandler</code> に3つの専用ハンドラを追加して封じた。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span class="tag-repo be">BE</span>src/main/java/.../presentation/rest/exception/GlobalExceptionHandler.java
+            <span class="diff-stat">+36 / -0</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">14</span><span class="line-prefix"> </span><span>import org.springframework.web.bind.MethodArgumentNotValidException;</span></div>
+            <div class="code-line line-add"><span class="line-num">15</span><span class="line-prefix">+</span><span>import org.springframework.web.bind.MissingServletRequestParameterException;</span></div>
+            <div class="code-line line-ctx"><span class="line-num">16</span><span class="line-prefix"> </span><span>import org.springframework.web.bind.annotation.ExceptionHandler;</span></div>
+            <div class="code-line line-ctx"><span class="line-num">17</span><span class="line-prefix"> </span><span>import org.springframework.web.bind.annotation.RestControllerAdvice;</span></div>
+            <div class="code-line line-add"><span class="line-num">18</span><span class="line-prefix">+</span><span>import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;</span></div>
+            <div class="code-line line-add"><span class="line-num">19</span><span class="line-prefix">+</span><span>import org.springframework.web.servlet.resource.NoResourceFoundException;</span></div>
+          </div>
+          <div class="code-block" style="margin-top:8px;">
+            <div class="code-line line-add"><span class="line-num">102</span><span class="line-prefix">+</span><span>@ExceptionHandler(MethodArgumentTypeMismatchException.class)</span></div>
+            <div class="code-line line-add"><span class="line-num">103</span><span class="line-prefix">+</span><span>public ResponseEntity&lt;ErrorResponse&gt; handleTypeMismatch(</span></div>
+            <div class="code-line line-add"><span class="line-num">104</span><span class="line-prefix">+</span><span>    MethodArgumentTypeMismatchException e, HttpServletRequest request) {</span></div>
+            <div class="code-line line-add"><span class="line-num">105</span><span class="line-prefix">+</span><span>  return build(HttpStatus.BAD_REQUEST, "BAD_REQUEST", "Invalid parameter type", request);</span></div>
+            <div class="code-line line-add"><span class="line-num">106</span><span class="line-prefix">+</span><span>}</span></div>
+            <div class="code-line line-ctx"><span class="line-num">…</span><span class="line-prefix"> </span><span></span></div>
+            <div class="code-line line-add"><span class="line-num">112</span><span class="line-prefix">+</span><span>@ExceptionHandler(MissingServletRequestParameterException.class)</span></div>
+            <div class="code-line line-add"><span class="line-num">113</span><span class="line-prefix">+</span><span>public ResponseEntity&lt;ErrorResponse&gt; handleMissingParameter(</span></div>
+            <div class="code-line line-add"><span class="line-num">114</span><span class="line-prefix">+</span><span>    MissingServletRequestParameterException e, HttpServletRequest request) {</span></div>
+            <div class="code-line line-add"><span class="line-num">115</span><span class="line-prefix">+</span><span>  return build(HttpStatus.BAD_REQUEST, "BAD_REQUEST", "Missing required parameter", request);</span></div>
+            <div class="code-line line-add"><span class="line-num">116</span><span class="line-prefix">+</span><span>}</span></div>
+            <div class="code-line line-ctx"><span class="line-num">…</span><span class="line-prefix"> </span><span></span></div>
+            <div class="code-line line-add"><span class="line-num">122</span><span class="line-prefix">+</span><span>@ExceptionHandler(NoResourceFoundException.class)</span></div>
+            <div class="code-line line-add"><span class="line-num">123</span><span class="line-prefix">+</span><span>public ResponseEntity&lt;ErrorResponse&gt; handleNoResourceFound(</span></div>
+            <div class="code-line line-add"><span class="line-num">124</span><span class="line-prefix">+</span><span>    NoResourceFoundException e, HttpServletRequest request) {</span></div>
+            <div class="code-line line-add"><span class="line-num">125</span><span class="line-prefix">+</span><span>  return build(HttpStatus.NOT_FOUND, "NOT_FOUND", "Resource not found", request);</span></div>
+            <div class="code-line line-add"><span class="line-num">126</span><span class="line-prefix">+</span><span>}</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>方針統一：<strong>型として変換できない入力のみ 400</strong> にする。変換自体は成功するが範囲外の値（例: <code>page=9999</code>）は既存の <code>PageRequest</code> のクランプ思想（400にしない）を維持し、空200のまま返す。<code>MissingServletRequestParameterException</code> は現状どのAPIにも必須パラメータが無いため直接は発火しないが、将来の必須パラメータ追加に備えた予防的ハードニング（単体テストで直接検証）。</span>
+          </div>
+        </div>
+
+        <div class="file-change">
+          <div class="file-name">
+            <span class="tag-repo be">BE</span>src/test/groovy/.../presentation/rest/CatalogControllerSpec.groovy <span style="color:#9ca3af;">(回帰テスト追加)</span>
+            <span class="diff-stat">L181-215</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">181</span><span class="line-prefix">+</span><span>def "#3 AC-neg1: 非数値pageは400に正規化される(500でない)"() {</span></div>
+            <div class="code-line line-add"><span class="line-num">183</span><span class="line-prefix">+</span><span>    mockMvc.perform(get("/api/categories/DOGS/products?page=abc"))</span></div>
+            <div class="code-line line-add"><span class="line-num">184</span><span class="line-prefix">+</span><span>            .andExpect(status().isBadRequest())</span></div>
+            <div class="code-line line-ctx"><span class="line-num">…</span><span class="line-prefix"> </span><span></span></div>
+            <div class="code-line line-add"><span class="line-num">195</span><span class="line-prefix">+</span><span>def "#3 AC-neg1: 桁あふれのpage(Integer範囲超)は400に正規化される(500でない)"() {</span></div>
+            <div class="code-line line-add"><span class="line-num">197</span><span class="line-prefix">+</span><span>    mockMvc.perform(get("/api/categories/DOGS/products?page=99999999999999999999"))</span></div>
+            <div class="code-line line-add"><span class="line-num">198</span><span class="line-prefix">+</span><span>            .andExpect(status().isBadRequest())</span></div>
+            <div class="code-line line-ctx"><span class="line-num">…</span><span class="line-prefix"> </span><span></span></div>
+            <div class="code-line line-add"><span class="line-num">202</span><span class="line-prefix">+</span><span>def "#3 AC-neg1: stale頁送り相当(範囲外の有効なpage番号)はクランプされ空200を返す(500でない)"() {</span></div>
+            <div class="code-line line-add"><span class="line-num">204</span><span class="line-prefix">+</span><span>    mockMvc.perform(get("/api/categories/DOGS/products?page=9999"))</span></div>
+            <div class="code-line line-add"><span class="line-num">205</span><span class="line-prefix">+</span><span>            .andExpect(status().isOk())</span></div>
+            <div class="code-line line-add"><span class="line-num">206</span><span class="line-prefix">+</span><span>            .andExpect(jsonPath('$.content.length()').value(0))</span></div>
+            <div class="code-line line-ctx"><span class="line-num">…</span><span class="line-prefix"> </span><span></span></div>
+            <div class="code-line line-add"><span class="line-num">210</span><span class="line-prefix">+</span><span>def "#3 AC-neg1: 未知のサブパスは404に正規化される(500でない・NoResourceFoundException)"() {</span></div>
+            <div class="code-line line-add"><span class="line-num">212</span><span class="line-prefix">+</span><span>    mockMvc.perform(get("/api/categories/DOGS/unknown-subpath"))</span></div>
+            <div class="code-line line-add"><span class="line-num">213</span><span class="line-prefix">+</span><span>            .andExpect(status().isNotFound())</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>実機（<code>bootRun</code>）でも同じ4パターンを curl で確認済み。<code>?page=abc</code> → 400、<code>?page=99999</code> → 空200（<code>totalElements</code>は保持）、未知パス → 404、いずれもスタックトレースを含まない固定文言のみを返す。</span>
+          </div>
+        </div>
+
+        <div class="file-change">
+          <div class="file-name">
+            <span class="tag-repo be">BE</span>src/test/groovy/.../exception/GlobalExceptionHandlerSpec.groovy <span style="color:#9ca3af;">(単体テスト追加)</span>
+            <span class="diff-stat">+41 / -0</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">96</span><span class="line-prefix">+</span><span>def "#3 AC-neg1: MethodArgumentTypeMismatchExceptionは400に正規化される(...)"() {</span></div>
+            <div class="code-line line-add"><span class="line-num">97</span><span class="line-prefix">+</span><span>    given:</span></div>
+            <div class="code-line line-add"><span class="line-num">98</span><span class="line-prefix">+</span><span>    def method = CatalogController.getMethod("listProductsByCategory", String, Integer, Integer)</span></div>
+            <div class="code-line line-add"><span class="line-num">99</span><span class="line-prefix">+</span><span>    def param = new MethodParameter(method, 1)</span></div>
+            <div class="code-line line-add"><span class="line-num">100</span><span class="line-prefix">+</span><span>    def exception = new MethodArgumentTypeMismatchException("abc", Integer, "page", param, ...)</span></div>
+            <div class="code-line line-ctx"><span class="line-num">…</span><span class="line-prefix"> </span><span></span></div>
+            <div class="code-line line-add"><span class="line-num">111</span><span class="line-prefix">+</span><span>def "#3 AC-neg1: MissingServletRequestParameterExceptionは400に正規化される(必須パラメータ欠落)"() {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">…</span><span class="line-prefix"> </span><span></span></div>
+            <div class="code-line line-add"><span class="line-num">122</span><span class="line-prefix">+</span><span>def "#3 AC-neg1: NoResourceFoundExceptionは404に正規化される(未知パスへのアクセス)"() {</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC-neg2 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC-neg2 (否定AC / SBD-18)</div>
+        <div class="ac-text">格納データ由来の HTML/スクリプトが実行されない（生HTML描画面が消える）</div>
+        <span class="ac-status existing">Sprint 6で既達（AC2と同じ）＋ 本スプリントで stale頁送り分を追加実証</span>
+      </div>
+      <div class="ac-body">
+        <p>本体（HTML/scriptが実行されない）は AC2 と同じ実証内容（<code>ItemDetailView.spec.ts</code>、変更なし）。加えて Sprint 7 では「stale/セッション切れ頁送りで 500・trace が出ないこと」を frontend の store 層でも回帰実証した（<code>CatalogController</code> がAC-neg1の型不一致ハンドラで400を返すことに依存）。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span class="tag-repo fe">FE</span>src/stores/__tests__/catalog.spec.ts <span style="color:#9ca3af;">(回帰テスト追加)</span>
+            <span class="diff-stat">+22 / -0</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">129</span><span class="line-prefix">+</span><span>it('#3 AC-neg2: fetchCategoryProductsが型不一致(400・stale頁送り相当)で失敗しても</span></div>
+            <div class="code-line line-add"><span class="line-num">130</span><span class="line-prefix">+</span><span>  hasError=trueになり例外は伝播しない', async () =&gt; {</span></div>
+            <div class="code-line line-add"><span class="line-num">131</span><span class="line-prefix">+</span><span>  mockedCatalogApi.fetchProductsByCategory.mockRejectedValue(new HttpError(400, 'Bad Request'))</span></div>
+            <div class="code-line line-add"><span class="line-num">134</span><span class="line-prefix">+</span><span>  await expect(store.fetchCategoryProducts('DOGS', 9999)).resolves.toBeUndefined()</span></div>
+            <div class="code-line line-add"><span class="line-num">136</span><span class="line-prefix">+</span><span>  expect(store.hasError).toBe(true)</span></div>
+            <div class="code-line line-ctx"><span class="line-num">…</span><span class="line-prefix"> </span><span></span></div>
+            <div class="code-line line-add"><span class="line-num">140</span><span class="line-prefix">+</span><span>it('#3 AC-neg2: fetchProductItemsが型不一致(400・stale頁送り相当)で失敗しても</span></div>
+            <div class="code-line line-add"><span class="line-num">141</span><span class="line-prefix">+</span><span>  hasError=trueになり例外は伝播しない', async () =&gt; { ... })</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>backendが「500/trace」ではなく「400＋固定文言」を返す前提のもとで、frontend側が例外を握りつぶさず<code>hasError</code>状態へ正しく落とし込めることを確認する。<code>await expect(...).resolves.toBeUndefined()</code>で「rejectされて画面がクラッシュしない」ことを保証している。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Verify -->
+  <section>
+    <h2>動作確認ポイント（ユーザー確認用）</h2>
+    <ul class="verify-list">
+      <li class="verify-item">
+        <div class="verify-num">1</div>
+        <div class="verify-content">
+          <strong>カタログの商品一覧ページでURLのページ番号を壊れた値に書き換えても、分かりやすいエラー表示になること</strong>
+          <span>例: <code>/api/categories/DOGS/products?page=abc</code> に直接アクセス → 「不正なリクエストです」相当のエラー応答（内部のクラス名やファイルパスは含まれない）</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">2</div>
+        <div class="verify-content">
+          <strong>ページ番号を極端に大きい値にしても壊れず、「該当なし」の表示になること</strong>
+          <span>例: <code>?page=9999</code> のような、ブックマークが古くなった/セッションが切れたケースを模したアクセスでもエラー画面にならない</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">3</div>
+        <div class="verify-content">
+          <strong>存在しないURL（壊れたリンク等）にアクセスしても、サーバー内部の情報が漏れないこと</strong>
+          <span>404ページ相当の応答になり、スタックトレースや実装の詳細が表示されない</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">4</div>
+        <div class="verify-content">
+          <strong>アイテム詳細画面で、商品説明文にHTMLタグのような文字列が含まれていても、太字やリンクとして描画されず、そのままの文字として表示されること</strong>
+          <span>Sprint 6から継続して安全な状態であることを確認済み（今回のリグレッションでも維持）</span>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- Scope -->
+  <section>
+    <h2>改修スコープ確認</h2>
+    <table class="scope-table">
+      <tr>
+        <th>リポジトリ</th>
+        <th>ファイル</th>
+        <th>変更</th>
+        <th>内容</th>
+      </tr>
+      <tr>
+        <td><span class="tag-repo be">BE</span></td>
+        <td><code>GlobalExceptionHandler.java</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>3ハンドラ追加（型不一致→400／必須パラ欠落→400／未知パス→404）</td>
+      </tr>
+      <tr>
+        <td><span class="tag-repo be">BE</span></td>
+        <td><code>CatalogControllerSpec.groovy</code></td>
+        <td><span class="tag-test">テスト追加</span></td>
+        <td>非数値/桁あふれpage/size→400・stale頁送り→空200・未知パス→404の回帰5件</td>
+      </tr>
+      <tr>
+        <td><span class="tag-repo be">BE</span></td>
+        <td><code>GlobalExceptionHandlerSpec.groovy</code></td>
+        <td><span class="tag-test">テスト追加</span></td>
+        <td>3ハンドラの単体テスト3件</td>
+      </tr>
+      <tr>
+        <td><span class="tag-repo fe">FE</span></td>
+        <td><code>stores/__tests__/catalog.spec.ts</code></td>
+        <td><span class="tag-test">テスト追加</span></td>
+        <td>stale頁送り(400)でstoreがhasErrorへ正規化される回帰2件</td>
+      </tr>
+      <tr>
+        <td><span class="tag-repo fe">FE</span></td>
+        <td><code>views/catalog/__tests__/ItemDetailView.spec.ts</code></td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td>SBD-18回帰は既存テストで既に実証済みのため無変更</td>
+      </tr>
+      <tr>
+        <td><span class="tag-repo be">BE</span></td>
+        <td><code>SecurityConfig.java</code></td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td>本Issueでは変更不要（#2のpermitAllも既存の<code>/api/products/**</code>で足りた）</td>
+      </tr>
+    </table>
+  </section>
+
+</div>
+</body>
+</html>

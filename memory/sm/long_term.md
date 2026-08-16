@@ -24,6 +24,11 @@
 - **設計選択を計画フェーズで AskUserQuestion 確定＝仕様委譲論点を SM が先に潰す**（Sprint 6・Sprint 5 の発展）: DEV 推奨（手書き enum）に対しユーザーが m_code を選択（「区分値は基本 m_code」）＝**2回目のユーザーオーバーライド**（Sprint 5 は再水和 /me）。**`architecture-conventions §3.1` が「確定は PO/仕様で」と委譲していた論点**を、SM が AskUserQuestion で先に確定→ Conv reviewer churn を回避（3観点全て指摘なし）。**spec/conventions が判断を PO/仕様に委ねている箇所は、DEV に一任せず SM が計画フェーズでユーザー承認を取る**。残少閾値（定量パラメータ）・ページ採番（先例規約）も同様に計画で確定＝PO が「定量パラメータ未定義」「先例規約未定義」を2回目発生として正式昇格。
 - **CRLF 行末のみの working-tree M ノイズを実変更と誤認しない**（Sprint 6 教訓・Windows 固有）: 実装後の working dir に、コミット対象外の foundation ファイルが `M` 表示されることがある（`npm run format`/`syncTestSchema` の EOL 正規化由来）。**`git diff -c core.autocrlf=false --numstat` が空＝内容差分ゼロ**を確認してから review/PR スコープを確定する（reviewer には**コミット対象の diff** を渡し、EOL ノイズの foundation ファイルはスコープ外と明示）。
 
+- **tier分離が7スプリント連続で有効・Epic 完成スプリントでも通用**（Sprint 7）: 2 Issue（#3 security＋#2 feature 混在）・2-repo・8SP でも計画=Opus で spec 委譲論点を確定→実装=Sonnet で手戻りゼロ完走。**Sprint6 の先例（1-index ページDTO・カードグリッド/ページネーション部品・カスタムXMLマッパー・例外正規化基盤・未配線 `.jps-search` CSS）を #2/#3 が無改造で再利用**＝計画フェーズのチャレンジ C1「先例の実効性検証」成功（conv/sec 指摘0・perf 軽微のみ）。土台だけでなく**先行ドメイン機能の実装先例そのものが後続 Story を加速する**ことを確認。
+- **計画前の実地調査はスコープ「縮小」方向でも効く**（Sprint 7・Sprint6 の逆）: Sprint6 は「DDL ありデータなし」でシード皆無→3-repo に**拡大**。Sprint 7 は seed 投入済（Sprint6 の `V00_000_008/009`）を確認して **database 追加不要＝2-repo に縮小**。「DDL/データ/依存の充足まで計画前に Explore」は拡大にも縮小にも効く＝**想定 repo 数を事前に仮定しない**（Issue の依存欄だけで repo 数を決めない）。
+- **複数 Issue の cross-repo closes は各 Issue の capstone repo に分散**（Sprint 7・Sprint3-6 の「1 Issue×主repo closes」の複数Issue版）: #3（backend 主＝例外正規化がコア）→ backend PR に `closes #3`、#2（frontend 主＝検索UIが capstone）→ frontend PR に `closes #2`、各他方は `Related:`。2 repo 同名ブランチ `feature/2-catalog-search-hardening` を**同時マージ**し、Issue #2/#3 とも closed（completed）を確認。各 Issue の closes を1つの PR にだけ置けば早期クローズ問題は起きない。
+- **spec 委譲論点の SM 計画フェーズ確定が3スプリント連続で定着**（Sprint5 /me・Sprint6 m_code/N/index・Sprint7 LIKE ハードニング/カテゴリフィルタ）: spec/AC/台帳が PO・仕様に委譲した論点を SM が AskUserQuestion で先に確定→ reviewer churn ゼロ。**もはや例外でなく標準手順**（次回1件でも追加発生で scrum-master-workflow ① の「対象Issue特定」直後に「spec 委譲論点の洗い出し→計画で AskUserQuestion 確定」を組み込む昇格を判定）。PO も同傾向を質問ログで追跡中。
+
 ## DEVレビュー指摘の傾向
 
 - **DBスキーマ Story**（Sprint 1）: FK 列の明示セカンダリインデックスの一貫性（m_item.supplier_id）。InnoDB は FK 索引を自動生成するため機能影響は無いが、兄弟列に明示索引がある場合は揃える。2回目の発生で rules/database.md への昇格を判定。
@@ -35,6 +40,8 @@
 - **フロント土台 Story の指摘傾向**（Sprint 5・初のフロント）: ①**汎用バリデータの「先頭のみ検証」バイパス**＝`redirectValidator` の制御文字判定が先頭1文字目のみで、`/\t/evil.com`（2文字目にタブ）がすり抜ける。WHATWG URL パーサはタブ/改行を位置問わず除去するため、将来 `location.href` 経路でプロトコル相対 `//evil.com` 化しうる既知バイパス（現状は呼び出し元が `router.push()` のみで exploit 不可だが、AC-neg2 を担保する security-critical utility の潜在バグ）。→ **汎用ユーティリティは入力全体を検証**（C0 制御文字 0x00-0x1F を全走査）。②**独立初期化の直列 await**＝`main.ts` の CSRF prime と `/me` 再水和が独立なのに直列（`Promise.all` で並列化可）。いずれも低深刻度/低リスクだが、security-critical utility の指摘は SM が exploit 可否を実コード検証したうえで「今スプリント修正 vs バックログ送り」を判断する（今回は修正が自明かつ担保点そのものなので即修正）。
 
 - **初のドメイン機能でも3観点クリーンだった**（Sprint 6・Sprint 3 認証クリーンと同型）: #1（3-repo・カタログ）は規約・Sec・Perf 全員指摘なし。要因は①**secure-by-default 土台の再利用**（#22 DB/#23 backend/#24 frontend＋既存の例外正規化・CSRF・permitAll 既定 authenticated）②**レビュー観点を計画フェーズで AC 化**（qty 非露出／`v-html` 禁止＝AC-neg1／permitAll GET スコープ限定＝AC4／パラメタライズ＝SBD-17／404 正規化＝SBD-10）を起動プロンプトで具体指定③**在庫 m_code・ページング DTO・スコープ境界をユーザー承認で計画確定**（実装が仕様どおり）。**固めた土台＋否定AC の先回り指定＋設計の計画確定**が揃うとドメイン機能でもクリーンに通る。
+
+- **2スプリント連続クリーン（Sprint6→7）＝secure-by-default 土台＋先例再利用の効果**（Sprint 7）: #3/#2 は conv/sec 指摘0・perf 軽微のみ。**catch-all 例外ハンドラの取りこぼし**（`@RestControllerAdvice` の catch-all が枠組例外＝`MethodArgumentTypeMismatchException`／`MissingServletRequestParameterException`／`NoResourceFoundException` 等を 500 に丸める）が Sprint3→7 で2回目発生→ **DEV が backend-conventions §9 に「catch-all 例外ハンドラ棚卸しチェックリスト」を昇格**（2回ルール）。**SBD-10 系 Story は「型不一致・必須param欠落・未知パス」の 4xx 正規化を起動プロンプトで先回り検証依頼**すると漏れない。perf 軽微（①存在確認クエリ=Sprint6 既存パターン②検索画面カテゴリ fetch=onMounted 1回・[L2]固定5件）は **SM verification で非ブロッキング判定→再修正ラウンドなし**（Sprint5/6 の「影響を裏取りして今対応 vs バックログ送り」の適用＝過剰対応の回避）。
 
 ## Sprint Reviewで発覚しやすいパターン
 
@@ -69,3 +76,7 @@
   - DEV: `backend-conventions` §9 に3点追記（初 XMLマッパー導入時の `mybatis.mapper-locations` 必須／区分値 m_code 化時は生成 enum＋算出は非生成 `Calculator` に分離／1-index 汎用ページング DTO `Page`/`PageRequest`/`PageResponse<T>`）・`frontend-conventions` §7 に2点追記（既達 `.jps-*` CSS の薄いラッパ／`import.meta.glob(eager)` 画像取り込み＋placeholder）（参照知識/実装パターン例外で即時反映）。
   - PO: `spec/intended-diff-ledger.md` に **ID-28**（在庫3段階バッジ＝旧は在庫概念なし固定 qty→新は在庫あり/残少[N=5]/在庫切れ・qty 非露出）を追加。m_code 化・ページ採番 1-index は外部挙動を変えない実装規約選択＝台帳非対象と判定。質問傾向2件（定量パラメータ未定義／先例規約未定義）を2回目発生で正式昇格。
   - 2回ルール据え置き（初出・long_term のみ）: 計画前調査での cross-repo スコープ拡大発見（シード皆無）／CRLF-only working-tree M ノイズの `--numstat` 切り分け／仕様委譲論点（§3.1）の SM 計画フェーズ確定＝2回目ユーザーオーバーライド／DEV の syncTestSchema・code_value VARCHAR(10)・i18n reconcile。
+- **Sprint 7**:
+  - SM: skill ファイル変更なし（今スプリントの SM 学びは 2回ルールで long_term 止まり）。long_term のみ：tier分離7連続・Epic 完成でも通用／計画前調査の**縮小**方向（2-repo）／複数 Issue の cross-repo closes を各 capstone repo に**分散**（#3→backend・#2→frontend）／spec 委譲論点の SM 計画確定が Sprint5/6/7 で3連続定着（**次回発生で scrum-master-workflow ① へ「spec 委譲論点の洗い出し→計画で AskUserQuestion 確定」を昇格判定**）／perf 軽微の非ブロッキング判定で再修正回避。
+  - DEV: `backend-conventions` §9 に2点（**catch-all 例外ハンドラ棚卸しチェックリスト**＝`@RestControllerAdvice` catch-all の枠組例外丸め込みが Sprint3→7 で2回目の2回ルール昇格／**LIKE 等 SQL サニタイズを SQL非依存の純VOに隔離**＝ID-29 `ProductSearchTerms`）。#skills-changelog 投稿済。frontend-conventions は「ヘッダ検索 form 追加で SignonView.spec の form セレクタ衝突」が初出のため未反映（long_term 止まり）。卒業候補なし（各 repo 15スプリント基準未達）。
+  - PO: `spec/intended-diff-ledger.md` に **ID-29**（LIKE メタ文字 `%`/`_` のリテラル化・ESCAPE 併用・SBD-17維持・関連 #2）追記／質問傾向を long_term 反映（新規2傾向＝「検索/フィルタ系 feature の UI 配置・検索対象範囲・異常系レスポンスが未定義になりやすい」「spec が PO へ確定を委譲した論点の計画フェーズ確認」、いずれも初出＝次回再発で昇格判定）。

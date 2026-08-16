@@ -1,10 +1,10 @@
 # SM 短期記憶（今スプリント）
 
-Sprint 6（#1 E1 カタログ階層閲覧・F1.1・SP8・**本プロジェクト初のドメイン機能**・**3-repo cross-repo**）完了。次スプリント開始時にリセット済み。
+Sprint 7（#3 F1.3 参照堅牢化/出力安全化・SP3・security／#2 F1.2 商品検索・SP5・feature＝**Epic E1 カタログ完成**・**2-repo cross-repo**）完了。次スプリント開始時にリセット済み。
 
-- 実装: **database**（seed V00_000_008 catalog / V00_000_009 stock_status m_code・在庫3状態 IN23/LOW3/OUT2）＋**backend**（catalog API・カスタム手書き XMLマッパー・1-index `PageResponse`・permitAll GET・qty非露出・`StockStatusCalculator` N=5・StockStatus は generateEnums 生成物）＋**frontend**（主・closes #1／catalog 画面・store/utils/View4種・薄ラッパ components・画像22点 import.meta.glob・AC-neg1 v-html禁止・Vitest79件）。
-- ユーザー承認3決定: **残少閾値 N=5／在庫ステータス=m_code 区分値（DEV 手書き enum 推奨をオーバーライド・「区分値は基本 m_code」）／ページ採番 1-index**。SM 実地調査で**シード皆無を発見→3-repo 化**を計画時点で確定。
-- 3観点レビュー**全て指摘なし**（no-Bash reviewer に絶対パス Read 運用・3-repo でも機能）。修正ループなし。PR: frontend #2(closes #1)・backend #5・database #4(Related)。Sprint Review 指摘なし。
-- Retro 完了（DEV/PO/SM）。教訓は long_term 反映済（tier分離6連続・初ドメイン機能でも通用／計画前調査で cross-repo スコープ拡大〔シード皆無〕発見／仕様委譲論点〔§3.1〕を SM 計画フェーズで AskUserQuestion 確定＝2回目ユーザーオーバーライド／CRLF-only M ノイズの --numstat 切り分け／固めた土台＋否定AC先回り＋設計計画確定でドメイン機能もクリーン／**scrum-master-workflow ⑥ に frontend-主 closes を明確化＝2回ルール昇格**／DEV: backend-conventions §9・frontend-conventions §7 追記／PO: ID-28 追加・質問傾向2件昇格）。
-- **agent-base `feature/sprint6`: Retro 完了後に PR＆マージ**（このリセット時点で PR＆マージ処理中／ユーザー指示）。コミット: 2b96bce(Planning)・5a3668f(Review)＋Retro 成果物。
-- 次スプリント候補: **#3 F1.3 参照堅牢化（SBD-10 集約ハードニング・#1/#2 と同一スライス）／#2 F1.2 検索**（いずれも Sprint 7）。#1 が確立したページDTO・カードグリッド部品・在庫バッジ・m_code パターンを再利用（先例の実効性を Sprint 7 で検証）。
+- 実装: **backend**（#3=`GlobalExceptionHandler` に例外3ハンドラ〔型不一致→400/必須param欠落→400/未知パス→404〕・型不一致のみ400で範囲外はクランプ空200／#2=`GET /api/products/search`・純VO `ProductSearchTerms`〔語分割+LIKEメタ文字エスケープ=ID-29〕・`CatalogCustomMapper.xml` searchProducts/countSearchProducts〔語分割 OR・`ESCAPE '\'`・全#{}〕・permitAll は既存 `/api/products/**` GET で自動カバー＝SecurityConfig 変更不要）＋**frontend**（#2=ヘッダ検索バー・`SearchResultView`・route・api/store・カテゴリフィルタ〔結果画面配置〕・i18n／#3=SBD-18回帰・stale頁送り正規化）。
+- ユーザー確定2決定（SM 計画フェーズ AskUserQuestion）: **LIKE メタ文字 `%`/`_`=ハードニング〔リテラル化・ESCAPE〕→ID-29 台帳登録済／カテゴリフィルタ=実装**。SM 実地調査で **seed 投入済→2-repo に縮小**（Sprint6 の 3-repo の逆）を計画時点で確定。
+- 3観点レビュー **conv/sec 指摘なし・perf 軽微2件（非ブロッキング・SM verification 済→再修正なし）**。Sprint6 同型クリーンパス。PR: backend #6(closes #3)・frontend #3(closes #2)＝**各 Issue の closes を capstone repo に分散**。同時マージで #2/#3 とも closed（completed）確認。Sprint Review 指摘なし。
+- Retro 完了（DEV/PO/SM）。教訓は long_term 反映済（tier分離7連続・Epic完成でも通用／計画前調査の縮小方向〔2-repo〕／複数Issue cross-repo closes 分散／spec委譲論点確定が Sprint5/6/7 で3連続定着＝次回で workflow ① 昇格判定／catch-all 例外ハンドラ取りこぼしが Sprint3→7 で2回目→DEV が backend-conventions §9 昇格／先例再利用でクリーンパス〔C1 成功〕／perf 軽微の非ブロッキング判定で過剰対応回避）。DEV: backend-conventions §9 に2点。PO: ID-29 追加・質問傾向2件初出記録。
+- **agent-base `feature/sprint7`: Retro 完了後に PR＆マージ**（このリセット時点で PR＆マージ処理中／ユーザー指示 2026-08-16）。コミット: Planning(sprint_backlog.md)・Review(review-#2/#3.html)＋Retro 成果物（memory/spec 更新）。
+- 次スプリント候補: **E1 完了**につき E2（カート）・E3（注文）等の次 Epic へ。#1 が確立し #2/#3 が再利用実証した先例（ページDTO・カードグリッド部品・在庫バッジ・m_code・例外正規化基盤・検索/VO パターン）を別ドメインで再検証。perf 微最適化（検索画面カテゴリ既ロード時 fetch スキップ）は低優先・issue化見送り。

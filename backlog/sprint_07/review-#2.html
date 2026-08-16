@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint 7 Review — #2 商品をキーワード検索できるようにする</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #f8f7f5; }
+
+  .page { max-width: 900px; margin: 0 auto; padding: 48px 24px; }
+
+  /* Header */
+  .sprint-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin-bottom: 8px; }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px; }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+  .badge-sprint { background: #e8f0fe; color: #1a56db; }
+  .badge-issue { background: #f0fdf4; color: #166534; }
+  .badge-feature { background: #ecfdf5; color: #047857; }
+  .badge-backend { background: #eef2ff; color: #4338ca; }
+  .badge-frontend { background: #fff7ed; color: #c2410c; }
+
+  /* Sections */
+  section { margin-bottom: 40px; }
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #888; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e5e5e5; }
+
+  /* Problem box */
+  .problem-box { background: #fff8f0; border-left: 3px solid #f59e0b; border-radius: 0 8px 8px 0; padding: 16px 20px; margin-bottom: 16px; }
+  .problem-box .label { font-size: 11px; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .problem-box p { color: #451a03; font-size: 13px; }
+  .problem-box p + p { margin-top: 8px; }
+
+  /* Architecture change */
+  .arch-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: center; margin-bottom: 8px; }
+  .arch-box { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; }
+  .arch-box .arch-title { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .arch-box.before { border-color: #fca5a5; }
+  .arch-box.after { border-color: #86efac; }
+  .arch-arrow { font-size: 20px; color: #888; text-align: center; }
+  .flow-item { font-size: 12px; color: #374151; padding: 3px 0; display: flex; align-items: flex-start; gap: 6px; }
+  .flow-item .dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .dot-red { background: #ef4444; }
+  .dot-green { background: #22c55e; }
+
+  /* Search demo */
+  .search-demo { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px 20px; margin-top: 16px; }
+  .search-demo .demo-title { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
+  .demo-row { display: flex; align-items: center; gap: 10px; font-size: 12px; padding: 4px 0; }
+  .demo-kw { font-family: 'SF Mono', 'Fira Code', monospace; background: #f3f4f6; padding: 2px 8px; border-radius: 4px; color: #374151; }
+  .demo-arrow { color: #9ca3af; }
+  .demo-result { color: #166534; font-weight: 600; }
+
+  /* AC cards */
+  .ac-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+  .ac-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid #f0f0f0; flex-wrap: wrap; }
+  .ac-check { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .ac-check.done { background: #dcfce7; color: #166534; }
+  .ac-num { font-size: 11px; font-weight: 700; color: #888; }
+  .ac-text { font-size: 13px; font-weight: 600; color: #1a1a1a; flex: 1; }
+  .ac-body { padding: 16px 18px; }
+  .ac-body p { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+
+  /* File change */
+  .file-change { margin-bottom: 16px; }
+  .file-name { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; background: #f3f4f6; color: #374151; padding: 5px 10px; border-radius: 4px 4px 0 0; border: 1px solid #e5e5e5; border-bottom: none; display: flex; justify-content: space-between; }
+  .diff-stat { color: #888; }
+  .code-block { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.7; background: #1e1e2e; color: #cdd6f4; padding: 14px 16px; border-radius: 0 0 6px 6px; overflow-x: auto; }
+  .code-line { display: flex; white-space: pre; }
+  .line-num { color: #45475a; min-width: 30px; user-select: none; }
+  .line-add { background: rgba(166, 227, 161, 0.12); color: #a6e3a1; }
+  .line-del { background: rgba(243, 139, 168, 0.12); color: #f38ba8; }
+  .line-ctx { color: #cdd6f4; }
+  .line-prefix { min-width: 14px; }
+
+  /* Annotation */
+  .annotation { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-size: 12px; color: #78350f; display: flex; gap: 8px; }
+  .annotation-icon { font-size: 14px; flex-shrink: 0; }
+
+  /* Verify section */
+  .verify-list { list-style: none; }
+  .verify-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; }
+  .verify-item:last-child { border-bottom: none; }
+  .verify-num { width: 22px; height: 22px; background: #e8f0fe; color: #1a56db; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .verify-content { flex: 1; }
+  .verify-content strong { font-size: 13px; color: #1a1a1a; display: block; margin-bottom: 3px; }
+  .verify-content span { font-size: 12px; color: #6b7280; }
+
+  /* Scope table */
+  .scope-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .scope-table th { text-align: left; padding: 8px 12px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .scope-table td { padding: 10px 12px; border: 1px solid #e5e5e5; color: #374151; vertical-align: top; }
+  .scope-table tr:hover td { background: #f9fafb; }
+  .tag-changed { font-size: 11px; font-weight: 600; background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 3px; }
+  .tag-new { font-size: 11px; font-weight: 600; background: #dbeafe; color: #1d4ed8; padding: 2px 6px; border-radius: 3px; }
+  .tag-test { font-size: 11px; font-weight: 600; background: #e8f0fe; color: #1a56db; padding: 2px 6px; border-radius: 3px; }
+  .tag-unchanged { font-size: 11px; font-weight: 600; background: #f3f4f6; color: #6b7280; padding: 2px 6px; border-radius: 3px; }
+  .tag-sideeffect { font-size: 11px; font-weight: 600; background: #fef3c7; color: #92400e; padding: 2px 6px; border-radius: 3px; }
+  .tag-repo { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 3px; margin-right: 4px; }
+  .tag-repo.be { background: #eef2ff; color: #4338ca; }
+  .tag-repo.fe { background: #fff7ed; color: #c2410c; }
+
+  a.pr-link { color: #1a56db; text-decoration: none; font-weight: 600; }
+  a.pr-link:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="sprint-label">Sprint 7 Review</div>
+  <h1>#2 — 商品をキーワードで検索できるようにする</h1>
+  <div class="meta">
+    <span class="badge badge-sprint">Sprint 7</span>
+    <span class="badge badge-issue">#2</span>
+    <span class="badge badge-feature">feature</span>
+    <span class="badge badge-frontend">frontend（主）</span>
+    <span class="badge badge-backend">backend（従・検索API）</span>
+  </div>
+  <p style="font-size:12px; color:#6b7280; margin-bottom: 24px;">
+    PR: <a class="pr-link" href="https://github.com/ryokkon624/jpetstore-frontend/pull/3" target="_blank">jpetstore-frontend #3</a>
+    ／ <a class="pr-link" href="https://github.com/ryokkon624/jpetstore-backend/pull/6" target="_blank">jpetstore-backend #6</a>（Related）
+  </p>
+
+  <!-- Problem -->
+  <section>
+    <h2>なぜこの改修が必要だったか</h2>
+    <div class="problem-box">
+      <div class="label">問題</div>
+      <p>Sprint 6（#1）でカテゴリ→商品→アイテムの階層閲覧は実装したが、キーワードで商品を横断検索する手段が無かった。legacy（Struts版 JPetStore）には <code>searchProductList</code> による検索（複数語を空白分割し、各語を name/category/description に LIKE 部分一致・OR結合）が存在しており、この挙動を踏襲した検索 API と検索UIを新設する必要があった。</p>
+      <p>あわせてユーザー決定（2026-08-16）により、検索語中の <code>%</code>/<code>_</code> を LIKE ワイルドカードとして機能させず<strong>リテラルとして扱う</strong>ハードニング（新規 intended-diff ID-29）と、<strong>カテゴリフィルタ</strong>を今スプリントのスコープに含めた。</p>
+    </div>
+    <div class="arch-grid">
+      <div class="arch-box before">
+        <div class="arch-title">改修前</div>
+        <div class="flow-item"><span class="dot dot-red"></span>検索エンドポイント無し（0件）</div>
+        <div class="flow-item"><span class="dot dot-red"></span>ヘッダに検索バー無し</div>
+        <div class="flow-item"><span class="dot dot-red"></span>商品を見つけるにはカテゴリを辿るしかない</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-box after">
+        <div class="arch-title">改修後</div>
+        <div class="flow-item"><span class="dot dot-green"></span><code>GET /api/products/search</code> 新設</div>
+        <div class="flow-item"><span class="dot dot-green"></span>ヘッダ検索バー → 結果カードグリッド（サーバページング12件/頁）</div>
+        <div class="flow-item"><span class="dot dot-green"></span>結果画面にカテゴリフィルタ（ドロップダウン）</div>
+      </div>
+    </div>
+
+    <div class="search-demo">
+      <div class="demo-title">実機（bootRun）での動作確認例</div>
+      <div class="demo-row"><span class="demo-kw">keyword=dog</span><span class="demo-arrow">→</span><span class="demo-result">7件</span>（DOGSカテゴリ6件 + REPTILESの Rattlesnake「Doubles as a watch dog」がdescriptionマッチでヒット。カテゴリ横断が旧同値の仕様）</div>
+      <div class="demo-row"><span class="demo-kw">keyword=dog&amp;categoryId=DOGS</span><span class="demo-arrow">→</span><span class="demo-result">6件</span>（カテゴリで絞り込み、Rattlesnakeを除外）</div>
+      <div class="demo-row"><span class="demo-kw">keyword=（空）</span><span class="demo-arrow">→</span><span class="demo-result">200・0件</span>（500やエラー画面にならない）</div>
+      <div class="demo-row"><span class="demo-kw">keyword=' OR 1=1 --</span><span class="demo-arrow">→</span><span class="demo-result">200・0件</span>（SQLインジェクション不成立、単なる不一致文字列として扱われる）</div>
+    </div>
+  </section>
+
+  <!-- AC breakdown -->
+  <section>
+    <h2>AC別 実装内容</h2>
+
+    <!-- AC1 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC1</div>
+        <div class="ac-text">ヘッダの検索バーからキーワード検索し、結果をカードグリッドで表示（サーバページング12件/頁）。複数語OR部分一致・カテゴリフィルタ</div>
+      </div>
+      <div class="ac-body">
+        <p>backend に <code>GET /api/products/search?keyword=&categoryId=&page=&size=</code> を新設。frontend にヘッダ検索バー（<code>.jps-search</code>・Sprint 5で用意済みの未配線CSSを利用）と検索結果画面（<code>SearchResultView.vue</code>）を追加し、Sprint 6 で確立済みの <code>ProductCard</code>/<code>Pagination</code>/<code>CatalogBreadcrumb</code> をそのまま再利用した。</p>
+
+        <div class="file-change">
+          <div class="file-name">
+            <span class="tag-repo be">BE</span>src/main/java/.../presentation/rest/CatalogController.java
+            <span class="diff-stat">+16 / -0</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">63</span><span class="line-prefix">+</span><span>@GetMapping("/products/search")</span></div>
+            <div class="code-line line-add"><span class="line-num">64</span><span class="line-prefix">+</span><span>public PageResponse&lt;ProductResponse&gt; searchProducts(</span></div>
+            <div class="code-line line-add"><span class="line-num">65</span><span class="line-prefix">+</span><span>    @RequestParam(required = false) String keyword,</span></div>
+            <div class="code-line line-add"><span class="line-num">66</span><span class="line-prefix">+</span><span>    @RequestParam(required = false) String categoryId,</span></div>
+            <div class="code-line line-add"><span class="line-num">67</span><span class="line-prefix">+</span><span>    @RequestParam(required = false) Integer page,</span></div>
+            <div class="code-line line-add"><span class="line-num">68</span><span class="line-prefix">+</span><span>    @RequestParam(required = false) Integer size) {</span></div>
+            <div class="code-line line-add"><span class="line-num">69</span><span class="line-prefix">+</span><span>  return PageResponse.from(</span></div>
+            <div class="code-line line-add"><span class="line-num">70</span><span class="line-prefix">+</span><span>      catalogApplicationService.searchProducts(keyword, categoryId, page, size),</span></div>
+            <div class="code-line line-add"><span class="line-num">71</span><span class="line-prefix">+</span><span>      ProductResponse::from);</span></div>
+            <div class="code-line line-add"><span class="line-num">72</span><span class="line-prefix">+</span><span>}</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>静的パス <code>/products/search</code> は <code>/products/{productId}</code> と衝突しない（Spring MVCが静的パスをパス変数より優先解決するため、宣言順に関わらず正しくルーティングされる。実機でも <code>?keyword=dog</code> が意図通り検索ハンドラで処理されることを確認済み）。permitAllは既存の <code>/api/products/**</code>（GETスコープ）が既にカバーしており、SecurityConfigの変更は不要だった。</span>
+          </div>
+        </div>
+
+        <div class="file-change">
+          <div class="file-name">
+            <span class="tag-repo be">BE</span>src/main/resources/mapper/custom/CatalogCustomMapper.xml
+            <span class="diff-stat">+32 / -0</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">77</span><span class="line-prefix">+</span><span>&lt;sql id="searchProductsWhere"&gt;</span></div>
+            <div class="code-line line-add"><span class="line-num">78</span><span class="line-prefix">+</span><span>    &lt;where&gt;</span></div>
+            <div class="code-line line-add"><span class="line-num">79</span><span class="line-prefix">+</span><span>        &lt;foreach collection="patterns" item="pattern" open="(" separator=" OR " close=")"&gt;</span></div>
+            <div class="code-line line-add"><span class="line-num">80</span><span class="line-prefix">+</span><span>            (name LIKE #{pattern} ESCAPE '\\' OR category_id LIKE #{pattern} ESCAPE '\\'</span></div>
+            <div class="code-line line-add"><span class="line-num">80</span><span class="line-prefix">+</span><span>             OR description LIKE #{pattern} ESCAPE '\\')</span></div>
+            <div class="code-line line-add"><span class="line-num">81</span><span class="line-prefix">+</span><span>        &lt;/foreach&gt;</span></div>
+            <div class="code-line line-add"><span class="line-num">82</span><span class="line-prefix">+</span><span>        &lt;if test="categoryId != null"&gt;</span></div>
+            <div class="code-line line-add"><span class="line-num">83</span><span class="line-prefix">+</span><span>            AND category_id = #{categoryId}</span></div>
+            <div class="code-line line-add"><span class="line-num">84</span><span class="line-prefix">+</span><span>        &lt;/if&gt;</span></div>
+            <div class="code-line line-add"><span class="line-num">85</span><span class="line-prefix">+</span><span>    &lt;/where&gt;</span></div>
+            <div class="code-line line-add"><span class="line-num">86</span><span class="line-prefix">+</span><span>&lt;/sql&gt;</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>name/category_id/description のいずれかに各語がOR一致し、語間もOR結合する（legacyの <code>searchProductList</code> の挙動を踏襲）。categoryId指定時のみ AND条件で絞り込む。全て <code>#{}</code> パラメタライズ・<code>ESCAPE '\\'</code>（<code>generatorConfig.xml</code>の先例と同じ書式）を併用。</span>
+          </div>
+        </div>
+
+        <div class="file-change">
+          <div class="file-name">
+            <span class="tag-repo fe">FE</span>src/views/catalog/SearchResultView.vue <span style="color:#9ca3af;">(新規)</span>
+            <span class="diff-stat">+174</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">75</span><span class="line-prefix"> </span><span>&lt;select id="search-category-filter" :value="categoryId ?? ''" @change="handleCategoryChange"&gt;</span></div>
+            <div class="code-line line-ctx"><span class="line-num">76</span><span class="line-prefix"> </span><span>  &lt;option value=""&gt;{{ t('catalog.search.categoryFilter.all') }}&lt;/option&gt;</span></div>
+            <div class="code-line line-ctx"><span class="line-num">77</span><span class="line-prefix"> </span><span>  &lt;option v-for="category in catalogStore.categories" :key="category.categoryId"</span></div>
+            <div class="code-line line-ctx"><span class="line-num">78</span><span class="line-prefix"> </span><span>          :value="category.categoryId"&gt;{{ category.name }}&lt;/option&gt;</span></div>
+            <div class="code-line line-ctx"><span class="line-num">79</span><span class="line-prefix"> </span><span>&lt;/select&gt;</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>カテゴリ選択肢は既存のカテゴリ一覧APIを再利用（<code>onMounted</code>で<code>fetchCategories()</code>を呼ぶ。検索本体の<code>load()</code>とは独立処理のため並行して走る）。route <code>/catalog/search</code> の query（keyword/categoryId/page）から状態を復元するため、URLをそのまま共有・ブックマークできる。</span>
+          </div>
+        </div>
+
+        <div class="file-change">
+          <div class="file-name">
+            <span class="tag-repo fe">FE</span>src/components/AppHeader.vue
+            <span class="diff-stat">+26 / -3</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">35</span><span class="line-prefix">+</span><span>&lt;form class="jps-search" role="search" @submit.prevent="handleSearchSubmit"&gt;</span></div>
+            <div class="code-line line-add"><span class="line-num">36</span><span class="line-prefix">+</span><span>  &lt;input</span></div>
+            <div class="code-line line-add"><span class="line-num">37</span><span class="line-prefix">+</span><span>    v-model="searchKeyword"</span></div>
+            <div class="code-line line-add"><span class="line-num">38</span><span class="line-prefix">+</span><span>    type="search"</span></div>
+            <div class="code-line line-add"><span class="line-num">40</span><span class="line-prefix">+</span><span>    :placeholder="t('app.header.search.placeholder')"</span></div>
+            <div class="code-line line-add"><span class="line-num">42</span><span class="line-prefix">+</span><span>  /&gt;</span></div>
+            <div class="code-line line-add"><span class="line-num">43</span><span class="line-prefix">+</span><span>&lt;/form&gt;</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span><code>.jps-search</code> は Sprint 5（#24）で用意済みだが未配線だったCSSクラス。マークアップを載せるだけで意図通りのレイアウトになった。空/空白キーワードのガード自体はヘッダ側ではなく<code>SearchResultView</code>側（store）に一元化し、常に検索結果画面へ遷移させる薄いラッパーに留めた。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC2 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC2</div>
+        <div class="ac-text">空キーワードは「キーワードを入力してください」相当の明示メッセージ（500やtraceを出さない）</div>
+      </div>
+      <div class="ac-body">
+        <p>frontendの<code>stores/catalog.ts</code>に空/空白キーワードガードを実装。API呼び出し自体を行わず<code>searchKeywordMissing</code>フラグを立てて画面にメッセージを出す。backend側も防御的に空/空白キーワードは空結果200へ正規化する（多層防御）。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span class="tag-repo fe">FE</span>src/stores/catalog.ts
+            <span class="diff-stat">+28 / -0</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">110</span><span class="line-prefix">+</span><span>async searchProducts(keyword: string, categoryId?: string, page?: number, size?: number) {</span></div>
+            <div class="code-line line-add"><span class="line-num">116</span><span class="line-prefix">+</span><span>  this.hasError = false</span></div>
+            <div class="code-line line-add"><span class="line-num">117</span><span class="line-prefix">+</span><span>  const trimmedKeyword = keyword.trim()</span></div>
+            <div class="code-line line-add"><span class="line-num">118</span><span class="line-prefix">+</span><span>  if (trimmedKeyword === '') {</span></div>
+            <div class="code-line line-add"><span class="line-num">119</span><span class="line-prefix">+</span><span>    this.searchKeywordMissing = true</span></div>
+            <div class="code-line line-add"><span class="line-num">120</span><span class="line-prefix">+</span><span>    this.searchResults = emptyPage&lt;Product&gt;()</span></div>
+            <div class="code-line line-add"><span class="line-num">121</span><span class="line-prefix">+</span><span>    return</span></div>
+            <div class="code-line line-add"><span class="line-num">122</span><span class="line-prefix">+</span><span>  }</span></div>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span class="tag-repo be">BE</span>src/main/java/.../application/service/CatalogApplicationService.java
+            <span class="diff-stat">L99-105</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">99</span><span class="line-prefix"> </span><span>public Page&lt;Product&gt; searchProducts(String keyword, String categoryId, Integer page, Integer size) {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">101</span><span class="line-prefix"> </span><span>  ProductSearchTerms terms = ProductSearchTerms.from(keyword);</span></div>
+            <div class="code-line line-ctx"><span class="line-num">103</span><span class="line-prefix"> </span><span>  if (terms.isEmpty()) {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">104</span><span class="line-prefix"> </span><span>    return Page.of(List.of(), pageRequest.page(), pageRequest.size(), 0);</span></div>
+            <div class="code-line line-ctx"><span class="line-num">105</span><span class="line-prefix"> </span><span>  }</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC3 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC3 (SBD-17)</div>
+        <div class="ac-text">検索SQLは全てパラメタライズ（プレースホルダ）。文字列連結でクエリを組まない</div>
+      </div>
+      <div class="ac-body">
+        <p>新規VO <code>ProductSearchTerms</code>（domain/catalog）に語分割・LIKEエスケープ処理を隔離した。SQL文字列そのものを組み立てるロジックはこのVOには一切無く、MyBatisの<code>#{}</code>バインドのみを使う。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span class="tag-repo be">BE</span>src/main/java/.../domain/catalog/ProductSearchTerms.java <span style="color:#9ca3af;">(新規)</span>
+            <span class="diff-stat">+52</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">24</span><span class="line-prefix"> </span><span>public static ProductSearchTerms from(String keyword) {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">25</span><span class="line-prefix"> </span><span>  if (keyword == null || keyword.isBlank()) {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">26</span><span class="line-prefix"> </span><span>    return new ProductSearchTerms(List.of());</span></div>
+            <div class="code-line line-ctx"><span class="line-num">27</span><span class="line-prefix"> </span><span>  }</span></div>
+            <div class="code-line line-ctx"><span class="line-num">29</span><span class="line-prefix"> </span><span>  StringTokenizer tokenizer = new StringTokenizer(keyword, " ", false);</span></div>
+            <div class="code-line line-ctx"><span class="line-num">30</span><span class="line-prefix"> </span><span>  while (tokenizer.hasMoreTokens()) {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">31</span><span class="line-prefix"> </span><span>    result.add("%" + escapeLikeMetacharacters(tokenizer.nextToken()) + "%");</span></div>
+            <div class="code-line line-ctx"><span class="line-num">32</span><span class="line-prefix"> </span><span>  }</span></div>
+            <div class="code-line line-ctx"><span class="line-num">…</span><span class="line-prefix"> </span><span></span></div>
+            <div class="code-line line-ctx"><span class="line-num">41</span><span class="line-prefix"> </span><span>private static String escapeLikeMetacharacters(String token) {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">45</span><span class="line-prefix"> </span><span>  if (c == '\\' || c == '%' || c == '_') {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">46</span><span class="line-prefix"> </span><span>    escaped.append('\\');</span></div>
+            <div class="code-line line-ctx"><span class="line-num">47</span><span class="line-prefix"> </span><span>  }</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>語分割は legacy（<code>SqlMapProductDao.ProductSearch</code>）と同じ単一スペース区切りの<code>StringTokenizer</code>を踏襲（[L2]旧同値）。返すのは<code>%...%</code>形の文字列パターンのみで、これをそのままMyBatisの<code>#{pattern}</code>にバインドする。</span>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span class="tag-repo be">BE</span>src/test/groovy/.../domain/catalog/ProductSearchTermsSpec.groovy <span style="color:#9ca3af;">(新規)</span>
+            <span class="diff-stat">+48</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">33</span><span class="line-prefix"> </span><span>def "ID-29: LIKEメタ文字%/_/\はバックスラッシュでエスケープされリテラル化される"() {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">38</span><span class="line-prefix"> </span><span>  keyword  | expectedPattern</span></div>
+            <div class="code-line line-ctx"><span class="line-num">39</span><span class="line-prefix"> </span><span>  "100%"   | "%100\%%"</span></div>
+            <div class="code-line line-ctx"><span class="line-num">40</span><span class="line-prefix"> </span><span>  "a_b"    | "%a\_b%"</span></div>
+            <div class="code-line line-ctx"><span class="line-num">41</span><span class="line-prefix"> </span><span>  "a\b"    | "%a\\b%"</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- L2 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">[L2] 旧同値</div>
+        <div class="ac-text">複数語 keyword 検索のヒット商品集合・件数が旧同値（OR・name/category/description 部分一致）</div>
+      </div>
+      <div class="ac-body">
+        <p>legacyの<code>searchProductList</code>（各語をname/category/descnにLIKE OR、語間もOR）と同じ集合になることをDB統合テストで検証。ID-29のエスケープによる差は<code>%</code>/<code>_</code>を含む病的入力のみで、seed 16商品のname/descriptionにはこれらの文字が無いため通常語では旧同値が保たれる。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span class="tag-repo be">BE</span>src/test/groovy/.../mapper/CatalogCustomMapperSpec.groovy
+            <span class="diff-stat">L85-134</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">85</span><span class="line-prefix">+</span><span>def "[L2] searchProductsは単一語'%dog%'でcategory_id/descriptionのOR一致7件を返す(旧同値)"() {</span></div>
+            <div class="code-line line-add"><span class="line-num">89</span><span class="line-prefix">+</span><span>    def rows = mapper.searchProducts(["%dog%"], null, 0, 20)</span></div>
+            <div class="code-line line-add"><span class="line-num">93</span><span class="line-prefix">+</span><span>    count == 7</span></div>
+            <div class="code-line line-add"><span class="line-num">95</span><span class="line-prefix">+</span><span>    rows*.productId.toSet() == ["K9-BD-01", ..., "RP-SN-01"].toSet()</span></div>
+            <div class="code-line line-ctx"><span class="line-num">…</span><span class="line-prefix"> </span><span></span></div>
+            <div class="code-line line-add"><span class="line-num">98</span><span class="line-prefix">+</span><span>def "[L2] searchProductsは複数語をOR結合する('%fish%'と'%dog%'で11件=4+7、旧同値)"() {</span></div>
+            <div class="code-line line-add"><span class="line-num">100</span><span class="line-prefix">+</span><span>    mapper.countSearchProducts(["%fish%", "%dog%"], null) == 11</span></div>
+            <div class="code-line line-ctx"><span class="line-num">…</span><span class="line-prefix"> </span><span></span></div>
+            <div class="code-line line-add"><span class="line-num">103</span><span class="line-prefix">+</span><span>def "AC1: searchProductsはcategoryId指定でその配下に限定する(dog×DOGS=6件、RP-SN-01を除外)"() {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">…</span><span class="line-prefix"> </span><span></span></div>
+            <div class="code-line line-add"><span class="line-num">123</span><span class="line-prefix">+</span><span>def "searchProductsはLIMIT/OFFSETでページングできる(dog=7件をsize=3で3頁)"() {</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC-neg1 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC-neg1 (否定AC / SBD-17)</div>
+        <div class="ac-text">検索語に SQL メタ文字（' OR 1=1 -- 等）を入れても注入が成立せず、通常の文字列一致として扱われる</div>
+      </div>
+      <div class="ac-body">
+        <p>DB統合テスト・end-to-endテストの両方で、SQLメタ文字を含む検索語が単なる不一致文字列として扱われ0件になることを確認。ID-29のLIKEメタ文字エスケープも同時に検証。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span class="tag-repo be">BE</span>src/test/groovy/.../mapper/CatalogCustomMapperSpec.groovy
+            <span class="diff-stat">L113-121</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">113</span><span class="line-prefix">+</span><span>def "ID-29: LIKEメタ文字はエスケープ済みならリテラル一致し、seedにアンダースコアを含む</span></div>
+            <div class="code-line line-add"><span class="line-num">114</span><span class="line-prefix">+</span><span>  語が無いため0件になる"() {</span></div>
+            <div class="code-line line-add"><span class="line-num">115</span><span class="line-prefix">+</span><span>    mapper.countSearchProducts(["%\\_%"], null) == 0</span></div>
+            <div class="code-line line-ctx"><span class="line-num">…</span><span class="line-prefix"> </span><span></span></div>
+            <div class="code-line line-add"><span class="line-num">118</span><span class="line-prefix">+</span><span>def "AC-neg1: SQLメタ文字を含む語(パラメタライズ)でも注入は成立せず単なる不一致で0件になる"() {</span></div>
+            <div class="code-line line-add"><span class="line-num">120</span><span class="line-prefix">+</span><span>    mapper.countSearchProducts(["%' OR 1=1 --%"], null) == 0</span></div>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span class="tag-repo be">BE</span>src/test/groovy/.../presentation/rest/CatalogControllerSpec.groovy
+            <span class="diff-stat">L253-280</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">253</span><span class="line-prefix">+</span><span>def "#2 AC-neg1(SBD-17): SQLメタ文字を含むkeywordを入れても注入は成立せず</span></div>
+            <div class="code-line line-add"><span class="line-num">254</span><span class="line-prefix">+</span><span>  200空結果になる(500でない)"() {</span></div>
+            <div class="code-line line-add"><span class="line-num">255</span><span class="line-prefix">+</span><span>    mockMvc.perform(get("/api/products/search").param("keyword", "' OR 1=1 --"))</span></div>
+            <div class="code-line line-add"><span class="line-num">256</span><span class="line-prefix">+</span><span>            .andExpect(status().isOk())</span></div>
+            <div class="code-line line-ctx"><span class="line-num">…</span><span class="line-prefix"> </span><span></span></div>
+            <div class="code-line line-add"><span class="line-num">275</span><span class="line-prefix">+</span><span>def "#2 ID-29: LIKEメタ文字'_'はエスケープされリテラル一致するため0件になる</span></div>
+            <div class="code-line line-add"><span class="line-num">276</span><span class="line-prefix">+</span><span>  (意図せぬ全件マッチ防止)"() {</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC-neg2 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC-neg2 (否定AC / SBD-10)</div>
+        <div class="ac-text">stale/セッション切れの頁送りで 500・スタックトレースが出ず、正規化された空結果/4xx になる（#3 依存）</div>
+      </div>
+      <div class="ac-body">
+        <p>#3で追加した<code>MethodArgumentTypeMismatchException</code>ハンドラに検索エンドポイントも乗るため、<code>?page=abc</code>のような型不一致は400に、<code>?page=9999</code>のような範囲外の有効な値は空200に正規化される。backend/frontend両方で回帰テストを追加した。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span class="tag-repo be">BE</span>src/test/groovy/.../presentation/rest/CatalogControllerSpec.groovy
+            <span class="diff-stat">L260-273</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">260</span><span class="line-prefix">+</span><span>def "#2 AC-neg2(#3依存): 検索結果のstale頁送り(範囲外の有効なpage)は空200になる(500でない)"() {</span></div>
+            <div class="code-line line-add"><span class="line-num">262</span><span class="line-prefix">+</span><span>    mockMvc.perform(get("/api/products/search").param("keyword", "dog").param("page", "9999"))</span></div>
+            <div class="code-line line-add"><span class="line-num">263</span><span class="line-prefix">+</span><span>            .andExpect(status().isOk())</span></div>
+            <div class="code-line line-ctx"><span class="line-num">…</span><span class="line-prefix"> </span><span></span></div>
+            <div class="code-line line-add"><span class="line-num">268</span><span class="line-prefix">+</span><span>def "#2 AC-neg2(#3依存): 検索の非数値pageは400に正規化される(500でない)"() {</span></div>
+            <div class="code-line line-add"><span class="line-num">270</span><span class="line-prefix">+</span><span>    mockMvc.perform(get("/api/products/search").param("keyword", "dog").param("page", "abc"))</span></div>
+            <div class="code-line line-add"><span class="line-num">271</span><span class="line-prefix">+</span><span>            .andExpect(status().isBadRequest())</span></div>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span class="tag-repo fe">FE</span>src/stores/__tests__/catalog.spec.ts
+            <span class="diff-stat">L198-206</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">198</span><span class="line-prefix">+</span><span>it('#2 AC-neg2(#3依存): searchProductsが失敗する(型不一致400・stale頁送り相当)と</span></div>
+            <div class="code-line line-add"><span class="line-num">199</span><span class="line-prefix">+</span><span>  hasError=trueになり例外は伝播しない', async () =&gt; {</span></div>
+            <div class="code-line line-add"><span class="line-num">200</span><span class="line-prefix">+</span><span>  mockedCatalogApi.searchProducts.mockRejectedValue(new HttpError(400, 'Bad Request'))</span></div>
+            <div class="code-line line-add"><span class="line-num">202</span><span class="line-prefix">+</span><span>  await expect(store.searchProducts('dog', undefined, 9999)).resolves.toBeUndefined()</span></div>
+            <div class="code-line line-add"><span class="line-num">204</span><span class="line-prefix">+</span><span>  expect(store.hasError).toBe(true)</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Verify -->
+  <section>
+    <h2>動作確認ポイント（ユーザー確認用）</h2>
+    <ul class="verify-list">
+      <li class="verify-item">
+        <div class="verify-num">1</div>
+        <div class="verify-content">
+          <strong>ヘッダの検索バーにキーワード（例: "dog"）を入力してEnterを押すと、検索結果画面に商品カードが表示されること</strong>
+          <span>「Bulldog」「Chihuahua」等 DOGS カテゴリの商品に加え、説明文に"dog"を含む REPTILES の「Rattlesnake」もヒットすること（旧サイトと同じ挙動）</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">2</div>
+        <div class="verify-content">
+          <strong>検索結果画面のカテゴリフィルタで「Dogs」を選ぶと、DOGSカテゴリの商品だけに絞り込まれること</strong>
+          <span>Rattlesnakeが結果から消えることを確認</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">3</div>
+        <div class="verify-content">
+          <strong>検索バーを空のまま検索すると、「キーワードを入力してください」相当のメッセージが表示され、エラー画面にならないこと</strong>
+          <span></span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">4</div>
+        <div class="verify-content">
+          <strong>結果が13件以上になる検索語では2ページ目以降にページネーションが表示され、ページ送りできること</strong>
+          <span>12件/頁でカードグリッドが分割される</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">5</div>
+        <div class="verify-content">
+          <strong>検索語に記号（<code>' OR 1=1 --</code> 等）を入力しても、エラー画面にならず単に「該当なし」になること</strong>
+          <span>SQLインジェクションが成立しないことのユーザー目線での確認</span>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- Scope -->
+  <section>
+    <h2>改修スコープ確認</h2>
+    <table class="scope-table">
+      <tr>
+        <th>リポジトリ</th>
+        <th>ファイル</th>
+        <th>変更</th>
+        <th>内容</th>
+      </tr>
+      <tr>
+        <td><span class="tag-repo be">BE</span></td>
+        <td><code>domain/catalog/ProductSearchTerms.java</code></td>
+        <td><span class="tag-new">新規</span></td>
+        <td>語分割＋LIKEエスケープ（ID-29）の純VO</td>
+      </tr>
+      <tr>
+        <td><span class="tag-repo be">BE</span></td>
+        <td><code>CatalogApplicationService.java</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td><code>searchProducts</code>追加。空キーワードは空結果へ短絡</td>
+      </tr>
+      <tr>
+        <td><span class="tag-repo be">BE</span></td>
+        <td><code>CatalogController.java</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td><code>GET /api/products/search</code>エンドポイント追加</td>
+      </tr>
+      <tr>
+        <td><span class="tag-repo be">BE</span></td>
+        <td><code>CatalogCustomMapper.java</code> / <code>.xml</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td><code>searchProducts</code>/<code>countSearchProducts</code>追加（全パラメタライズ）</td>
+      </tr>
+      <tr>
+        <td><span class="tag-repo be">BE</span></td>
+        <td><code>SecurityConfig.java</code></td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td>既存の<code>/api/products/**</code>（GETスコープpermitAll）がカバー</td>
+      </tr>
+      <tr>
+        <td><span class="tag-repo fe">FE</span></td>
+        <td><code>views/catalog/SearchResultView.vue</code></td>
+        <td><span class="tag-new">新規</span></td>
+        <td>検索結果画面（カードグリッド・ページング・カテゴリフィルタ）</td>
+      </tr>
+      <tr>
+        <td><span class="tag-repo fe">FE</span></td>
+        <td><code>components/AppHeader.vue</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>ヘッダ検索バー追加（既製の<code>.jps-search</code>CSSを配線）</td>
+      </tr>
+      <tr>
+        <td><span class="tag-repo fe">FE</span></td>
+        <td><code>router/index.ts</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>route <code>/catalog/search</code>追加</td>
+      </tr>
+      <tr>
+        <td><span class="tag-repo fe">FE</span></td>
+        <td><code>api/catalogApi.ts</code> / <code>stores/catalog.ts</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td><code>searchProducts</code>関数・state/action・空キーワードガード追加</td>
+      </tr>
+      <tr>
+        <td><span class="tag-repo fe">FE</span></td>
+        <td><code>views/__tests__/SignonView.spec.ts</code></td>
+        <td><span class="tag-sideeffect">副作用の修正</span></td>
+        <td>ヘッダに検索用<code>&lt;form&gt;</code>が増えたことで<code>wrapper.find('form')</code>が衝突。<code>form.signon__form</code>へセレクタを明示化（signon画面自体の挙動は無変更）</td>
+      </tr>
+      <tr>
+        <td><span class="tag-repo fe">FE</span></td>
+        <td><code>components/catalog/ProductCard.vue</code> / <code>Pagination.vue</code></td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td>Sprint 6の既存部品をそのまま再利用</td>
+      </tr>
+    </table>
+  </section>
+
+</div>
+</body>
+</html>
