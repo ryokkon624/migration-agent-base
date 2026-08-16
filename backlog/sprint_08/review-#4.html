@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint 08 Review — #4 [E2] カートの追加/数量更新/削除/表示ができるようにする</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #f8f7f5; }
+
+  .page { max-width: 900px; margin: 0 auto; padding: 48px 24px; }
+
+  /* Header */
+  .sprint-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin-bottom: 8px; }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px; }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+  .badge-sprint { background: #e8f0fe; color: #1a56db; }
+  .badge-issue { background: #f0fdf4; color: #166534; }
+  .badge-feature { background: #dcfce7; color: #166534; }
+  .badge-epic { background: #fff7ed; color: #c2410c; }
+  .badge-repo { background: #f3f4f6; color: #374151; }
+  .story { font-size: 13px; color: #4b5563; margin-bottom: 32px; padding: 12px 16px; background: white; border: 1px solid #e5e5e5; border-radius: 8px; }
+  .story b { color: #1a1a1a; }
+
+  /* Sections */
+  section { margin-bottom: 40px; }
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #888; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e5e5e5; }
+
+  /* Problem box */
+  .problem-box { background: #fff8f0; border-left: 3px solid #f59e0b; border-radius: 0 8px 8px 0; padding: 16px 20px; margin-bottom: 16px; }
+  .problem-box .label { font-size: 11px; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .problem-box p { color: #451a03; font-size: 13px; }
+  .problem-box ul { margin: 8px 0 0 18px; color: #451a03; font-size: 13px; }
+
+  /* Architecture change */
+  .arch-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: center; margin-bottom: 8px; }
+  .arch-box { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; }
+  .arch-box .arch-title { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .arch-box.before { border-color: #fca5a5; }
+  .arch-box.after { border-color: #86efac; }
+  .arch-arrow { font-size: 20px; color: #888; text-align: center; }
+  .flow-item { font-size: 12px; color: #374151; padding: 3px 0; display: flex; align-items: flex-start; gap: 6px; }
+  .flow-item .dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .dot-red { background: #ef4444; }
+  .dot-green { background: #22c55e; }
+
+  /* AC cards */
+  .ac-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+  .ac-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid #f0f0f0; }
+  .ac-check { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .ac-check.done { background: #dcfce7; color: #166534; }
+  .ac-num { font-size: 11px; font-weight: 700; color: #888; }
+  .ac-text { font-size: 13px; font-weight: 600; color: #1a1a1a; flex: 1; }
+  .ac-body { padding: 16px 18px; }
+  .ac-body p { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+
+  /* File change */
+  .file-change { margin-bottom: 16px; }
+  .file-name { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; background: #f3f4f6; color: #374151; padding: 5px 10px; border-radius: 4px 4px 0 0; border: 1px solid #e5e5e5; border-bottom: none; display: flex; justify-content: space-between; }
+  .diff-stat { color: #888; }
+  .code-block { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.7; background: #1e1e2e; color: #cdd6f4; padding: 14px 16px; border-radius: 0 0 6px 6px; overflow-x: auto; }
+  .code-line { display: flex; }
+  .line-num { color: #45475a; min-width: 32px; user-select: none; }
+  .line-add { background: rgba(166, 227, 161, 0.12); color: #a6e3a1; }
+  .line-del { background: rgba(243, 139, 168, 0.12); color: #f38ba8; }
+  .line-ctx { color: #cdd6f4; }
+  .line-prefix { min-width: 14px; }
+
+  /* Annotation */
+  .annotation { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-size: 12px; color: #78350f; display: flex; gap: 8px; }
+  .annotation-icon { font-size: 14px; flex-shrink: 0; }
+  .annotation.sec { background: #fef2f2; border-color: #fecaca; color: #7f1d1d; }
+
+  /* Notes list */
+  .note-list { list-style: none; }
+  .note-item { padding: 12px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px; color: #374151; }
+  .note-item:last-child { border-bottom: none; }
+  .note-item b { color: #1a1a1a; }
+
+  /* Verify section */
+  .verify-list { list-style: none; }
+  .verify-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; }
+  .verify-item:last-child { border-bottom: none; }
+  .verify-num { width: 22px; height: 22px; background: #e8f0fe; color: #1a56db; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .verify-content { flex: 1; }
+  .verify-content strong { font-size: 13px; color: #1a1a1a; display: block; margin-bottom: 3px; }
+  .verify-content span { font-size: 12px; color: #6b7280; }
+
+  /* Scope table */
+  .scope-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .scope-table th { text-align: left; padding: 8px 12px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .scope-table td { padding: 10px 12px; border: 1px solid #e5e5e5; color: #374151; vertical-align: top; }
+  .scope-table tr:hover td { background: #f9fafb; }
+  .tag-changed { font-size: 11px; font-weight: 600; background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 3px; white-space: nowrap; }
+  .tag-new { font-size: 11px; font-weight: 600; background: #e8f0fe; color: #1a56db; padding: 2px 6px; border-radius: 3px; white-space: nowrap; }
+  .tag-unchanged { font-size: 11px; font-weight: 600; background: #f3f4f6; color: #6b7280; padding: 2px 6px; border-radius: 3px; white-space: nowrap; }
+  .repo-h { font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; padding: 14px 12px 6px; }
+
+  /* Test summary */
+  .test-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .test-box { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; text-align: center; }
+  .test-box .label { font-size: 11px; color: #888; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+  .test-box .count { font-size: 30px; font-weight: 700; line-height: 1; color: #166534; }
+  .test-box .sublabel { font-size: 11px; color: #888; margin-top: 4px; }
+
+  /* Commit list */
+  .commit-list { list-style: none; font-size: 13px; }
+  .commit-list li { padding: 6px 0; }
+  .commit-hash { font-family: 'SF Mono', 'Fira Code', monospace; background: #f3f4f6; padding: 1px 6px; border-radius: 4px; font-size: 12px; color: #374151; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="sprint-label">Sprint 08 Review</div>
+  <h1>#4 — [E2] カートの追加/数量更新/削除/表示ができるようにする</h1>
+  <div class="meta">
+    <span class="badge badge-sprint">Sprint 08</span>
+    <span class="badge badge-issue">#4</span>
+    <span class="badge badge-feature">feature</span>
+    <span class="badge badge-epic">E2 / F2.1</span>
+    <span class="badge badge-repo">database</span>
+    <span class="badge badge-repo">backend</span>
+    <span class="badge badge-repo">frontend</span>
+  </div>
+  <div class="story">
+    <b>As a</b> 買い物客（未認証を含む）　<b>I want to</b> 商品をカートに入れ、数量を変え、削除し、内容を確認したい　<b>So that</b> 購入前に注文内容を組み立てられる
+  </div>
+
+  <!-- Problem -->
+  <section>
+    <h2>なぜこの改修が必要だったか</h2>
+    <div class="problem-box">
+      <div class="label">as-is（レガシー）の問題</div>
+      <p>Struts 1 の <code>Cart.java</code> はセッション内オブジェクトのみでDB永続化がなく、以下の課題があった。</p>
+      <ul>
+        <li><b>幽霊行バグ</b>: <code>itemMap</code>（itemId→CartItem）と <code>itemList</code>（PagedListHolder）の二重構造で、数量0以下の削除が <code>itemList</code> からのみ行われ <code>itemMap</code> に残存する（同itemId再追加で数量が想定外に加算される）</li>
+        <li>数量更新は「リクエストパラメータ名＝itemId」という暗黙規約で、明示的なAPI契約がない</li>
+        <li>不正な itemId は <code>getItem</code> が null を返しそのまま <code>item.getItemId()</code> でNPE</li>
+        <li>在庫充足の強制がなく、在庫を超える数量でもカートに入れられる（過剰販売の温床）</li>
+      </ul>
+    </div>
+    <div class="arch-grid">
+      <div class="arch-box before">
+        <div class="arch-title">改修前（as-is）</div>
+        <div class="flow-item"><span class="dot dot-red"></span>カート = セッション内Javaオブジェクトのみ、DB永続なし</div>
+        <div class="flow-item"><span class="dot dot-red"></span>itemMap/itemList二重構造 → 幽霊行desync（ID-17）</div>
+        <div class="flow-item"><span class="dot dot-red"></span>数量更新はパラメータ名=itemIdの暗黙規約</div>
+        <div class="flow-item"><span class="dot dot-red"></span>不正itemId → NPE</div>
+        <div class="flow-item"><span class="dot dot-red"></span>在庫充足チェックなし</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-box after">
+        <div class="arch-title">改修後（after）</div>
+        <div class="flow-item"><span class="dot dot-green"></span>t_cart/t_cart_item（DB永続）＋未ログインはPinia/localStorage</div>
+        <div class="flow-item"><span class="dot dot-green"></span>単一表+UNIQUE(cart_id,item_id)で幽霊行を構造的に排除</div>
+        <div class="flow-item"><span class="dot dot-green"></span>明示的な {itemId, quantity} REST API</div>
+        <div class="flow-item"><span class="dot dot-green"></span>不正itemId → 404（SBD-10）</div>
+        <div class="flow-item"><span class="dot dot-green"></span>在庫上限=在庫数をserver-sideで強制（qtyは非露出のまま・ID-28）</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AC breakdown -->
+  <section>
+    <h2>AC別 実装内容</h2>
+
+    <!-- AC1 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC1</div>
+        <div class="ac-text">追加/数量更新/削除/表示をカート REST＋SPA状態で提供（明示的な {itemId, quantity} API）</div>
+      </div>
+      <div class="ac-body">
+        <p>backend に <code>/api/cart</code> 配下4エンドポイント（GET表示・POST追加・PUT更新・DELETE削除）を新設し、frontend の <code>cartApi.ts</code>／Pinia <code>cart</code> store／<code>CartView.vue</code> から一気通貫で疎通させた。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>jpetstore-backend/.../presentation/rest/CartController.java（新規）</span>
+            <span class="diff-stat">127行</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">41</span><span class="line-prefix">+</span><span>@GetMapping</span></div>
+            <div class="code-line line-add"><span class="line-num">42</span><span class="line-prefix">+</span><span>public CartResponse viewCart() { ... }</span></div>
+            <div class="code-line line-add"><span class="line-num">47</span><span class="line-prefix">+</span><span>@PostMapping("/items")</span></div>
+            <div class="code-line line-add"><span class="line-num">48</span><span class="line-prefix">+</span><span>public CartResponse addItem(@Valid @RequestBody AddCartItemRequest request) { ... }</span></div>
+            <div class="code-line line-add"><span class="line-num">54</span><span class="line-prefix">+</span><span>@PutMapping("/items/{itemId}")</span></div>
+            <div class="code-line line-add"><span class="line-num">55</span><span class="line-prefix">+</span><span>public CartResponse updateItem(@PathVariable String itemId, ...) { ... }</span></div>
+            <div class="code-line line-add"><span class="line-num">61</span><span class="line-prefix">+</span><span>@DeleteMapping("/items/{itemId}")</span></div>
+            <div class="code-line line-add"><span class="line-num">62</span><span class="line-prefix">+</span><span>public CartResponse removeItem(@PathVariable String itemId) { ... }</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>legacy の「パラメータ名=itemId」暗黙規約を廃し、明示的な body（<code>{itemId, quantity}</code>）で受理する。カートは常にJWTプリンシパルから導出し、URLにcartId等を取らない（IDOR面ゼロ）。</span>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>jpetstore-frontend/src/views/CartView.vue（新規）</span>
+            <span class="diff-stat">225行</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">31</span><span class="line-prefix">+</span><span>function load() {</span></div>
+            <div class="code-line line-add"><span class="line-num">32</span><span class="line-prefix">+</span><span>  if (authStore.isAuthenticated) { cartStore.fetchCart() }</span></div>
+            <div class="code-line line-add"><span class="line-num">33</span><span class="line-prefix">+</span><span>  else { cartStore.refreshLocalItemDetails() }</span></div>
+            <div class="code-line line-add"><span class="line-num">34</span><span class="line-prefix">+</span><span>}</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>表示テーブルは商品名・単価・数量入力・行小計・削除ボタンを持ち、認証状態に応じてサーバーカート／ローカルカートを自動で切り替える。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC2 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC2</div>
+        <div class="ac-text">数量0以下は行削除。削除は map/list 一貫の単一意味論に正規化（幽霊行バグ=ID-17を踏襲しない）</div>
+      </div>
+      <div class="ac-body">
+        <p>legacy の itemMap/itemList 二重構造そのものを廃止し、<b>単一表 <code>t_cart_item</code> + <code>UNIQUE(cart_id, item_id)</code></b> という構造そのもので幽霊行の発生を不能にした。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>jpetstore-database/flyway/sql/V00_000_010__create_cart_tables.sql（新規）</span>
+            <span class="diff-stat">73行</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">53</span><span class="line-prefix">+</span><span>CREATE TABLE t_cart_item (</span></div>
+            <div class="code-line line-add"><span class="line-num">56</span><span class="line-prefix">+</span><span>    , item_id VARCHAR(10) NOT NULL COMMENT 'アイテムID'</span></div>
+            <div class="code-line line-add"><span class="line-num">57</span><span class="line-prefix">+</span><span>    , quantity INT NOT NULL COMMENT '数量(正の整数・0以下は行削除で対応)'</span></div>
+            <div class="code-line line-add"><span class="line-num">67</span><span class="line-prefix">+</span><span>    , UNIQUE KEY uk_t_cart_item_cart_id_item_id (cart_id, item_id)</span></div>
+            <div class="code-line line-add"><span class="line-num">73</span><span class="line-prefix">+</span><span>) ENGINE = InnoDB ... COMMENT = 'カート明細';</span></div>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>jpetstore-backend/.../CartApplicationService.java — updateItem</span>
+            <span class="diff-stat">L94-111</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">94</span><span class="line-prefix"> </span><span>public Cart updateItem(String itemId, int quantity) {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">97</span><span class="line-prefix"> </span><span>  ItemForCartCustomEntity lookup = requireItemForCart(itemId, cartId);</span></div>
+            <div class="code-line line-add"><span class="line-num">99</span><span class="line-prefix">+</span><span>  if (quantity &lt;= 0) {</span></div>
+            <div class="code-line line-add"><span class="line-num">100</span><span class="line-prefix">+</span><span>    cartCustomMapper.deleteCartItem(cartId, itemId);</span></div>
+            <div class="code-line line-add"><span class="line-num">101</span><span class="line-prefix">+</span><span>    return toCart(cartId);</span></div>
+            <div class="code-line line-add"><span class="line-num">102</span><span class="line-prefix">+</span><span>  }</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>DELETEも同じ単一表への単一削除経路（<code>deleteCartItem</code>）を通るため、「map/list一貫の単一削除意味論」を経路レベルでも徹底している。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC3 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC3</div>
+        <div class="ac-text">未ログインカートはクライアント状態（Pinia/localStorage）に保持し、ログイン時にサーバーカートへマージ</div>
+      </div>
+      <div class="ac-body">
+        <p>フロント初の <code>localStorage</code> 導入（<code>utils/cartStorage.ts</code>）。ログイン遷移（<code>isAuthenticated</code> false→true）を <code>App.vue</code> で監視し、<code>cart</code> store の <code>mergeOnLogin</code> を呼ぶ。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>jpetstore-frontend/src/utils/cartStorage.ts（新規・フロント初のlocalStorage導入）</span>
+            <span class="diff-stat">67行</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">22</span><span class="line-prefix">+</span><span>export function loadCart(): StoredCartLine[] {</span></div>
+            <div class="code-line line-add"><span class="line-num">23</span><span class="line-prefix">+</span><span>  try {</span></div>
+            <div class="code-line line-add"><span class="line-num">28</span><span class="line-prefix">+</span><span>    const parsed: unknown = JSON.parse(raw)</span></div>
+            <div class="code-line line-add"><span class="line-num">32</span><span class="line-prefix">+</span><span>    return parsed.filter(isStoredCartLine)</span></div>
+            <div class="code-line line-add"><span class="line-num">33</span><span class="line-prefix">+</span><span>  } catch { return [] }</span></div>
+            <div class="code-line line-add"><span class="line-num">34</span><span class="line-prefix">+</span><span>}</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>破損JSON・非配列・型不一致の要素は例外を投げずフォールバックする。<code>onCartStorageChange</code>でタブ間同期にも対応。</span>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>jpetstore-frontend/src/stores/cart.ts — mergeOnLogin / syncOnAuthChange</span>
+            <span class="diff-stat">L180-206</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">180</span><span class="line-prefix"> </span><span>async mergeOnLogin(): Promise&lt;void&gt; {</span></div>
+            <div class="code-line line-add"><span class="line-num">181</span><span class="line-prefix">+</span><span>  if (this.localLines.length === 0) { await this.fetchCart(); return }</span></div>
+            <div class="code-line line-add"><span class="line-num">186</span><span class="line-prefix">+</span><span>  try {</span></div>
+            <div class="code-line line-add"><span class="line-num">187</span><span class="line-prefix">+</span><span>    this.cart = await cartApi.merge(this.localLines)</span></div>
+            <div class="code-line line-add"><span class="line-num">188</span><span class="line-prefix">+</span><span>    this.localLines = []</span></div>
+            <div class="code-line line-add"><span class="line-num">189</span><span class="line-prefix">+</span><span>    clearCart()</span></div>
+            <div class="code-line line-add"><span class="line-num">190</span><span class="line-prefix">+</span><span>  } catch { /* localLinesを保持しリトライ可能にする */ }</span></div>
+            <div class="code-line line-add"><span class="line-num">199</span><span class="line-prefix">+</span><span>async syncOnAuthChange(isAuthenticated: boolean) { ... }</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span><code>localLines</code>が空になったら以後は<code>merge</code>を呼ばず<code>fetchCart</code>のみ実行する設計にすることで、明示フラグ無しに「1回だけマージ・失敗時は自動リトライ」を実現している。<code>App.vue</code>の<code>watch(authStore.isAuthenticated, ...)</code>（immediate:true）がトリガー元。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC4 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC4</div>
+        <div class="ac-text">不正/存在しない itemId は 404/検証エラーへ正規化（SBD-10・as-is の NPE を踏襲しない）</div>
+      </div>
+      <div class="ac-body">
+        <p>存在しない itemId は既存の <code>ResourceNotFoundException</code>→<code>GlobalExceptionHandler</code>（404正規化）にそのまま合流させ、新規のエラーハンドリングを増やしていない。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>jpetstore-backend/.../CartApplicationService.java — requireItemForCart</span>
+            <span class="diff-stat">L159-165</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">159</span><span class="line-prefix">+</span><span>private ItemForCartCustomEntity requireItemForCart(String itemId, Long cartId) {</span></div>
+            <div class="code-line line-add"><span class="line-num">160</span><span class="line-prefix">+</span><span>  ItemForCartCustomEntity lookup = cartCustomMapper.selectItemForCart(itemId, cartId);</span></div>
+            <div class="code-line line-add"><span class="line-num">161</span><span class="line-prefix">+</span><span>  if (lookup == null) {</span></div>
+            <div class="code-line line-add"><span class="line-num">162</span><span class="line-prefix">+</span><span>    throw new ResourceNotFoundException("Item not found: " + itemId);</span></div>
+            <div class="code-line line-add"><span class="line-num">163</span><span class="line-prefix">+</span><span>  }</span></div>
+            <div class="code-line line-add"><span class="line-num">164</span><span class="line-prefix">+</span><span>  return lookup;</span></div>
+            <div class="code-line line-add"><span class="line-num">165</span><span class="line-prefix">+</span><span>}</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC5 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC5</div>
+        <div class="ac-text">在庫切れアイテムは追加不可、数量上限＝在庫数。在庫表示はバッジ（在庫あり/残少/在庫切れ）</div>
+      </div>
+      <div class="ac-body">
+        <p>在庫qtyは <code>CartApplicationService</code> 内でのみ扱い、Application/Presentation層の戻り値には一切含めない（ID-28・在庫数非露出）。バッジ表示は既達の <code>StockStatusCalculator</code>／<code>StockBadge.vue</code> をそのまま再利用した。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>jpetstore-backend/.../CartApplicationService.java — addItem</span>
+            <span class="diff-stat">L62-85</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">69</span><span class="line-prefix"> </span><span>ItemForCartCustomEntity lookup = requireItemForCart(itemId, cartId);</span></div>
+            <div class="code-line line-add"><span class="line-num">71</span><span class="line-prefix">+</span><span>if (lookup.getStockQuantity() &lt;= 0) {</span></div>
+            <div class="code-line line-add"><span class="line-num">72</span><span class="line-prefix">+</span><span>  throw new IllegalArgumentException("Item is out of stock");</span></div>
+            <div class="code-line line-add"><span class="line-num">73</span><span class="line-prefix">+</span><span>}</span></div>
+            <div class="code-line line-add"><span class="line-num">80</span><span class="line-prefix">+</span><span>if (newQuantity &gt; lookup.getStockQuantity()) {</span></div>
+            <div class="code-line line-add"><span class="line-num">81</span><span class="line-prefix">+</span><span>  throw new IllegalArgumentException("Requested quantity exceeds available stock");</span></div>
+            <div class="code-line line-add"><span class="line-num">82</span><span class="line-prefix">+</span><span>}</span></div>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>jpetstore-backend/.../ItemDetailView.vue — 在庫状況に応じた活性/非活性</span>
+            <span class="diff-stat">frontend</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">89</span><span class="line-prefix">+</span><span>&lt;button :disabled="catalogStore.currentItem.stockStatus === 'OUT_STOCK' || isAddingToCart"&gt;</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- [L2] -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">[L2]</div>
+        <div class="ac-text">旧同値: item X 2個＋item Y 1個 → 小計=Σ(listPrice×qty)</div>
+      </div>
+      <div class="ac-body">
+        <p>価格はマスター（<code>m_item.list_price</code>）由来でクライアントは価格を送れない。小計は行ごとの <code>lineTotal</code> の合算としてサーバ計算する。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>jpetstore-backend/.../CartApplicationService.java — toCartItem</span>
+            <span class="diff-stat">L196-207</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">197</span><span class="line-prefix">+</span><span>BigDecimal lineTotal = entity.getListPrice().multiply(BigDecimal.valueOf(entity.getQuantity()));</span></div>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>jpetstore-backend/.../domain/cart/Cart.java — of</span>
+            <span class="diff-stat">新規</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">18</span><span class="line-prefix">+</span><span>public static Cart of(Long cartId, List&lt;CartItem&gt; items) {</span></div>
+            <div class="code-line line-add"><span class="line-num">19</span><span class="line-prefix">+</span><span>  BigDecimal subtotal = items.stream().map(CartItem::lineTotal)</span></div>
+            <div class="code-line line-add"><span class="line-num">20</span><span class="line-prefix">+</span><span>      .reduce(BigDecimal.ZERO, BigDecimal::add);</span></div>
+            <div class="code-line line-add"><span class="line-num">21</span><span class="line-prefix">+</span><span>  return new Cart(cartId, items, subtotal);</span></div>
+            <div class="code-line line-add"><span class="line-num">22</span><span class="line-prefix">+</span><span>}</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC-neg1 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC-neg1</div>
+        <div class="ac-text">在庫数を超える数量での追加/更新が拒否される（カート段階の上限チェック）</div>
+      </div>
+      <div class="ac-body">
+        <p>未ログイン（バックエンドのカートAPIが呼べない）でも同じ強制を効かせるため、公開GET <code>/api/items/{itemId}/orderable?quantity=N</code>（計画フェーズ確定 D1）を新設。qtyは返さず orderable真偽＋理由コードのみ返す。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>jpetstore-backend/.../CatalogController.java — checkOrderable（追加）</span>
+            <span class="diff-stat">+19行</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">96</span><span class="line-prefix">+</span><span>@GetMapping("/items/{itemId}/orderable")</span></div>
+            <div class="code-line line-add"><span class="line-num">97</span><span class="line-prefix">+</span><span>public OrderableResponse checkOrderable(</span></div>
+            <div class="code-line line-add"><span class="line-num">98</span><span class="line-prefix">+</span><span>    @PathVariable String itemId, @RequestParam(defaultValue = "1") int quantity) {</span></div>
+            <div class="code-line line-add"><span class="line-num">99</span><span class="line-prefix">+</span><span>  return OrderableResponse.from(catalogApplicationService.checkOrderable(itemId, quantity));</span></div>
+            <div class="code-line line-add"><span class="line-num">100</span><span class="line-prefix">+</span><span>}</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>既存の <code>/api/items/**</code> GETスコープpermitAllにそのまま収まるため <code>SecurityConfig</code> の変更は不要（土台再利用）。</span>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>jpetstore-frontend/src/stores/cart.ts — applyLocalQuantity（未ログイン側）</span>
+            <span class="diff-stat">L144-162</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">150</span><span class="line-prefix">+</span><span>const result = await cartApi.checkOrderable(itemId, quantity)</span></div>
+            <div class="code-line line-add"><span class="line-num">151</span><span class="line-prefix">+</span><span>if (!result.orderable) {</span></div>
+            <div class="code-line line-add"><span class="line-num">152</span><span class="line-prefix">+</span><span>  return { success: false, reason: result.reason ?? undefined }</span></div>
+            <div class="code-line line-add"><span class="line-num">153</span><span class="line-prefix">+</span><span>}</span></div>
+          </div>
+        </div>
+        <div class="annotation sec">
+          <span class="annotation-icon">🔒</span>
+          <span><b>セキュリティレビュー対応（コミット <span class="commit-hash">ea9102b</span>）</b>: 初回実装は上限（超過拒否）のみ検査しており、<code>quantity&lt;=0</code>の下限と、既存数量との加算がintをオーバーフローして負の巨大値にラップし上限チェックを迂回する経路が未対策だった。DTO側 <code>@Min(1)</code> に加え、サービス層でも <code>requestedQuantity&lt;=0</code> を拒否し、<code>Math.addExact</code>でオーバーフローを検出して400へ正規化した（mergeは非拒否方針を維持し、オーバーフロー時は在庫数へクランプ）。レビュー通過後にマージ済み。</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Test summary -->
+  <section>
+    <h2>テスト結果</h2>
+    <div class="test-grid">
+      <div class="test-box">
+        <div class="label">database</div>
+        <div class="count">8</div>
+        <div class="sublabel">CartTablesSpec（Testcontainers）</div>
+      </div>
+      <div class="test-box">
+        <div class="label">backend</div>
+        <div class="count">230</div>
+        <div class="sublabel">./gradlew check 全体（unit + integrationTest）green</div>
+      </div>
+      <div class="test-box">
+        <div class="label">frontend</div>
+        <div class="count">122</div>
+        <div class="sublabel">Vitest 全体 green（type-check/build/format済）</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Verify -->
+  <section>
+    <h2>動作確認ポイント（ユーザー確認用）</h2>
+    <ul class="verify-list">
+      <li class="verify-item">
+        <div class="verify-num">1</div>
+        <div class="verify-content">
+          <strong>商品詳細画面で「Add to Cart」を押すとカートに追加され、ヘッダーの件数バッジが増えること</strong>
+          <span>在庫切れ商品（例: Tiger Shark）はボタンが非活性になっていることも確認</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">2</div>
+        <div class="verify-content">
+          <strong>カート画面（/cart）で数量変更・削除すると即座に反映され、小計が正しく再計算されること</strong>
+          <span>数量を0にすると行が消えること（AC2）</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">3</div>
+        <div class="verify-content">
+          <strong>未ログインでカートに商品を追加した後ログインすると、内容がサーバー側に引き継がれる（マージ）こと</strong>
+          <span>ログイン前にサーバーカートに同じ商品があった場合は数量が加算されること</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">4</div>
+        <div class="verify-content">
+          <strong>在庫数を超える数量を入力するとエラーメッセージが表示され拒否されること</strong>
+          <span>未ログイン状態でも同じ検証が効くこと（在庫数自体はUIに一切表示されない）</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">5</div>
+        <div class="verify-content">
+          <strong>未ログインでもカート画面（/cart）自体は開けること</strong>
+          <span>認証が必要なのはカートAPIの呼び出しのみで、画面自体は公開ルート（D2）</span>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- Scope -->
+  <section>
+    <h2>改修スコープ確認</h2>
+    <table class="scope-table">
+      <tr><th colspan="3" class="repo-h">database</th></tr>
+      <tr>
+        <td><code>V00_000_010__create_cart_tables.sql</code></td>
+        <td><span class="tag-new">新規</span></td>
+        <td>t_cart / t_cart_item（UNIQUE(cart_id,item_id)・version列なし＝D3意図的逸脱）</td>
+      </tr>
+      <tr>
+        <td><code>CartTablesSpec.groovy</code></td>
+        <td><span class="tag-new">新規</span></td>
+        <td>スキーマ表明テスト（8件）</td>
+      </tr>
+
+      <tr><th colspan="3" class="repo-h">backend</th></tr>
+      <tr>
+        <td><code>CartApplicationService.java</code></td>
+        <td><span class="tag-new">新規</span></td>
+        <td>add/update/remove/view/merge（在庫上限強制・小計計算・sec修正含む）</td>
+      </tr>
+      <tr>
+        <td><code>CartController.java</code></td>
+        <td><span class="tag-new">新規</span></td>
+        <td>/api/cart 4EP + merge</td>
+      </tr>
+      <tr>
+        <td><code>domain/cart/{Cart,CartItem,CartLine}.java</code></td>
+        <td><span class="tag-new">新規</span></td>
+        <td>カートドメインモデル</td>
+      </tr>
+      <tr>
+        <td><code>CartCustomMapper.java / .xml</code></td>
+        <td><span class="tag-new">新規</span></td>
+        <td>ensureCart（upsert-get-id）・JOIN読み取り・絶対値upsert</td>
+      </tr>
+      <tr>
+        <td><code>domain/catalog/OrderabilityResult.java</code></td>
+        <td><span class="tag-new">新規</span></td>
+        <td>orderable判定結果（D1）</td>
+      </tr>
+      <tr>
+        <td><code>CatalogController.java / CatalogApplicationService.java</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>orderable EP追加のみ（SecurityConfig無変更）</td>
+      </tr>
+      <tr>
+        <td><code>SecurityConfig.java</code></td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td>既存の anyRequest().authenticated() が /api/cart/** をそのままカバー</td>
+      </tr>
+      <tr>
+        <td>CartCustomMapperSpec / CartApplicationServiceSpec / CartControllerSpec</td>
+        <td><span class="tag-new">新規</span></td>
+        <td>Spock TDD（9 + 22 + 25件）</td>
+      </tr>
+
+      <tr><th colspan="3" class="repo-h">frontend</th></tr>
+      <tr>
+        <td><code>utils/cartStorage.ts</code></td>
+        <td><span class="tag-new">新規</span></td>
+        <td>フロント初のlocalStorage導入</td>
+      </tr>
+      <tr>
+        <td><code>stores/cart.ts</code></td>
+        <td><span class="tag-new">新規</span></td>
+        <td>未ログインlocalStorage/ログインサーバミラー・mergeOnLogin</td>
+      </tr>
+      <tr>
+        <td><code>api/cartApi.ts</code></td>
+        <td><span class="tag-new">新規</span></td>
+        <td>view/add/update/remove/merge + checkOrderable</td>
+      </tr>
+      <tr>
+        <td><code>views/CartView.vue</code></td>
+        <td><span class="tag-new">新規</span></td>
+        <td>カート画面（公開ルート）</td>
+      </tr>
+      <tr>
+        <td><code>components/AppHeader.vue</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>仮リンク→実ルート化＋件数バッジ接続</td>
+      </tr>
+      <tr>
+        <td><code>views/catalog/ItemDetailView.vue</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>disabledプレースホルダ→実装（在庫状況で活性/非活性）</td>
+      </tr>
+      <tr>
+        <td><code>App.vue</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>authStore.isAuthenticated監視watch追加（マージトリガー）</td>
+      </tr>
+      <tr>
+        <td>cartStorage.spec.ts / cart.spec.ts / ItemDetailView.spec.ts</td>
+        <td><span class="tag-new">新規/更新</span></td>
+        <td>Vitest（10 + 22件、既存ItemDetailView.spec.tsは実挙動に合わせ更新）</td>
+      </tr>
+    </table>
+  </section>
+
+  <!-- Commits -->
+  <section>
+    <h2>コミット</h2>
+    <ul class="commit-list">
+      <li><span class="commit-hash">d9e40f6</span> database — feat: カート(t_cart/t_cart_item)テーブルを追加する</li>
+      <li><span class="commit-hash">f13cc15</span> backend — feat: カートREST API(追加/更新/削除/表示/マージ)とorderable EPを追加する</li>
+      <li><span class="commit-hash">ea9102b</span> backend — fix: addItemの数量下限バリデーション欠落を修正する（sec指摘対応）</li>
+      <li><span class="commit-hash">5685453</span> frontend — feat: カート画面(追加/数量更新/削除/表示)を追加する</li>
+    </ul>
+  </section>
+
+</div>
+</body>
+</html>
