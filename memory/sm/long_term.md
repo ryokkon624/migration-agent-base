@@ -35,6 +35,8 @@
 
 - **tier分離9連続で有効・security ハードニング Story でも通用**（Sprint 9）: #5/#6（E2 カート価格権威＋CSRF/冪等・計6SP・backend 主体）でも計画=Opus で spec 委譲論点を確定→実装=Sonnet で手戻りゼロ完走・3観点クリーン。**Sprint 4 型「既達が大きい」ハードニング Story を再現**＝計画前 Explore で「既達 vs 未実装」を切り分け（#4 実装が価格サーバ権威・BigDecimal・SQLパラメタライズ・CSRF トークン・冪等メソッドまで概ね完成）→残作業を backend 4ファイル＋否定AC 回帰テストに集約し frontend/database ノータッチ。**security ハードニング Story は AC 文言に literal 準拠しすぎると新規機構（Origin フィルタ・グローバル FAIL_ON_UNKNOWN）を足す過剰実装に陥りやすい→計画フェーズ AskUserQuestion で「足さない範囲」を確定**（#6 Origin検証=SameSite＋トークンで充足・新規フィルタ無し／#5 update 0=削除維持・merge ≤0→400）＝spec 委譲かつ先行 Story(#4)/cart.md と**衝突する**論点の計画確定（Sprint5-8 の spec 委譲論点確定の「衝突解消」次元での5回目）で reviewer churn ゼロ。**perf 指摘（merge N+1）は SM が `git diff main...branch` で Sprint8 由来の既存問題と検証→非ブロッキング判定→backlog 化(#28)**（Sprint60 教訓の適用・過剰対応回避）。**reviewer 起動プロンプトに計画フェーズ確定事項を明記して churn を防止**（「新規 Origin フィルタ不在は意図的」等・初出＝次回再発で昇格判定）。
 
+- **tier分離10連続で有効・初のチェックアウト導線（多段階ウィザード）でも通用**（Sprint 10）: #7（F3.1 チェックアウト・ウィザード・確定前段まで・cross-repo・SP8）でも計画=Opus で spec 委譲論点を確定→実装=Sonnet で手戻りゼロ完走・3観点クリーン。**計画前「既達 vs 未実装」調査（Explore 2本並列）でスコープ最小化**＝カート確認は既達 `GET /api/cart`・認証復帰は既達 authGuard・CSS `.jps-steps`/フォーム kit 既存 → 新規作業を「**backend read-only 住所API 1本＋frontend ウィザード一式**」に集約（過剰実装回避＝Sprint4/9 型のフロント版）。**spec 委譲論点の計画確定に「上流Feature未実装での cross-repo 化」という新分岐タイプ**が出現＝AC1 プリフィルの住所源が E4 プロフィール #13/#14 未着手で上流不在→AskUserQuestion で「cross-repo 化 vs 持ち越し」を確定し**住所 read-only API 新設を選択**（Sprint5#24 の /me 追加と同型だが「土台 Story」でなく「上流Feature未実装」が分岐理由）。PO も同傾向を正式昇格（範囲を機能Story一般へ拡張）。cross-repo closes は主=frontend #5（capstone＝ウィザードUI）に集約・従=backend #9 は Related で Issue #7 completed クローズ（frontend 主パターン3回目・Sprint5#24/Sprint6#1 に続く）。
+
 ## DEVレビュー指摘の傾向
 
 - **DBスキーマ Story**（Sprint 1）: FK 列の明示セカンダリインデックスの一貫性（m_item.supplier_id）。InnoDB は FK 索引を自動生成するため機能影響は無いが、兄弟列に明示索引がある場合は揃える。2回目の発生で rules/database.md への昇格を判定。
@@ -53,6 +55,8 @@
 
 - **3観点クリーンが Sprint3/6/7 に続き4回目・security ハードニング Story でも通用**（Sprint 9）: #5/#6 は conv/sec 指摘0。要因＝①**固めた secure-by-default 土台＋#4 実装の再利用**（価格サーバ権威・BigDecimal・SQLパラメタライズ・CSRF基盤）②**否定AC を計画フェーズで先回り指定**（価格注入無視・外部オリジン拒否・数量検証統一を reviewer 起動プロンプトで具体化）③**計画フェーズで spec 委譲・衝突論点を確定**（実装が仕様どおり）。perf の merge N+1 は**Sprint8 由来の既存問題**＝今スプリント非導入で SM が `git diff main...branch` 検証→スコープ外・非ブロッキング（#28 backlog）。sec の軽微 FYI（updateItem にサービス層の下限重複チェックなし）は確定②「update=DTO層検証」に沿った意図的設計で呼び出し元 Controller のみ＝非exploitable＝対応不要（Sprint8 の「同種メソッド群の検証一貫性」教訓を計画で先回りし再発せず）。
 
+- **3観点クリーンが Sprint3/6/7/9 に続き5回目・今回は perf も完全ゼロ**（Sprint 10）: #7（cross-repo・チェックアウト・ウィザード）は conv/sec/perf 全て指摘なし。要因＝①**固めた secure-by-default 土台＋E1/E2 カート·認証土台の無改造再利用**（既達 `GET /api/cart`・authGuard/redirectValidator・httpClient CSRF・CSS stepper/フォーム kit）②**否定AC を reviewer 起動プロンプトで先回り指定**（AC-neg1 空カート進入不可・AC4 GET状態変更なし・AC3 カード欄なし）③**計画フェーズ確定事項＝意図的設計を reviewer プロンプトに明記して churn 防止**（read-only 限定・SecurityConfig 無変更・orderApi 未作成・注文確定ボタン無効・Pinia 揮発は「欠落として指摘しないこと」と明示）＝Sprint9 初出の2回目で scrum-master-workflow ③ へ昇格。sec は IDOR 面ゼロ（principal から userId 解決・クライアントパラメータ非受理）・`#{userId}` パラメタライズ・未認証401/POST405 を実テストで確認＝**read-only 参照API でも secure-by-default が効いた**。
+
 ## Sprint Reviewで発覚しやすいパターン
 
 - **Flyway 採番規約（versioned vs repeatable）**（Sprint 1）: 開発/テスト用シードを versioned で採番すると out-of-order 破綻の懸念。→ repeatable（`R__`）＋冪等を rules/database.md に明文化。**自動3reviewer は規約に無い観点は全員見逃す**（規約の明文化が再発防止の要）。
@@ -64,6 +68,8 @@
 - **write ドメインの入力検証漏れは Sprint Review 前に自動レビュー（sec）で捕捉できた**（Sprint 8）: addItem の数量下限漏れは sec reviewer が exploit 経路付きで発見→Sprint Review に持ち込まず解消。Sprint Review 指摘は**ゼロ**（クリーン）。secure-by-default 土台＋否定AC の先回り指定＋計画フェーズの設計確定が揃うと、write ドメインでも Sprint Review 前に品質を固められる（Sprint3/6/7 のクリーンパスに続く）。
 
 - **security ハードニングでも Sprint Review クリーン（指摘ゼロ）**（Sprint 9・Sprint3/6/7/8 に続く）: 否定AC 回帰テスト（攻撃が失敗することの実証）を主成果物として計画で先取り＋計画前 Explore の既達/未実装切り分け＋計画フェーズの spec 委譲/衝突論点確定が揃い、Sprint Review 前に品質が固まった。attack-card で攻撃失敗を可視化した Review HTML も奏功。**「既達が大きい」ハードニング Story はスコープを絞れる分クリーンに通りやすい**（計画前調査で残作業を最小化し過剰実装を回避したことが要因）。
+
+- **Sprint Review クリーン（指摘ゼロ）が継続・初のチェックアウト導線でも**（Sprint 10・Sprint3/6/7/8/9 に続く）: #7 は Sprint Review 指摘ゼロ。secure-by-default 土台＋既達資産の無改造再利用＋否定AC 先回り＋計画フェーズの spec 委譲論点確定（cross-repo 化を含む）が揃い Sprint Review 前に品質が固まった。**計画前「既達 vs 未実装」調査で cross-repo スコープ（住所プリフィルAPI）を先に確定**したため、Sprint Review で「プリフィルできない/データがない」等の実機ギャップが出なかった（Sprint6「DDL ありデータなし」先回りの frontend/cross-repo 版）。
 
 ## Skills更新履歴
 
@@ -102,3 +108,7 @@
   - SM: **`scrum-master-workflow` SKILL.md ① Planning に「spec 委譲論点の洗い出し」を昇格追加**（Sprint5-8 で4連続定着＝long_term「次回昇格判定」到達）。対象Issue特定直後に spec/AC/台帳/architecture-conventions から委譲論点を洗い出し、既決 vs 実装未確定を区別して後者を計画で AskUserQuestion 確定する手順を明文化。#skills-changelog 投稿済。その他 SM 学びは long_term 止まり（tier分離8連続・初 write ドメイン／計画前調査で永続基盤皆無→3-repo／sec の検証一貫性教訓／DEV の GCM push ハング→SM トークン URL push 運用）。
   - DEV: `frontend-conventions` §7 に localStorage 初導入パターン（cartStorage: 破損フォールバック/タブ間同期/型ガード）を追記（参照知識の即時反映）。`backend-conventions` は sec 指摘（同種メソッド群の検証一貫性）が初出のため未反映（2回ルール）。long_term に Math.addExact・単一表+UNIQUE 構造的整合（ID-17 是正）・orderable qty 非露出（D1）・C1 再検証を記録。卒業候補なし（backend6/frontend4/database3 スプリント・15基準未達）。
   - PO: 台帳 `ID-19` を「client+server 加算・在庫数クランプ」に具体化・由来更新。先回りチェックリスト2昇格（新ドメイン feature の UI 配置＋ルーティング保護境界〔Sprint7#2/Sprint8#4〕／architecture-conventions の PO 判断委譲項目〔§3.1・§4.3〕の確定値・適用可否〔Sprint6#1/Sprint8#4〕）。質問傾向 Sprint8 追記（傾向1=先行台帳エントリの後続 API 制約未参照＝初出・見送り）。
+- **Sprint 10**:
+  - SM: **`scrum-master-workflow` ③（reviewer 起動）に「意図的設計の明記による churn 防止」を追記**（2回ルール昇格＝Sprint9 #5/#6 初出→Sprint10 #7 で3観点クリーン再現）。計画フェーズで確定した「あえて作らない／変更しない／無効化する」判断（read-only 限定・SecurityConfig 無変更・スコープ外で未作成の API・無効化した UI プレースホルダ・揮発 Pinia 等）を reviewer 起動プロンプトに「欠落として指摘しないこと」と明示する運用を明文化。#skills-changelog 投稿済。その他 SM 学びは long_term 止まり（tier分離10連続・計画前調査でスコープ最小化・上流Feature未実装での cross-repo 化という新分岐・cross-repo closes 主=frontend 3回目）。
+  - DEV: `frontend-conventions` §7 に2点追記（**多段階入力フロー＝単一ルート＋内部ステップ＋揮発 Pinia** で実装するパターン／**View 非テスト方針下の否定AC は Pinia の testable getter に切り出す**＝`cart.isEmpty`。#8 拡張での再利用見込みで2回ルール例外の即時反映）。`backend-conventions` は更新なし（read-only 参照API は既存 §9 custom mapper/entity 規約の踏襲のみ）。backend ハマり2件（Groovy GString.equals(String)／Spock Stub がデフォルトメソッド非委譲）は初出で long_term 止まり。卒業候補なし（backend8/frontend5/database3・15基準未達）。#skills-changelog 投稿済。
+  - PO: **`intended-diff-ledger.md` に ID-30 新規追加**（ウィザード下書き＝旧 session `workingOrderForm` 保持〔リロード後も残る〕→新 Pinia 揮発〔リロードで消失〕・由来 E3 決定 2026-08-16・関連 #7）。プリフィル自体はレガシー等価で追記対象外。質問傾向「上流Feature未実装による cross-repo 化」を正式昇格（Sprint5 傾向2 の2回目・範囲を機能Story一般へ拡張）／「空カート誘導UX（異常系）」は既存チェックリスト項目の記述強化（異常系UI遷移を明記・再昇格せず）。意思決定ログに Sprint10 6件追記。

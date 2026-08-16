@@ -222,6 +222,9 @@ git diff [sprint-start-commit]^...HEAD で変更内容を確認してくださ�
 > ブランチ名はいずれかのIssue#でよい。この方針であれば `git diff main...[ブランチ名]` で全変更が取得でき、コミット単位でIssue別ファイルも特定できる。
 > `git log main...[ブランチ名] --oneline` でコミット一覧を確認し、`git show [コミットハッシュ] --name-only --format=""` でIssue別変更ファイルを取得してreviewerに渡すこと。
 
+> ⚠️ **reviewer 起動プロンプトに計画フェーズで確定した「意図的な設計」を明記して churn を防ぐ（Sprint 9 初出→Sprint 10 昇格）。**
+> 計画フェーズで確定した「あえて作らない／変更しない／無効化する」設計判断（例: read-only 限定で編集 API を作らない・SecurityConfig 無変更・スコープ外で未作成の API〔次 Story へ延期〕・意図的に無効化した UI プレースホルダ・揮発 Pinia 等）を、各 reviewer の起動プロンプトに **「これらは意図的な設計であり『欠落』として指摘しないこと」** と明示する。これで reviewer が意図的な非実装を欠落・未実装と誤指摘する churn を防げる（否定 AC の先回り指定と併用）。Sprint 9（#5/#6・新規 Origin フィルタ不在は意図的）で初出、Sprint 10（#7・read-only 限定／orderApi 未作成／注文確定ボタン無効／SecurityConfig 無変更／Pinia 揮発を明記）で 3観点クリーンを再現し 2回ルールで昇格。
+
 ---
 
 ### ④ レビュー結果の集約・判断

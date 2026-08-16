@@ -335,4 +335,53 @@ export function loadCart(): StoredCartLine[] {
 > **背景（Sprint 8 #4）**: フロント初のlocalStorage導入（`utils/cartStorage.ts`・未ログインカートの
 > クライアント状態保持）で採用。
 
+### 多段階入力フロー（ウィザード）は単一ルート＋内部ステップ＋揮発Piniaで実装する
+
+チェックアウトのように複数ステップにまたがる入力フローは、ステップごとに個別ルートを切らず、単一ルート
+（例: `/checkout`・`meta.requiresAuth: true`）配下でコンテナ側がステップコンポーネントを切り替える構成に
+する。
+
+- **per-stepルートにしない**。単一ルートにすることで、既達の`authGuard`/`redirectValidator`（未認証時の
+  元URL退避→サインオン→復帰）が新規配線ゼロでそのまま機能する（per-stepルートだと各ルートに
+  `meta.requiresAuth`を付与し直す必要がある）
+- **下書き状態（住所等）はsessionStorage/DBに永続化せず、Piniaストアのメモリ保持のみ（揮発）とする。**
+  `reset()`は明示的なアクション呼び出し時のみ実行し、SPA内の通常遷移では自動リセットしない
+- 既達のステッパーCSS（`.jps-steps`/`.jps-step*`）・フォームkit（`.jps-field`等）をそのまま再利用し、
+  新規スタイルを増やさない
+
+```ts
+// OK: 単一ルート + 内部ステップ。meta.requiresAuthはこの1ルートに付けるだけでよい
+{ path: '/checkout', component: CheckoutView, meta: { requiresAuth: true } }
+```
+
+> **背景（Sprint 10 #7）**: `/checkout`（カート確認→住所→確定の3ステップ）で採用。既達の`GET /api/cart`・
+> カートストア・認証復帰の仕組みを一切変更せず再利用でき、ウィザード固有の実装（ステップ管理・住所フォーム・
+> 下書き状態）だけに集中できた。今後の多段階フロー（例: 注文確定ウィザードの拡張）でも再利用する想定。
+
+### View非テスト方針下での否定ACはPiniaストアのtestableなgetterに切り出す
+
+View/Component（見た目の変更）はVitestテスト不要という方針だが、Viewが依存する判定ロジック（否定AC等）を
+View内に直接書いてしまうと、そのACはテストで担保できなくなる。View側の判定はPiniaストアの**testableな
+getter**に切り出し、Viewはそのgetterの結果を参照するだけにする。
+
+```ts
+// stores/cart.ts: getterとして切り出し、Vitestで固定できる
+export const useCartStore = defineStore('cart', {
+  getters: {
+    isEmpty: (state) => state.displayItems.length === 0,
+  },
+})
+```
+
+```ts
+// View側は判定結果を参照するだけ（Viewのロジック自体はテスト不要）
+onMounted(async () => {
+  await cartStore.fetchCart()
+  if (cartStore.isEmpty) router.replace('/cart?reason=empty-checkout')
+})
+```
+
+> **背景（Sprint 10 #7）**: AC-neg1（空カート進入不可）で採用。`isEmpty`getterを`cart.spec.ts`で固定し、
+> `CheckoutView.vue`自体は無テストのままACの正しさを担保した。
+
 ---

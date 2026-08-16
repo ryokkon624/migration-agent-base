@@ -1,12 +1,11 @@
 # SM 短期記憶（今スプリント）
 
-Sprint 9（#5 [E2] 価格サーバ権威・SBD-2/17・SP3 ＋ #6 [E2] カート CSRF・冪等・SBD-3/15・SP3＝計6SP・security ハードニング）完了。次スプリント開始時にリセット済み。
+Sprint 10（#7 [E3] チェックアウト・ウィザード＝F3.1・確定前段まで・cross-repo・SP8）完了。次スプリント開始時にリセット済み。
 
-- 実装（backend のみ・`feature/5-cart-price-csrf-hardening`・2コミット）: #5=UpdateCartItemRequest→@NotNull @Min(0) Integer（0=削除温存・負数/欠落→400）・merge ≤0→400・GlobalExceptionHandler に HttpMessageNotReadable→400／#6=XSRF-TOKEN Cookie に SameSite=Strict/Secure（既存 jwt.cookie.* 再利用・CsrfTokenRepository bean 切出）＋否定AC 回帰テスト（価格注入無視・外部オリジン拒否・冪等性）。
-- 性格: **Sprint 4 型「既達が大きい」ハードニング**。計画前 Explore で既達/未実装切り分け→過剰実装回避（新規 Origin フィルタ・グローバル FAIL_ON_UNKNOWN を足さない）。
-- **SM 計画フェーズ AskUserQuestion 確定（spec 委譲かつ #4/cart.md と衝突）**: #6 Origin検証=SameSite＋トークンで充足／#5 update 0=削除維持・merge ≤0→400。台帳追記なし。
-- **3観点クリーン**（conv/sec 指摘0＝Sprint3/6/7 に続く4回目）。perf の merge N+1 は SM が `git diff` で Sprint8 由来の既存問題と検証→非ブロッキング→#28 で backlog 化。
-- PR#8 マージ済・#5/#6 closed(completed)・Sprint Review 指摘なし。
-- Retro 完了（DEV/PO/SM）。教訓は long_term 反映済：tier分離9連続・security ハードニングでも通用／「既達が大きい」ハードニングの過剰実装回避＝Sprint4型再現／spec 委譲かつ衝突論点の計画確定（5回目・衝突解消次元）／perf 既存問題のスコープ外判定→backlog／reviewer プロンプトに確定事項明記で churn 防止（初出）。DEV: backend-conventions §9 catch-all テーブルに HttpMessageNotReadable→400 追記。PO: 傾向1（否定AC 実装レベル論点）初出見送り・Origin/SameSite は Sprint4 昇格済チェックリスト3件目。
-- agent-base `feature/sprint9`: Retro 完了後に PR＆マージ（ユーザー指示 2026-08-16「PR はマージしてください」）。コミット: Planning(sprint_backlog.md)・Review(review-#5/#6.html)＋Retro 成果物（memory dev/po/sm・backend-conventions §9）。
-- 次スプリント候補: **E2 完成**（#4/#5/#6）につき **E3（注文＝checkout ウィザード #7・在庫原子引当 #8・注文履歴 #9/#10・remoting 廃止 #11・支払プレースホルダ #12）**へ。カート土台を注文導線で再利用・接続。在庫充足の実強制（ID-1）が E3 中核。
+- 実装: cross-repo `feature/7-checkout-wizard`（backend `GET /api/account/me` read-only 住所API＋frontend `/checkout` 単一ルート3ステップ・揮発 Pinia・支払プレースホルダ・AC-neg1 空カートガード）。**orderApi は #8 延期**（スコープ境界に準拠）。
+- **3観点クリーン（5回目・今回は perf も完全ゼロ）**。計画前 Explore の「既達 vs 未実装」でスコープ最小化＋否定AC 先回り＋計画確定事項（意図的設計）を reviewer プロンプトに明記して churn 防止。tier分離10連続・手戻りゼロ。C1 先例再利用（CSS stepper/フォームkit・httpClient CSRF・cart ストア・authGuard・api-module/Vitest）実証成功。
+- **計画フェーズ AskUserQuestion 確定3件**（住所プリフィル源=cross-repo〔上流Feature未実装 E4 が分岐理由の新タイプ〕／#7·#8 スコープ境界=確定前段まで／下書き=Pinia 揮発）。
+- PR: frontend #5（主・closes #7）＋backend #9（従・Related）→ **両マージ済・Issue #7 completed クローズ**。
+- Sprint Review 指摘なし。Retro 完了（SM/DEV/PO）。Skills 更新: SM=scrum-master-workflow ③ churn 防止昇格／DEV=frontend-conventions §7（多段階フロー・testable getter）／PO=intended-diff-ledger ID-30 追加・傾向1 昇格。長期記憶反映済。
+- agent-base 成果物: `feature/sprint10` ブランチでコミット＆PR＆マージ（ユーザー指示 2026-08-16「Retro 完了時に作って」）。
+- **次スプリント候補**: E3 継続 → **#8（F3.2 注文確定・在庫原子引当・整合性）**。#7 の accountApi/checkout ストア/内容確認画面・無効化した『注文確定』ボタンを #8 で配線（先例再利用の継続実証）。**ID-1（在庫充足の実強制＝ガード付きアトミック減算）が #8 中核**。t_order/t_order_line/t_inventory テーブルは既達（計画前調査で確認済）。
