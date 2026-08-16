@@ -19,6 +19,11 @@
 - **計画フェーズの論点をユーザー承認で「プロダクト判断」ごと確定**（Sprint 5）: #24 の再水和ポリシー（①）で、DEV 推奨(b)メモリのみ＋持ち越しに対し**ユーザーが `/me` 追加＝cross-repo 化を選択**。計画フェーズで論点を AskUserQuestion 形式で3点（再水和・AC8実証・画像スコープ）提示し、スコープを変える判断（cross-repo 化）を実装前に吸収＝手戻りゼロ。**土台 Story は how/どこまで が割れやすい（PO も3回目の傾向認定）ので、SM が計画で選択肢を具体化しユーザーに委ねるのが有効**。
 - **レビュー指摘は SM verification 後に1ラウンドへ集約して DEV に回す**（Sprint 5 で徹底）: perf（初期化直列）・sec（redirectValidator 制御文字バイパス）の2件を、SM が実コードで CONFIRMED まで裏取り（sec は現状 router.push のみで exploit 不可だが AC-neg2 担保点の潜在バグと判定し「今スプリント修正」を選択）してから、**reviewer ごとに往復させず1回の修正依頼に束ねた**。再修正後の再レビューは「runtime/security に触れる修正は Sec 必須・perf は該当箇所・conv は該当面なしで SM 検証代替」と観点を絞った（⑦b/④の原則）。
 
+- **tier分離が6スプリント連続で有効・初のドメイン機能 Story でも通用**（Sprint 6 実証）: 8SP・3-repo・初のドメイン機能（カタログ閲覧）でも、計画=Opus で全AC＋`catalog.md`＋#22/#23/#24 土台＋レガシー seed を一括読解→スコープ確定→実装=Sonnet で手戻りゼロ完走。**土台規律（土台 vs ドメイン）だけでなく、ドメイン機能そのものでも tier 分離が効く**ことを確認（backend 4連続＋frontend 1回＋ドメイン機能1回）。
+- **計画前の「既達 vs 未実装」実地調査が想定外の cross-repo スコープ拡大を発見**（Sprint 6 で新パターン・Sprint 4/5 の発展）: 調査（Explore）で、**カタログ4テーブルの DDL は #22 済だがシードデータが皆無**（`m_category/m_product/m_item/t_inventory` の INSERT が全リポジトリ0件）と判明→ 2-repo 想定を **3-repo（database 追加）** に計画時点で確定。**「DDL があるからデータもある」と仮定しない**＝ドメイン機能の計画前調査は**シード/マイグレーションの有無まで**確認する。mid-implementation の破綻を回避できた（初出＝2回ルールで long_term 止まり／再発時に scrum-master-workflow ① へ「計画前にシード/マイグレーションの充足まで調査」を昇格判定）。
+- **設計選択を計画フェーズで AskUserQuestion 確定＝仕様委譲論点を SM が先に潰す**（Sprint 6・Sprint 5 の発展）: DEV 推奨（手書き enum）に対しユーザーが m_code を選択（「区分値は基本 m_code」）＝**2回目のユーザーオーバーライド**（Sprint 5 は再水和 /me）。**`architecture-conventions §3.1` が「確定は PO/仕様で」と委譲していた論点**を、SM が AskUserQuestion で先に確定→ Conv reviewer churn を回避（3観点全て指摘なし）。**spec/conventions が判断を PO/仕様に委ねている箇所は、DEV に一任せず SM が計画フェーズでユーザー承認を取る**。残少閾値（定量パラメータ）・ページ採番（先例規約）も同様に計画で確定＝PO が「定量パラメータ未定義」「先例規約未定義」を2回目発生として正式昇格。
+- **CRLF 行末のみの working-tree M ノイズを実変更と誤認しない**（Sprint 6 教訓・Windows 固有）: 実装後の working dir に、コミット対象外の foundation ファイルが `M` 表示されることがある（`npm run format`/`syncTestSchema` の EOL 正規化由来）。**`git diff -c core.autocrlf=false --numstat` が空＝内容差分ゼロ**を確認してから review/PR スコープを確定する（reviewer には**コミット対象の diff** を渡し、EOL ノイズの foundation ファイルはスコープ外と明示）。
+
 ## DEVレビュー指摘の傾向
 
 - **DBスキーマ Story**（Sprint 1）: FK 列の明示セカンダリインデックスの一貫性（m_item.supplier_id）。InnoDB は FK 索引を自動生成するため機能影響は無いが、兄弟列に明示索引がある場合は揃える。2回目の発生で rules/database.md への昇格を判定。
@@ -29,11 +34,15 @@
 - **security Story の「受容可能な既知リスク」分類は SM が実コード検証してから**（Sprint 4 確立）: Sec reviewer の非ブロッキング2件（①ロック短絡が bcrypt 前＝タイミング副次チャネル／②assertNotLocked と recordFailure の check-then-act 非原子性→高並列でロック延長）を、**偽陽性でも要修正でもなく「受容可能な既知リスク」と分類**。SM が実コードで(a) `t_login_attempt` の username 対称ロック＋Spring のダミー bcrypt でタイミングは {ロック/非ロック} 軸のみ＝**存在と直交で列挙 oracle にならない**、(b)ロック延長は**フェイルセーフ（bypass 不可）で受容済 DoS モデル内**、を裏取りしてから受容判定。security Story は否定AC（攻撃が失敗する）検証が主眼だが、**残存する副次チャネル/並行性の受容判断も SM が verification して行い、Sprint Review でユーザーに明示**（reviewer が SM/PO に委ねた受容可否はユーザー承認まで取る）。
 - **フロント土台 Story の指摘傾向**（Sprint 5・初のフロント）: ①**汎用バリデータの「先頭のみ検証」バイパス**＝`redirectValidator` の制御文字判定が先頭1文字目のみで、`/\t/evil.com`（2文字目にタブ）がすり抜ける。WHATWG URL パーサはタブ/改行を位置問わず除去するため、将来 `location.href` 経路でプロトコル相対 `//evil.com` 化しうる既知バイパス（現状は呼び出し元が `router.push()` のみで exploit 不可だが、AC-neg2 を担保する security-critical utility の潜在バグ）。→ **汎用ユーティリティは入力全体を検証**（C0 制御文字 0x00-0x1F を全走査）。②**独立初期化の直列 await**＝`main.ts` の CSRF prime と `/me` 再水和が独立なのに直列（`Promise.all` で並列化可）。いずれも低深刻度/低リスクだが、security-critical utility の指摘は SM が exploit 可否を実コード検証したうえで「今スプリント修正 vs バックログ送り」を判断する（今回は修正が自明かつ担保点そのものなので即修正）。
 
+- **初のドメイン機能でも3観点クリーンだった**（Sprint 6・Sprint 3 認証クリーンと同型）: #1（3-repo・カタログ）は規約・Sec・Perf 全員指摘なし。要因は①**secure-by-default 土台の再利用**（#22 DB/#23 backend/#24 frontend＋既存の例外正規化・CSRF・permitAll 既定 authenticated）②**レビュー観点を計画フェーズで AC 化**（qty 非露出／`v-html` 禁止＝AC-neg1／permitAll GET スコープ限定＝AC4／パラメタライズ＝SBD-17／404 正規化＝SBD-10）を起動プロンプトで具体指定③**在庫 m_code・ページング DTO・スコープ境界をユーザー承認で計画確定**（実装が仕様どおり）。**固めた土台＋否定AC の先回り指定＋設計の計画確定**が揃うとドメイン機能でもクリーンに通る。
+
 ## Sprint Reviewで発覚しやすいパターン
 
 - **Flyway 採番規約（versioned vs repeatable）**（Sprint 1）: 開発/テスト用シードを versioned で採番すると out-of-order 破綻の懸念。→ repeatable（`R__`）＋冪等を rules/database.md に明文化。**自動3reviewer は規約に無い観点は全員見逃す**（規約の明文化が再発防止の要）。
 - **「テスト green ＝完成」の盲点**（Sprint 2）: 実機起動の基本動作（Swagger UI 疎通）・IDE 警告（deprecated プロパティ・lint・unknown property・metadata 不足）・依存更新後の IDE クラスパス staleness は、**自動3reviewer もテストも拾わない**。#23 の Sprint Review 指摘8件中6件がこれ由来。→ DoD に「実機起動＋主要エンドポイント疎通（ping/swagger-ui/actuator health）＋IDE 警告ゼロ」を追加（developer-workflow 反映済）。
 - **IDE 由来の指摘の切り分け**（Sprint 2）: 依存版更新後（例 jjwt 0.11.5→0.12.6）の IDE lint（`parser() deprecated`/`verifyWith`/`subject` undefined 等）は、`./gradlew compileJava` が green なら**実装は正・IDE のクラスパス staleness**。コードを旧 API に直すとビルドが壊れる。SM が真因を verification してから DEV に回す（コード修正不要と判断できる）。IDE 設定は gitignore 済でリポジトリに影響なし。
+
+- **計画前調査で「DDL ありデータなし」を先に潰した**（Sprint 6）: シード皆無は Sprint Review まで残さず**計画前の実地調査で発見**（→ 3-repo 化して database でシード新規作成）。Sprint 2 の「テスト green＝完成の盲点」の裏返し＝**実機で動かすのに必要なデータ/設定（シード・`mybatis.mapper-locations` 等）は自動 reviewer もテストも拾わない**ため、計画前調査 or DoD の実機起動＋主要 EP 疎通で先に潰す（Sprint 6 は実機 E2E 疎通も DoD で実施しクリーン）。
 
 ## Skills更新履歴
 
@@ -55,3 +64,8 @@
   - `backend-conventions` §9 に「`/me` パターンは permitAll に入れない（未認証は `anyRequest().authenticated()` で自動 401）」を追記（DEV）。
   - 2回ルール据え置き（1回目・long_term のみ）: フロント土台 Story のレビュー指摘2件（オープンリダイレクト・バリデータの制御文字混入バイパス／独立初期化の直列 await）、cross-repo で frontend 主のケースの closes 運用、計画フェーズでプロダクト判断（cross-repo 化）をユーザー承認で吸収。
   - PO: 質問傾向「スコープ境界」「実証手段」が #23→#21→#24 で3回目（正式昇格済のため説明文を画面/コンポーネント/アセット単位まで具体化）＋新規候補2件（フロント土台での backend API 過不足未確認による cross-repo 追加／横断ライブラリの技術選定・命名の AC 未定義）を記録（初出・再発時に昇格判断）。
+- **Sprint 6**:
+  - **`scrum-master-workflow` SKILL.md ⑥ PR節の cross-repo `closes` 記述を明確化**（2回ルール昇格＝frontend 主が Sprint 5 #24・Sprint 6 #1 で2回発生）（SM）。「主リポジトリ（通常 backend）」→「**主＝Story の主成果物／ユーザー価値の実現層（capstone）のある repo。backend とは限らない。フロント主体のドメイン機能／画面 Story は frontend が主**」に是正。
+  - DEV: `backend-conventions` §9 に3点追記（初 XMLマッパー導入時の `mybatis.mapper-locations` 必須／区分値 m_code 化時は生成 enum＋算出は非生成 `Calculator` に分離／1-index 汎用ページング DTO `Page`/`PageRequest`/`PageResponse<T>`）・`frontend-conventions` §7 に2点追記（既達 `.jps-*` CSS の薄いラッパ／`import.meta.glob(eager)` 画像取り込み＋placeholder）（参照知識/実装パターン例外で即時反映）。
+  - PO: `spec/intended-diff-ledger.md` に **ID-28**（在庫3段階バッジ＝旧は在庫概念なし固定 qty→新は在庫あり/残少[N=5]/在庫切れ・qty 非露出）を追加。m_code 化・ページ採番 1-index は外部挙動を変えない実装規約選択＝台帳非対象と判定。質問傾向2件（定量パラメータ未定義／先例規約未定義）を2回目発生で正式昇格。
+  - 2回ルール据え置き（初出・long_term のみ）: 計画前調査での cross-repo スコープ拡大発見（シード皆無）／CRLF-only working-tree M ノイズの `--numstat` 切り分け／仕様委譲論点（§3.1）の SM 計画フェーズ確定＝2回目ユーザーオーバーライド／DEV の syncTestSchema・code_value VARCHAR(10)・i18n reconcile。

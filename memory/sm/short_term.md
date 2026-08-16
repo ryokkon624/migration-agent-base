@@ -1,9 +1,10 @@
 # SM 短期記憶（今スプリント）
 
-Sprint 5（#24 E6 フロントエンド・アーキ土台 SP8・cross-repo・**初のフロント・スプリント**）完了。次スプリント開始時にリセット済み。
+Sprint 6（#1 E1 カタログ階層閲覧・F1.1・SP8・**本プロジェクト初のドメイン機能**・**3-repo cross-repo**）完了。次スプリント開始時にリセット済み。
 
-- 実装＝frontend（主）: i18n基盤(vue-i18n v11・英語のみ)／one-system(既存 .jps-* ＋ AppHeader/AppLayout)／API クライアント(非XOR CSRF cookie-to-header・/api/ping prime・401 silent refresh)＋Pinia auth ストア(username/roles のみメモリ・localStorage 不使用)／SignonView(プリフィル廃止・一律エラー)／router ガード＋復帰先バリデータ(相対のみ)／起動時 /me 再水和。backend（従）: `GET /api/auth/me` 追加＋Spock。
-- 3観点レビュー: 規約=指摘なし／sec=低深刻度1件(redirectValidator 制御文字バイパス)／perf=1件(初期化直列→Promise.all)。両件 SM が CONFIRMED 検証→1ラウンド集約で DEV 修正→再レビュー全観点指摘なし。
-- PR: frontend #1(closes #24)・backend #4(Related #24)。Sprint Review 指摘なし。Retro 完了(DEV/PO/SM)。
-- 教訓は long_term 反映済（tier分離5連続・フロントでも通用／既達vs未実装のフロント適用／cross-repo frontend 主の closes 判断／計画でプロダクト判断を承認吸収／レビュー指摘の1ラウンド集約／**scrum-master-workflow ③ に no-Bash reviewer 絶対パス Read を明示昇格**／frontend-conventions §7・backend-conventions §9 追記(DEV)）。
-- 次スプリント候補: E1 カタログ（#1/#2/#3）等のドメイン画面が本フロント土台の上に積める。#25（日本語 i18n）は NotReady。
+- 実装: **database**（seed V00_000_008 catalog / V00_000_009 stock_status m_code・在庫3状態 IN23/LOW3/OUT2）＋**backend**（catalog API・カスタム手書き XMLマッパー・1-index `PageResponse`・permitAll GET・qty非露出・`StockStatusCalculator` N=5・StockStatus は generateEnums 生成物）＋**frontend**（主・closes #1／catalog 画面・store/utils/View4種・薄ラッパ components・画像22点 import.meta.glob・AC-neg1 v-html禁止・Vitest79件）。
+- ユーザー承認3決定: **残少閾値 N=5／在庫ステータス=m_code 区分値（DEV 手書き enum 推奨をオーバーライド・「区分値は基本 m_code」）／ページ採番 1-index**。SM 実地調査で**シード皆無を発見→3-repo 化**を計画時点で確定。
+- 3観点レビュー**全て指摘なし**（no-Bash reviewer に絶対パス Read 運用・3-repo でも機能）。修正ループなし。PR: frontend #2(closes #1)・backend #5・database #4(Related)。Sprint Review 指摘なし。
+- Retro 完了（DEV/PO/SM）。教訓は long_term 反映済（tier分離6連続・初ドメイン機能でも通用／計画前調査で cross-repo スコープ拡大〔シード皆無〕発見／仕様委譲論点〔§3.1〕を SM 計画フェーズで AskUserQuestion 確定＝2回目ユーザーオーバーライド／CRLF-only M ノイズの --numstat 切り分け／固めた土台＋否定AC先回り＋設計計画確定でドメイン機能もクリーン／**scrum-master-workflow ⑥ に frontend-主 closes を明確化＝2回ルール昇格**／DEV: backend-conventions §9・frontend-conventions §7 追記／PO: ID-28 追加・質問傾向2件昇格）。
+- **agent-base `feature/sprint6`: Retro 完了後に PR＆マージ**（このリセット時点で PR＆マージ処理中／ユーザー指示）。コミット: 2b96bce(Planning)・5a3668f(Review)＋Retro 成果物。
+- 次スプリント候補: **#3 F1.3 参照堅牢化（SBD-10 集約ハードニング・#1/#2 と同一スライス）／#2 F1.2 検索**（いずれも Sprint 7）。#1 が確立したページDTO・カードグリッド部品・在庫バッジ・m_code パターンを再利用（先例の実効性を Sprint 7 で検証）。
