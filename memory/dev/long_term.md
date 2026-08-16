@@ -11,11 +11,12 @@
   3観点レビュー指摘0件だった。要因は下記「横断（database＋backend＋frontend）」参照。
 
 ### jpetstore-backend
-Sprint2（#23）・Sprint3（#18/#19）・Sprint4（#21/#20）・Sprint6（#1）・Sprint7（#2/#3）・Sprint9（#5/#6）とも
-実装スプリントを終えたが、3観点レビュー（規約/セキュリティ/パフォーマンス）での**指摘は今のところ0件の
-繰り返しも無し**（Sprint3はレビュー指摘自体が0件、Sprint4は規約/パフォーマンスが0件・セキュリティは
-非ブロッキング2件、Sprint6は3観点とも0件、Sprint7はconvention/securityが0件・performanceのみ非ブロッキング
-1件で再修正不要、Sprint9は3観点とも指摘0件でクリーン）。
+Sprint2（#23）・Sprint3（#18/#19）・Sprint4（#21/#20）・Sprint6（#1）・Sprint7（#2/#3）・Sprint9（#5/#6）・
+Sprint10（#7）とも実装スプリントを終えたが、3観点レビュー（規約/セキュリティ/パフォーマンス）での
+**指摘は今のところ0件の繰り返しも無し**（Sprint3はレビュー指摘自体が0件、Sprint4は規約/パフォーマンスが
+0件・セキュリティは非ブロッキング2件、Sprint6は3観点とも0件、Sprint7はconvention/securityが0件・
+performanceのみ非ブロッキング1件で再修正不要、Sprint9は3観点とも指摘0件でクリーン、Sprint10
+（read-only住所API・既達custom mapper/entityパターンの再利用）も3観点とも指摘0件でクリーン）。
 以下の発見はいずれもDEV自身がTDD・実機検証中に見つけたもので初出＝1回目のため、2回ルールに従い本セクション
 ではなく「習得したこと」「技術的なハマりポイント」に記録する。ただし一部は参照知識/実装パターンとして
 初出からSkillへ即時反映した（詳細は「Skills更新履歴」）。
@@ -73,6 +74,9 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   大きいにもかかわらず3観点とも指摘0件だった。Sprint5の2件（上記）はいずれも1回目のままで2回目の再発が
   無いため、本セクションでの待機を継続する（次回同種発生時に2回目→Skill昇格を判定）。要因は下記
   「横断（database＋backend＋frontend）」参照。
+- Sprint10（#7・チェックアウト・ウィザード。cross-repo backend従／frontend主）も3観点とも指摘0件・
+  手戻りゼロで完走した。Sprint5の2件（上記）は依然2回目の再発が無いため、本セクションでの待機を継続する。
+  要因は下記「横断（database＋backend＋frontend）」参照。
 
 ### 横断（database＋backend＋frontend）
 - **Sprint6（#1）は3観点レビュー（規約/セキュリティ/パフォーマンス）が3-repoすべてで指摘0件だった。**
@@ -119,6 +123,16 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   レビュー観点先回りAC化・設計論点事前確定、に「新規入力値の受理経路横断チェック」を加える形で次スプリント
   以降に活かす）。
   発生スプリント: Sprint8（#4）
+- **Sprint10（#7・チェックアウト・ウィザード。確定前段まで）はSprint6/7/9で確立した「secure-by-defaultな
+  土台の再利用」パターンを、初の多段階UIフロー（ウィザード）でも維持できることを確認した。** backend側は
+  新規エンドポイント1本（`GET /api/account/me`）のみで`SecurityConfig`無変更、既達`AccountAuthCustom*`と
+  同じcustom mapper/entity方式をそのまま踏襲した。frontend側は認証復帰（`authGuard`/`redirectValidator`）・
+  カート確認（`GET /api/cart`・カートストア）・ステッパーCSS（`.jps-steps`）をいずれも新規配線ゼロで
+  再利用し、ウィザード固有の実装（ステップ管理・住所フォーム・下書き状態）だけに集中できた。Sprint8で
+  提起した「ドメイン固有ロジック（新しい入力値の検証等）は個別に注意が必要」という教訓についても、本Story
+  はミューテーションを一切含まない設計（GET専用・確定前段まで）だったため該当リスクが構造的に存在せず、
+  3観点レビュー指摘0件・手戻りゼロの完走につながった。
+  発生スプリント: Sprint10（#7）
 
 ## 技術的なハマりポイント
 
@@ -224,6 +238,22 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   `getSecure()`・`isHttpOnly()`）を直接assertする。
   発生スプリント: Sprint9（#6、`SecurityConfigCsrfTokenRepositorySpec.groovy`実装時。初出のため2回ルールに
   従い本Skillには未反映）
+- **Groovyの`GString`は`equals(String)`が常に`false`を返すため、MockMvcの`jsonPath(...).value(gstring)`は
+  GString型の期待値を渡すと（実際の値と等しくても）一致しない。** Spockのテストコードで文字列展開
+  （`"${variable}"`）した値をそのまま`jsonPath("$.field").value(expected)`のexpected引数に渡すと、内部的
+  には文字列に見えても実体はGStringのため`equals`比較が常にfalseになりテストが落ちる。`expected.toString()`
+  のように明示的にStringへ変換してから渡すことで解消する。GStringを`jsonPath().value()`やその他の
+  `equals`ベースの比較APIに渡す箇所全般で同じ注意が必要。
+  発生スプリント: Sprint10（#7、`AccountControllerSpec`実装時。初出のため2回ルールに従い本Skillには未反映）
+- **Spockの`Stub`はインターフェースのデフォルトメソッド実装へスタブ呼び出しを委譲しない。**
+  `CurrentUserProvider`の`currentUser()`（抽象）と`requireCurrentUser()`（`currentUser()`を呼ぶデフォルト
+  メソッド実装）のうち、`currentUser()`のみをStubしても`requireCurrentUser()`はStubされた`currentUser()`の
+  戻り値を経由せず、実際のデフォルトメソッド本体（インターフェースの生実装）がそのまま実行される。未認証系
+  のテストケースで`requireCurrentUser()`が例外を投げることを期待する場合は、`requireCurrentUser()`自体を
+  直接Stubする必要がある。インターフェースのデフォルトメソッドをStubで検証する際は、呼び出されるメソッド
+  自体を直接指定すること（委譲元の抽象メソッドだけをStubしても効果が及ばない）。
+  発生スプリント: Sprint10（#7、`AccountApplicationServiceSpec`実装時。初出のため2回ルールに従い本Skillには
+  未反映）
 
 ### jpetstore-frontend
 - **vue-i18n（v11・Composition API）のメッセージ文字列中の`@`はlinked message構文（`@:key`形式）として
@@ -425,6 +455,15 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   設定源で環境ごとに揃えられる（`SecurityConfig`に`@Value`2つを注入するだけで済み、`application.yml`
   への新規プロパティ追加が不要）。
   発生スプリント: Sprint9（#6、計画フェーズ確定①）
+- **同一ドメインリソースに対し、先にread-only（GET専用）の参照APIをcustom mapper/entity/serviceで実装し、
+  update系は後続Storyへ段階的に追加する設計が機能した。** チェックアウトのプリフィル用`GET /api/account/me`
+  （`AccountContactCustomEntity`/`AccountContactCustomMapper`/`AccountApplicationService`/`AccountController`）
+  は、Sprint2（#23）で確立した`AccountAuthCustom*`と同じ配置・命名規約（`infrastructure.mybatis.custom.
+  {entity,mapper}`・単一SELECTはアノテーション方式）をそのまま踏襲し、mapper/service/controllerをSELECT
+  のみに厳格限定した（POSTは405）。E4（住所編集）で同じcustom entity上にUPDATEを追加する計画とし、本Story
+  では意図的にスコープを絞った。既存の配置規約（`backend-conventions`§9）を変更せずに再利用できたため
+  新規のSkill反映は不要だった。
+  発生スプリント: Sprint10（#7）
 
 ### jpetstore-frontend
 - **backendのSpring Security 7 CSRF設定（非XOR `CsrfTokenRequestAttributeHandler`・consume-then-
@@ -480,6 +519,23 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   再利用できる（frontend-conventionsへ即時反映。詳細は「Skills更新履歴」）。
   発生スプリント: Sprint8（#4）→ frontend-conventionsへ即時反映（初のlocalStorage導入パターン・
   2回ルール例外＝Sprint5 CSRF/Sprint6 MyBatisXMLマッパー等と同じ位置づけ）
+- **複数ステップにまたがる入力フロー（チェックアウト等）は、ステップごとに個別ルートを切らず単一ルート＋
+  内部ステップ管理として実装するパターンを確立した。** `/checkout`（`meta.requiresAuth: true`）配下で
+  `CheckoutView.vue`がステップコンポーネント（カート確認/住所/確定）を切り替える構成にしたことで、Sprint5
+  で確立済みの`authGuard`/`redirectValidator`（未認証時の元URL退避→サインオン→復帰）が新規配線ゼロで
+  そのまま機能した（per-stepルートにしていた場合は各ルートに`meta.requiresAuth`を付与する必要があった）。
+  下書き状態（住所等）はsessionStorage/DB永続化を持たない揮発Piniaストアとし、`reset()`は明示的なアクション
+  呼び出し時のみ実行してSPA内の通常遷移では自動リセットしない設計にした。既達の`.jps-steps`/`.jps-step*`
+  （ステッパーCSS）・`.jps-field`系フォームkitを再利用し新規スタイルを増やさなかった。今後の多段階フロー
+  （例: #8の注文確定ウィザード拡張）で再利用できる型として`frontend-conventions`§7へ反映した（詳細は
+  「Skills更新履歴」）。
+  発生スプリント: Sprint10（#7）
+- **View/Componentはテスト不要という方針下でも、Viewが依存する否定AC判定ロジックはPiniaストアのtestable
+  なgetterに切り出せばVitestで固定できる。** AC-neg1（空カート進入不可）の判定を`CheckoutView`内に直接
+  書かず、`stores/cart.ts`に`isEmpty`getterを追加してテストし、Viewは`onMounted`でその結果を参照して
+  `router.replace('/cart?reason=empty-checkout')`するだけにした。View自体はVitest対象外のままでも、AC
+  の正しさはストア側のテストで担保できる。`frontend-conventions`§7へ反映した（詳細は「Skills更新履歴」）。
+  発生スプリント: Sprint10（#7）
 
 ### 横断（database＋backend＋frontend）
 - **区分値をm_codeに新規登録する際の3-repo横断フロー**を在庫ステータスで実地確認した:
@@ -660,9 +716,32 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   プロセス上の教訓としては新規性が無くチェックリスト化しなかった。
 - `#skills-changelog` へ `[DEV]` で投稿済み。
 
+### Sprint 10（#7・チェックアウト・ウィザード・確定前段まで・backend従/frontend主 cross-repo）
+
+- **`frontend-conventions`**: `## 7. jpetstore-frontend 固有の注意事項` に以下2点を追記した（初出だが
+  「知らないと書けない参照知識・実装パターン」の2回ルール例外として即時反映。今後の多段階フロー
+  （#8の注文確定拡張等）で直接再利用が見込まれるため）:
+  - 多段階入力フローは単一ルート＋内部ステップ＋揮発Piniaで実装する（per-stepルートにしない・既達
+    `authGuard`/`redirectValidator`が新規配線ゼロで機能する・下書きは明示`reset()`のみ）
+  - View非テスト方針下の否定AC判定は、Piniaストアのtestableなgetterに切り出しVitestで固定する
+- **`backend-conventions`へは反映しなかったもの**: read-only参照API（`AccountContactCustom*`）は
+  Sprint2（#23）で既にSkill化済みのcustom mapper/entity配置・命名規約（§9）をそのまま踏襲しただけで
+  新規パターンではないため、追記不要と判断した。
+- **Skillに反映しなかった技術的ハマりポイント**: 以下2件はいずれも初出（1回目）のため、2回ルールに従い
+  今回はSkillに反映せず`memory/dev/long_term.md`「技術的なハマりポイント」に留めた:
+  - GroovyのGStringは`equals(String)`が常にfalseを返すため`jsonPath(...).value(gstring)`が一致しない
+    （`.toString()`変換で回避）
+  - SpockのStubはインターフェースのデフォルトメソッドへ委譲しないため、デフォルトメソッド自体を
+    直接Stubする必要がある
+- 3観点レビュー指摘0件・手戻りゼロで完走した要因分析（Sprint6/7/9の「土台再利用」パターンが初の多段階
+  UIフローでも機能した確認）は、チェックリスト項目ではなくプロセス上の教訓のためSkillには反映せず
+  `memory/dev/long_term.md`「繰り返し指摘されるパターン」の「横断」に記録した。
+- `#skills-changelog` へ `[DEV]` で投稿済み。
+
 ## 卒業済みルール
 
 （該当なし。棚卸し対象となるルールが直近15スプリント基準に達していない。
-  jpetstore-backendはSprint2・3・4・6・7・8・9の7スプリントのみ、jpetstore-databaseはSprint1・3・6の
-  3スプリントのみ、jpetstore-frontendはSprint5・6・7・8の4スプリントのみのため、いずれも対象外。
-  Sprint4・Sprint5・Sprint6・Sprint7・Sprint8・Sprint9 Retroでも棚卸しを実施したが同様の理由で卒業候補なし）
+  jpetstore-backendはSprint2・3・4・6・7・8・9・10の8スプリントのみ、jpetstore-databaseはSprint1・3・6の
+  3スプリントのみ、jpetstore-frontendはSprint5・6・7・8・10の5スプリントのみのため、いずれも対象外。
+  Sprint4・Sprint5・Sprint6・Sprint7・Sprint8・Sprint9・Sprint10 Retroでも棚卸しを実施したが同様の理由で
+  卒業候補なし）
