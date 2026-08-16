@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint 09 Review — #6 カート状態変更に CSRF 対策を施し REST 冪等性を整理する</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #f8f7f5; }
+
+  .page { max-width: 900px; margin: 0 auto; padding: 48px 24px; }
+
+  /* Header */
+  .sprint-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin-bottom: 8px; }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px; }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+  .badge-sprint { background: #e8f0fe; color: #1a56db; }
+  .badge-issue { background: #f0fdf4; color: #166534; }
+  .badge-security { background: #fef2f2; color: #b91c1c; }
+  .badge-epic { background: #fff7ed; color: #c2410c; }
+  .badge-repo { background: #f3f4f6; color: #374151; }
+  .story { font-size: 13px; color: #4b5563; margin-bottom: 32px; padding: 12px 16px; background: white; border: 1px solid #e5e5e5; border-radius: 8px; }
+  .story b { color: #1a1a1a; }
+
+  /* Sections */
+  section { margin-bottom: 40px; }
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #888; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e5e5e5; }
+  .section-sub { font-size: 12px; color: #6b7280; margin: -10px 0 16px; }
+
+  /* Problem box */
+  .problem-box { background: #fff8f0; border-left: 3px solid #f59e0b; border-radius: 0 8px 8px 0; padding: 16px 20px; margin-bottom: 16px; }
+  .problem-box .label { font-size: 11px; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .problem-box p { color: #451a03; font-size: 13px; }
+
+  /* Architecture change */
+  .arch-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: center; margin-bottom: 8px; }
+  .arch-box { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; }
+  .arch-box .arch-title { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .arch-box.before { border-color: #fca5a5; }
+  .arch-box.after { border-color: #86efac; }
+  .arch-arrow { font-size: 20px; color: #888; text-align: center; }
+  .flow-item { font-size: 12px; color: #374151; padding: 3px 0; display: flex; align-items: flex-start; gap: 6px; }
+  .flow-item .dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .dot-red { background: #ef4444; }
+  .dot-green { background: #22c55e; }
+  .dot-gray { background: #9ca3af; }
+
+  /* AC cards */
+  .ac-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+  .ac-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid #f0f0f0; }
+  .ac-check { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .ac-check.done { background: #dcfce7; color: #166534; }
+  .ac-num { font-size: 11px; font-weight: 700; color: #888; }
+  .ac-text { font-size: 13px; font-weight: 600; color: #1a1a1a; flex: 1; }
+  .ac-body { padding: 16px 18px; }
+  .ac-body p { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+
+  /* File change */
+  .file-change { margin-bottom: 16px; }
+  .file-name { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; background: #f3f4f6; color: #374151; padding: 5px 10px; border-radius: 4px 4px 0 0; border: 1px solid #e5e5e5; border-bottom: none; display: flex; justify-content: space-between; }
+  .diff-stat { color: #888; }
+  .code-block { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.7; background: #1e1e2e; color: #cdd6f4; padding: 14px 16px; border-radius: 0 0 6px 6px; overflow-x: auto; }
+  .code-line { display: flex; }
+  .line-num { color: #45475a; min-width: 32px; user-select: none; }
+  .line-add { background: rgba(166, 227, 161, 0.12); color: #a6e3a1; }
+  .line-del { background: rgba(243, 139, 168, 0.12); color: #f38ba8; }
+  .line-ctx { color: #cdd6f4; }
+  .line-prefix { min-width: 14px; }
+
+  /* Annotation */
+  .annotation { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-size: 12px; color: #78350f; display: flex; gap: 8px; }
+  .annotation-icon { font-size: 14px; flex-shrink: 0; }
+
+  /* Attack card (否定AC = 攻撃が失敗することの実証) */
+  .attack-card { background: white; border: 1px solid #fecaca; border-left: 4px solid #ef4444; border-radius: 8px; padding: 16px 18px; margin-bottom: 16px; }
+  .attack-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+  .attack-label { font-size: 11px; font-weight: 700; color: #b91c1c; text-transform: uppercase; letter-spacing: 0.06em; }
+  .attack-title { font-size: 13px; font-weight: 700; color: #1a1a1a; flex: 1; }
+  .attack-result { font-size: 11px; font-weight: 700; color: #166534; background: #dcfce7; padding: 3px 10px; border-radius: 12px; white-space: nowrap; }
+  .attack-desc { font-size: 12px; color: #4b5563; margin-bottom: 10px; }
+  .attack-request { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11.5px; background: #1e1e2e; color: #f38ba8; padding: 10px 12px; border-radius: 6px; margin-bottom: 8px; overflow-x: auto; white-space: pre; }
+  .attack-arrow-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #6b7280; margin: 6px 0; }
+  .attack-response { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11.5px; background: #f0fdf4; color: #166534; padding: 10px 12px; border-radius: 6px; border: 1px solid #bbf7d0; }
+  .attack-test-ref { font-size: 11px; color: #888; margin-top: 8px; }
+  .attack-test-ref code { background: #f3f4f6; padding: 1px 6px; border-radius: 3px; }
+
+  /* Idempotency mini table */
+  .idem-table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 4px; }
+  .idem-table th { text-align: left; padding: 6px 10px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 10.5px; font-weight: 700; color: #6b7280; text-transform: uppercase; }
+  .idem-table td { padding: 8px 10px; border: 1px solid #e5e5e5; color: #374151; }
+  .idem-table code { background: #f3f4f6; padding: 1px 5px; border-radius: 3px; }
+
+  /* Verify section */
+  .verify-list { list-style: none; }
+  .verify-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; }
+  .verify-item:last-child { border-bottom: none; }
+  .verify-num { width: 22px; height: 22px; background: #e8f0fe; color: #1a56db; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .verify-content { flex: 1; }
+  .verify-content strong { font-size: 13px; color: #1a1a1a; display: block; margin-bottom: 3px; }
+  .verify-content span { font-size: 12px; color: #6b7280; }
+
+  /* Scope table */
+  .scope-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .scope-table th { text-align: left; padding: 8px 12px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .scope-table td { padding: 10px 12px; border: 1px solid #e5e5e5; color: #374151; vertical-align: top; }
+  .scope-table tr:hover td { background: #f9fafb; }
+  .tag-changed { font-size: 11px; font-weight: 600; background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 3px; white-space: nowrap; }
+  .tag-new { font-size: 11px; font-weight: 600; background: #e8f0fe; color: #1a56db; padding: 2px 6px; border-radius: 3px; white-space: nowrap; }
+  .tag-unchanged { font-size: 11px; font-weight: 600; background: #f3f4f6; color: #6b7280; padding: 2px 6px; border-radius: 3px; white-space: nowrap; }
+
+  /* Test summary */
+  .test-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .test-box { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; text-align: center; }
+  .test-box .label { font-size: 11px; color: #888; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+  .test-box .count { font-size: 30px; font-weight: 700; line-height: 1; color: #166534; }
+  .test-box .sublabel { font-size: 11px; color: #888; margin-top: 4px; }
+
+  /* Ledger note */
+  .ledger-box { background: #f3f4f6; border-radius: 8px; padding: 12px 16px; font-size: 12px; color: #4b5563; }
+  .ledger-box b { color: #1a1a1a; }
+
+  /* Commit list */
+  .commit-list { list-style: none; font-size: 13px; }
+  .commit-list li { padding: 6px 0; }
+  .commit-hash { font-family: 'SF Mono', 'Fira Code', monospace; background: #f3f4f6; padding: 1px 6px; border-radius: 4px; font-size: 12px; color: #374151; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="sprint-label">Sprint 09 Review</div>
+  <h1>#6 — [E2] カート状態変更に CSRF 対策を施し REST 冪等性を整理する</h1>
+  <div class="meta">
+    <span class="badge badge-sprint">Sprint 09</span>
+    <span class="badge badge-issue">#6</span>
+    <span class="badge badge-security">security</span>
+    <span class="badge badge-epic">E2 / F2.3</span>
+    <span class="badge badge-repo">backend</span>
+  </div>
+  <div class="story">
+    <b>As a</b> 買い物客　<b>I want to</b> カートの状態変更が正規のリクエストのみ受理されるようにしたい　<b>So that</b> CSRF による意図しないカート操作を防ぐ
+  </div>
+
+  <!-- Problem -->
+  <section>
+    <h2>なぜこの改修が必要だったか</h2>
+    <div class="problem-box">
+      <div class="label">Sprint 8（#4）／ #23 からの持ち越し課題</div>
+      <p>CSRF 基盤（cookie-to-header の非XOR方式・<code>CsrfCookieFilter</code>・非GETへのCSRFトークン必須化）と、カートの冪等メソッド割当（view=GET・add=POST・update=PUT・remove=DELETE）は既に実装済みだった。しかし (1) <code>XSRF-TOKEN</code> Cookie 自体には <code>SameSite</code>/<code>Secure</code> 属性が付いておらず JWT Cookie（access/refresh）と非対称だった、(2)「外部オリジンからの状態変更が拒否される」ことを検証する否定AC回帰テストが無かった、(3) 冪等性そのものを検証する回帰テストも無かった。</p>
+    </div>
+    <div class="arch-grid">
+      <div class="arch-box before">
+        <div class="arch-title">改修前（Sprint 8 / #23 時点）</div>
+        <div class="flow-item"><span class="dot dot-gray"></span>CSRF有効・cookie-to-header非XOR・非GETにトークン必須（既達・変更なし）</div>
+        <div class="flow-item"><span class="dot dot-gray"></span>冪等メソッド割当（GET/POST/PUT/DELETE）（既達・変更なし）</div>
+        <div class="flow-item"><span class="dot dot-red"></span><code>XSRF-TOKEN</code> Cookie に SameSite/Secure 未設定（JWT Cookieと非対称）</div>
+        <div class="flow-item"><span class="dot dot-red"></span>外部オリジン拒否の否定AC回帰テストが無い</div>
+        <div class="flow-item"><span class="dot dot-red"></span>冪等性の明示回帰テストが無い</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-box after">
+        <div class="arch-title">改修後</div>
+        <div class="flow-item"><span class="dot dot-gray"></span>CSRF基盤・冪等メソッド割当（不変・既達を維持）</div>
+        <div class="flow-item"><span class="dot dot-gray"></span></div>
+        <div class="flow-item"><span class="dot dot-green"></span><code>setCookieCustomizer</code> で SameSite=Strict＋Secure を付与（JWT Cookieと統一）</div>
+        <div class="flow-item"><span class="dot dot-green"></span>外部オリジン拒否の否定AC回帰テストを新規追加</div>
+        <div class="flow-item"><span class="dot dot-green"></span>PUT/DELETE冪等性の回帰テストを新規追加</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AC breakdown -->
+  <section>
+    <h2>AC別 実装内容</h2>
+
+    <!-- AC1 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC1 (SBD-3 / SBD-15)</div>
+        <div class="ac-text">add/update/remove の状態変更に CSRF トークン必須＋Origin/SameSite 検証。GET で状態変更しない</div>
+      </div>
+      <div class="ac-body">
+        <p>CSRF トークン必須自体は既達（変更なし）。今回追加したのは「XSRF-TOKEN Cookie 自体への SameSite=Strict＋Secure 付与」。計画フェーズ確定事項①により、新規の Origin/Referer 検証フィルタは追加せず、既存の cookie-to-header double-submit ＋ SameSite=Strict の組み合わせで Origin/SameSite 検証を充足する方針とした。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../config/SecurityConfig.java — csrfTokenRepository（新規Bean）</span>
+            <span class="diff-stat">L101-116（新規）</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">109</span><span class="line-prefix">+</span><span>@Bean</span></div>
+            <div class="code-line line-add"><span class="line-num">110</span><span class="line-prefix">+</span><span>public CsrfTokenRepository csrfTokenRepository(</span></div>
+            <div class="code-line line-add"><span class="line-num">111</span><span class="line-prefix">+</span><span>    @Value("${jwt.cookie.secure:true}") boolean secure,</span></div>
+            <div class="code-line line-add"><span class="line-num">112</span><span class="line-prefix">+</span><span>    @Value("${jwt.cookie.same-site:Strict}") String sameSite) {</span></div>
+            <div class="code-line line-add"><span class="line-num">113</span><span class="line-prefix">+</span><span>  CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();</span></div>
+            <div class="code-line line-add"><span class="line-num">114</span><span class="line-prefix">+</span><span>  repository.setCookieCustomizer(builder -&gt; builder.sameSite(sameSite).secure(secure));</span></div>
+            <div class="code-line line-add"><span class="line-num">115</span><span class="line-prefix">+</span><span>  return repository;</span></div>
+            <div class="code-line line-add"><span class="line-num">116</span><span class="line-prefix">+</span><span>}</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>属性値は JWT Cookie（access/refresh・<code>AuthCookieSupport</code>）と同じ <code>jwt.cookie.secure</code>/<code>jwt.cookie.same-site</code>（既定 <code>true</code>/<code>Strict</code>）を再利用。全 Cookie の属性値を1箇所の設定で統一し、環境ごとに切り替え可能なまま新規プロパティは増やさない。<code>httpOnly=false</code> は維持（SPA が JS で Cookie を読みヘッダへ転記する既存フローを壊さない）。</span>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../config/SecurityConfig.java — securityFilterChain（配線）</span>
+            <span class="diff-stat">L46-52, L85-88</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">46</span><span class="line-prefix"> </span><span>public SecurityFilterChain securityFilterChain(</span></div>
+            <div class="code-line line-ctx"><span class="line-num">50</span><span class="line-prefix"> </span><span>    AuditingAuthenticationEntryPoint authenticationEntryPoint,</span></div>
+            <div class="code-line line-add"><span class="line-num">51</span><span class="line-prefix">+</span><span>    CsrfTokenRepository csrfTokenRepository)</span></div>
+            <div class="code-line line-ctx"><span class="line-num">86</span><span class="line-prefix"> </span><span>    .csrf(</span></div>
+            <div class="code-line line-ctx"><span class="line-num">87</span><span class="line-prefix"> </span><span>        csrf -&gt;</span></div>
+            <div class="code-line line-del"><span class="line-num">-</span><span class="line-prefix">-</span><span>            csrf.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())</span></div>
+            <div class="code-line line-add"><span class="line-num">87</span><span class="line-prefix">+</span><span>            csrf.csrfTokenRepository(csrfTokenRepository)</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>直書きしていた <code>CookieCsrfTokenRepository.withHttpOnlyFalse()</code> を、上記の新規Bean（属性カスタマイズ済み）への依存性注入に置き換えただけ。CSRFトークン必須の判定ロジック自体（<code>csrfTokenRequestHandler</code>・非GETの必須化）は無変更。</span>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/test/groovy/.../config/SecurityConfigCsrfTokenRepositorySpec.groovy（新規）</span>
+            <span class="diff-stat">60行・2テスト</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">229</span><span class="line-prefix">+</span><span>def "既定値(secure=true, same-site=Strict)でXSRF-TOKEN CookieにSecure+SameSite=Strictを</span></div>
+            <div class="code-line line-add"><span class="line-num"> </span><span class="line-prefix"> </span><span>    付与しhttpOnlyはfalseのまま"() {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">240</span><span class="line-prefix"> </span><span>  then:</span></div>
+            <div class="code-line line-ctx"><span class="line-num">241</span><span class="line-prefix"> </span><span>  def cookie = response.getCookie("XSRF-TOKEN")</span></div>
+            <div class="code-line line-ctx"><span class="line-num">242</span><span class="line-prefix"> </span><span>  cookie.getAttribute("SameSite") == "Strict"</span></div>
+            <div class="code-line line-ctx"><span class="line-num">243</span><span class="line-prefix"> </span><span>  cookie.getSecure()</span></div>
+            <div class="code-line line-ctx"><span class="line-num">244</span><span class="line-prefix"> </span><span>  !cookie.isHttpOnly()</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>MockMvc 統合テストにはせず、リポジトリを直接構築して Cookie オブジェクトの属性を検証する plain Specification にした。理由は2点: (1) <code>SecurityMockMvcRequestPostProcessors.csrf()</code> は呼ばれた時点で共有Springコンテキストの <code>CsrfTokenRepository</code> をセッションベースへ恒久的に差し替えてしまう既知の挙動があり、他のCSRFテストとコンテキストを共有すると干渉する。(2) <code>MockHttpServletResponse</code> の Set-Cookie ヘッダ再構築は <code>MockCookie</code> 型のみ <code>SameSite</code> を見るため、通常の <code>jakarta.servlet.http.Cookie</code> ではヘッダ文字列に反映されない。2件目のテストは <code>secure=false, same-site=Lax</code> でも設定値が反映されることを確認し、環境ごとの切り替え可能性を担保している。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC2 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC2</div>
+        <div class="ac-text">REST 冪等性を整理（例: update/remove は冪等、add は明示セマンティクス）</div>
+      </div>
+      <div class="ac-body">
+        <p>メソッド割当自体は Sprint 8 で実装済み（既達・無変更）。今回は「本当に冪等であること」を実証する回帰テストを新規追加した。</p>
+        <table class="idem-table">
+          <tr><th>操作</th><th>メソッド</th><th>冪等性</th><th>検証内容</th></tr>
+          <tr><td>表示</td><td><code>GET /api/cart</code></td><td>冪等（既達）</td><td>状態変更なし</td></tr>
+          <tr><td>追加</td><td><code>POST /api/cart/items</code></td><td>非冪等（明示的に加算）</td><td>既存の仕様どおり（変更なし）</td></tr>
+          <tr><td>更新</td><td><code>PUT /api/cart/items/{itemId}</code></td><td>冪等（新規回帰テスト）</td><td>同じ数量を2回送っても結果が同一</td></tr>
+          <tr><td>削除</td><td><code>DELETE /api/cart/items/{itemId}</code></td><td>冪等（新規回帰テスト）</td><td>2回目も200・空カートのまま</td></tr>
+        </table>
+        <div class="file-change" style="margin-top:14px;">
+          <div class="file-name">
+            <span>src/test/groovy/.../presentation/rest/CartControllerSpec.groovy — 冪等性テスト（新規）</span>
+            <span class="diff-stat">2テスト追加</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">362</span><span class="line-prefix">+</span><span>def "#6 AC2: PUTで同じ数量を2回送っても同じ結果になる(冪等)"() {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">370</span><span class="line-prefix"> </span><span>  def first = mockMvc.perform(put(...).content('{"quantity":5}')) ...</span></div>
+            <div class="code-line line-ctx"><span class="line-num">375</span><span class="line-prefix"> </span><span>  def second = mockMvc.perform(put(...).content('{"quantity":5}')) ...</span></div>
+            <div class="code-line line-ctx"><span class="line-num">382</span><span class="line-prefix"> </span><span>  first.response.contentAsString == second.response.contentAsString</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 否定AC = 攻撃が失敗することの実証 -->
+  <section>
+    <h2>否定AC 回帰テスト — 攻撃が失敗することの実証</h2>
+    <p class="section-sub">Phase 4（Verify）でそのまま再実行し「脆弱性が消滅していること」を確認する種となるテスト。攻撃者は被害者の <code>XSRF-TOKEN</code> Cookie を Same-Origin Policy により読み取れない、という前提を実際のリクエストで再現している。</p>
+
+    <div class="attack-card">
+      <div class="attack-head">
+        <span class="attack-label">🔒 AC-neg1（SBD-3）</span>
+        <span class="attack-title">CSRFトークン偽造攻撃（Cookie値とヘッダ値の不一致）</span>
+        <span class="attack-result">✓ 攻撃失敗（403）</span>
+      </div>
+      <div class="attack-desc">攻撃者は被害者ブラウザの本物の <code>XSRF-TOKEN</code> Cookie を読めないため、それらしく見える値をでっち上げてヘッダに載せるしかない。Cookie 値とヘッダ値が一致しない double-submit の照合失敗を再現。</div>
+      <div class="attack-request">POST /api/cart/items
+Cookie: XSRF-TOKEN=legit-looking-token-attacker-cannot-forge
+X-XSRF-TOKEN: attacker-cannot-know-this-value
+{"itemId":"EST-1","quantity":1}</div>
+      <div class="attack-arrow-row">↓ サーバの応答</div>
+      <div class="attack-response">403 Forbidden</div>
+      <div class="attack-test-ref">テスト: <code>CartControllerSpec.groovy</code> — "#6 AC-neg1: XSRF-TOKEN Cookieの値とX-XSRF-TOKENヘッダの値が不一致だと403になる"</div>
+    </div>
+
+    <div class="attack-card">
+      <div class="attack-head">
+        <span class="attack-label">🔒 AC-neg1（SBD-3）</span>
+        <span class="attack-title">外部オリジンからのクロスサイトリクエスト</span>
+        <span class="attack-result">✓ 攻撃失敗（403）</span>
+      </div>
+      <div class="attack-desc"><code>evil.example.com</code> 上の罠ページから、被害者のログイン済みブラウザ経由でカート追加を試みる。CSRFトークンを載せられないため（<code>SameSite=Strict</code> でも Cookie が送られない／トークン欠落）拒否される。</div>
+      <div class="attack-request">POST /api/cart/items
+Origin: https://evil.example.com
+（CSRFトークン無し）
+{"itemId":"EST-1","quantity":1}</div>
+      <div class="attack-arrow-row">↓ サーバの応答</div>
+      <div class="attack-response">403 Forbidden</div>
+      <div class="attack-test-ref">テスト: <code>CartControllerSpec.groovy</code> — "#6 AC-neg1: 外部オリジンを装いOriginヘッダのみ付けてCSRFトークン無しで送ると403になる(GETでのカート変更リンクも存在しない=非GETのみが状態変更経路)"</div>
+    </div>
+
+    <div class="attack-card" style="border-color:#bbf7d0; border-left-color:#22c55e;">
+      <div class="attack-head">
+        <span class="attack-label" style="color:#166534;">↩ 設計確認</span>
+        <span class="attack-title">GET でのカート状態変更エンドポイントが存在しない</span>
+        <span class="attack-result">✓ 意図通り</span>
+      </div>
+      <div class="attack-desc"><code>CartController</code> の状態変更3経路（追加/更新/削除）はいずれも <code>@PostMapping</code>/<code>@PutMapping</code>/<code>@DeleteMapping</code> のみで宣言され、GET で呼べる変更用エンドポイントは存在しない（罠 <code>&lt;img&gt;</code> タグ等によるGETベースCSRFの経路自体が無い）。</div>
+      <div class="attack-test-ref">確認方法: <code>CartController.java</code> のコードレビュー（<code>@GetMapping</code> は <code>viewCart</code> のみ）</div>
+    </div>
+  </section>
+
+  <!-- Verify -->
+  <section>
+    <h2>動作確認ポイント（ユーザー確認用）</h2>
+    <ul class="verify-list">
+      <li class="verify-item">
+        <div class="verify-num">1</div>
+        <div class="verify-content">
+          <strong>カートへの追加・数量変更・削除が、これまで通り問題なく成功すること</strong>
+          <span>XSRF-TOKEN Cookieの属性（SameSite/Secure）を変えたため、フロントのCSRF自動修復フロー（欠落時に自動でトークンを再取得してリトライ）が壊れていないことの確認</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">2</div>
+        <div class="verify-content">
+          <strong>同じ数量への数量変更操作を続けて2回行っても、エラーにならず同じ結果になること</strong>
+          <span>冪等性（AC2）の実感確認。連打しても壊れない</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">3</div>
+        <div class="verify-content">
+          <strong>（開発者向け確認）ブラウザの開発者ツールで XSRF-TOKEN Cookie の属性に Secure と SameSite=Strict が付いていることを確認</strong>
+          <span>DevTools の Application/Storage タブの Cookie 一覧で確認可能</span>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- Test summary -->
+  <section>
+    <h2>テスト結果</h2>
+    <div class="test-grid">
+      <div class="test-box">
+        <div class="label">CartControllerSpec</div>
+        <div class="count">33</div>
+        <div class="sublabel">統合テスト（うち #6 新規4件）</div>
+      </div>
+      <div class="test-box">
+        <div class="label">SecurityConfigCsrfTokenRepositorySpec</div>
+        <div class="count">2</div>
+        <div class="sublabel">新規（Cookie属性検証）</div>
+      </div>
+      <div class="test-box">
+        <div class="label">影響範囲</div>
+        <div class="count">backend</div>
+        <div class="sublabel">frontend/database は無変更</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Ledger -->
+  <section>
+    <h2>台帳（脆弱性差分台帳）への記載</h2>
+    <div class="ledger-box">
+      <b>今回は台帳追記なし。</b> CSRFトークン必須・冪等メソッド割当という外部挙動は変わっておらず、追加したのはCookie属性の強化と回帰テストのみ（非等価変更なし）。#23で確立したCSRF基盤とSprint 8の否定テスト作法を無改造で活用できた（計画フェーズ確定 C3）。
+    </div>
+  </section>
+
+  <!-- Scope -->
+  <section>
+    <h2>改修スコープ確認</h2>
+    <table class="scope-table">
+      <tr>
+        <th>ファイル</th>
+        <th>変更</th>
+        <th>内容</th>
+      </tr>
+      <tr>
+        <td><code>config/SecurityConfig.java</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td><code>csrfTokenRepository</code> Bean新設・<code>securityFilterChain</code>で配線</td>
+      </tr>
+      <tr>
+        <td><code>SecurityConfigCsrfTokenRepositorySpec.groovy</code></td>
+        <td><span class="tag-new">新規</span></td>
+        <td>XSRF-TOKEN CookieのSameSite/Secure属性を直接検証（2テスト）</td>
+      </tr>
+      <tr>
+        <td><code>CartControllerSpec.groovy</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>外部オリジン拒否2件＋冪等性2件の回帰テストを追加</td>
+      </tr>
+      <tr>
+        <td><code>README.md</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>CSRF Cookie属性のドキュメント更新のみ</td>
+      </tr>
+      <tr>
+        <td><code>CsrfCookieFilter.java</code></td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td>トークン解決の強制ロジックは既達のまま</td>
+      </tr>
+      <tr>
+        <td><code>AuthCookieSupport.java</code>（JWT Cookie）</td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td>SameSite/Secure/HttpOnlyは元々設定済み（既達）</td>
+      </tr>
+      <tr>
+        <td><code>CartController.java</code>（HTTPメソッド割当）</td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td>Sprint 8のGET/POST/PUT/DELETE割当のまま（既達）</td>
+      </tr>
+      <tr>
+        <td>frontend / database</td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td>本Issueは backend 集中・原則ノータッチ</td>
+      </tr>
+    </table>
+  </section>
+
+  <!-- Commits -->
+  <section>
+    <h2>コミット</h2>
+    <ul class="commit-list">
+      <li><span class="commit-hash">ae03ea7</span> backend — feat: カートCSRFのXSRF-TOKEN CookieにSameSite/Secureを付与し冪等性を回帰テスト化する (ryokkon624/jpetstore-manage#6)</li>
+    </ul>
+    <p class="section-sub" style="margin-top:8px;">ブランチ <code>feature/5-cart-price-csrf-hardening</code> は #5 と共用（backend 1PR に <code>closes #5</code> / <code>closes #6</code> を集約）。#5 側のコミット（<span class="commit-hash">60774fe</span>）は <a href="review-%235.html">review-#5.html</a> を参照。</p>
+  </section>
+
+</div>
+</body>
+</html>
