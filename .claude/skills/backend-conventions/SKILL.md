@@ -520,12 +520,18 @@ public ResponseEntity<LoginResponse> me() {
 | `MethodArgumentTypeMismatchException` | 400 | クエリ/パスパラメータの型変換失敗（非数値・桁あふれ等） |
 | `MissingServletRequestParameterException` | 400 | 必須クエリパラメータの欠落 |
 | `NoResourceFoundException` | 404 | どのハンドラマッピング・静的リソースにも一致しない未知パス |
+| `HttpMessageNotReadableException` | 400 | リクエストボディの型不一致・不正JSON（非数値文字列等でのデシリアライズ失敗） |
 
 > **背景（Sprint 3 #18・Sprint 7 #3）**: Sprint 3で`HttpRequestMethodNotSupportedException`が
 > catch-allに落ちて500になる問題が初めて発覚（自動テストで顕在化）。当時は初出のためSkill未反映
 > だったが、Sprint 7で`?page=abc`のような型不一致・未知パスへのアクセスが同じ理由で500に落ちる
 > 穴が再発したため、2回目としてSkillへ昇格した。新規`@RequestParam`・新規エンドポイントを追加する際は
 > 上表の例外が発生しうるケース（非数値パラメータ・存在しないパス等）を実機/自動テストの両方で確認する。
+> **Sprint 9 #5**では`UpdateCartItemRequest.quantity`に非数値文字列（`"abc"`）を送るケースで
+> `HttpMessageNotReadableException`（リクエストボディのデシリアライズ失敗）が同じ理由で500に落ちる穴が
+> 見つかり表に追記した（新規パターンの2回ルール判定ではなく、既にSkill昇格済みの本テーブルへの追加）。
+> 新規`@RequestBody`を扱うエンドポイントを追加する際は、ボディの型不一致（非数値文字列等）も
+> 上表の確認対象に含めること。
 
 ### LIKE等のSQL用サニタイズ・エスケープ処理はSQL文字列非依存の純VOに隔離する
 
@@ -551,5 +557,7 @@ public ResponseEntity<LoginResponse> me() {
 > CSRFトークンのconsume-then-regenerate挙動・セキュリティ上意味のある日時比較はDB側`NOW(6)`で
 > 行うべき問題（Sprint4）・`ON DUPLICATE KEY UPDATE`のSET句左→右評価順依存の二重計算（Sprint4）・
 > `syncTestSchema`が`flyway/sql-test`を同期対象外とする点（Sprint6）・`m_code.code_value`の
-> VARCHAR(10)制約（Sprint6）は、いずれも初出（1回目）のため、2回ルールに従い本Skillには未反映
-> （`memory/dev/long_term.md`「技術的なハマりポイント」参照）。2回目の発生でSkill昇格を検討する。
+> VARCHAR(10)制約（Sprint6）・MockMvc経由でCSRF Cookie属性（SameSite等）を検証できない制約と
+> bean切り出しユニットテストによる回避策（Sprint9）は、いずれも初出（1回目）のため、2回ルールに従い
+> 本Skillには未反映（`memory/dev/long_term.md`「技術的なハマりポイント」参照）。2回目の発生でSkill昇格を
+> 検討する。

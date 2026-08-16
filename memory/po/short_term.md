@@ -1,8 +1,8 @@
 # PO 短期記憶（今スプリント）
 
-## Sprint 8 Retro（2026-08-16）で棚卸し済み
+## Sprint 9 Retro（2026-08-16）で棚卸し済み
 
-Sprint 7 Retro以降の文脈（Sprint8計画フェーズ〔#4 カート追加/数量更新/削除/表示〕でのDEV→ユーザー確認3件〔D1 匿名カートの在庫上限検証・D2 カート画面のルート保護境界・D3 `t_cart_item`のversion列〕、Epic E2着手・3-repo cross-repo）はSprint 8 Retroで棚卸し済み。要点は `memory/po/long_term.md`（質問傾向へSprint8セクション追記・チェックリスト2件正式昇格〔新ドメインfeature全般のUI配置/保護境界・architecture-conventionsのPO判断委譲箇所〕・意思決定ログ5件追記〔サーバーカート永続スコープ・マージ数量意味論・D1/D2/D3の決定〕・`spec/intended-diff-ledger.md` ID-19具体化〔数量加算・在庫クランプ〕）に反映済み。
+Sprint 8 Retro以降の文脈（Sprint9計画フェーズ〔#5価格サーバ権威・#6カートCSRF/冪等〕でのDEV→ユーザー確認3件〔Q1エラー正規化ハンドラ配置・Q2 Cookieセキュリティ属性設定方式・Q3検証層配置〕、SM確定2件〔Origin/SameSite充足判定・update/mergeの数量境界値〕）はSprint 9 Retroで棚卸し済み。要点は `memory/po/long_term.md`（質問傾向へSprint9セクション追記〔傾向1「security hardening Storyにおける否定AC実装レベル論点」は初出のため正式昇格見送り・Origin/SameSite確定はSprint4昇格済み項目の再発例と整理〕・意思決定ログ5件追記〔グローバル例外ハンドラ新設・Cookie設定再利用・検証層非対称配置・Origin/SameSite充足判定・update/merge数量境界値〕）に反映済み。`spec/intended-diff-ledger.md`への追記は不要と判定（SBD-2/17は既存維持項目のため台帳対象外）。
 
 ### 未解決の判断事項
 
@@ -20,10 +20,11 @@ Sprint 7 Retro以降の文脈（Sprint8計画フェーズ〔#4 カート追加/�
 - 確認メール（#8備考）の将来Feature化（Issue起票 or ドロップ）の判断。
 - #23のAC/備考へ、Sprint2質問ログで判明した5観点（スコープ境界・実証手段・監査ログ範囲・秘密管理・他repo連携）を反映（着手可否含め次回Refinementで判断）。
 - Sprint5傾向2（フロント土台起票時のbackend API過不足未確認によるcross-repo追加）が次回以降のStoryで再発した場合、正式昇格を判断する。
-- 振る舞いを変える新判断が出たら都度 `spec/intended-diff-ledger.md` への追記要否を判定する（Sprint6はID-28、Sprint7はID-29、Sprint8はID-19具体化を追記済み）。
+- 振る舞いを変える新判断が出たら都度 `spec/intended-diff-ledger.md` への追記要否を判定する（Sprint6はID-28、Sprint7はID-29、Sprint8はID-19具体化を追記済み・Sprint9は追記なし〔SBD-2/17は既存維持項目のため台帳対象外と判定〕）。
 - architecture-conventionsのPO判断委譲パターン（§3.1区分値のm_code採用・§4.3更新系エンティティのversion列）は2セクションで再発しチェックリストへ正式昇格済み（Sprint8 Retro）。architecture-conventions文書自体の一般原則firmup（個別確認を減らす明文化）要否は、さらなる再発またはユーザーとの次回接点で判断する。
 - Sprint7傾向3（specがPOへ確定を委譲した論点の計画フェーズ確認）は初出のため、次回以降の同種発生時に正式昇格を判断する。
 - Sprint8傾向1（先行スプリントのintended-diff-ledgerエントリが後続StoryのAPI設計に及ぼす制約の未参照。D1）は初出のため、次回以降の同種発生時に正式昇格を判断する。Refinement/計画フェーズで対象Storyに関連するledgerエントリを確認する運用の要否も併せて検討する。
+- Sprint9傾向1（security hardening Storyにおける否定AC実装レベル論点＝エラー正規化ハンドラ配置・Cookieセキュリティ属性設定方式・検証層配置）は初出のため、次回以降の同種Story（既存feature/APIへの後乗せ的なセキュリティ強化Story）で再発した場合、正式昇格を判断する。
 
 ## SMやDevから受けた質問ログ
 

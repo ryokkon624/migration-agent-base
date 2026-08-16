@@ -140,6 +140,22 @@ DEVからSprint8計画フェーズでユーザーに直接確認した事項をS
 
 **判定**: 傾向2・傾向3は2回目の発生条件を満たすため、下記チェックリストへ正式昇格する。傾向1は初出のため、次回以降の再発時に正式昇格を判断する。
 
+### Sprint 9（2026-08-16）— E2系（#5 価格サーバ権威・#6 カートCSRF/冪等）計画フェーズより
+
+DEVからSprint9計画フェーズでユーザーに直接確認した事項をSM経由で中継され、3件を質問ログに記録した（3件ともバックログ修正不要と判定＝実装アーキテクチャ判断）。加えて、SM主導のAskUserQuestionで確定した2件（Origin/SameSite検証の要否・update/mergeの数量境界値の扱い）も同系統の実装レベル論点として判定材料に含めた。#5・#6は既存feature（#4カート）への後乗せ的security hardening Story（Sprint4型＝既達判定の比重が大きい）。
+
+- Q1: AC2「非数値quantity→400」実現のための`HttpMessageNotReadableException`→400グローバル例外ハンドラ新設要否（#6）
+- Q2: XSRF-TOKEN CookieのSecure/SameSite設定方式（既存`jwt.cookie.*`再利用 vs ハードコード）（#6）
+- Q3: 数量バリデーションのDTO層/サービス層非対称配置（update=DTO、merge=service）（#6）
+- （参考・SM確定）#6 Origin/SameSite検証はSameSite＋トークンで充足、新規フィルタ不要
+- （参考・SM確定）#5 updateの数量0は削除維持・merge数量≤0は400化
+
+**傾向1（新規パターン・3件同一Sprint内・初出）＝「security hardening Storyにおける否定AC実装レベル論点」**: Q1〜Q3はいずれも「否定AC（非数値→400・不正入力→400等）をどう実現するか」という実装アーキテクチャ判断であり、個別にはAC先回り明記になじまない（PO/ユーザーが事前に確定値を書けるものではなく、コードベースの制約〔Bean Validation順序、Cookie設定の既存パターン、例外ハンドラの影響範囲〕を踏まえた実装時判断）と判定した。一方、3件が同一Sprint・同一Story群（#5/#6のsecurity hardening）で連続発生した点は、Sprint1(#22)が5件の下位論点を1テーマに束ねながらも初出として昇格見送りとなった前例と同型であり、1Sprint内での複数発生だけでは正式昇格の閾値（2回以上＝異なるレビュー時点での再現）を満たさないと判断する。
+
+**（参考）Origin/SameSite確定の位置づけ**: SM確定の「Origin/SameSite検証は既存機構（SameSite＋トークン）で充足・新規フィルタ不要」は、Sprint4で正式昇格済みの「セキュリティ対策の新規追加要否は既存機構の充足可能性を先に確認する」チェックリスト項目の再発例（Sprint4 #20/#21に続く3件目）であり、追加の昇格判断は不要。
+
+**判定**: 傾向1は初出のため、正式チェックリストへの昇格は見送り、傾向記録に留める。次回以降、既存feature/APIへの後乗せ的なsecurity hardening Storyで同種の質問（否定ACの実装方式＝エラー正規化ハンドラ・Cookie属性設定・検証層配置など）が再発した場合に正式昇格を判断する。Origin/SameSite確定は既存チェックリスト項目の再発例として扱う（判定は上記参照）。
+
 ## バックログ起票時の先回りチェックリスト
 
 **土台Story（DB移行・backend/frontend土台・認可/認証基盤など、新規リポジトリ・新規レイヤー・新規ドメイン横断機構に着手するStory）を起票・詳細化する際は、以下をAC/備考に先回り明記できないか確認する**（Sprint1 #22・Sprint2 #23の計11件中9件がAC/備考の先回り明記で防止できたと判定され、2Sprint連続発生のため正式昇格。Sprint4 #21で「E6基盤系」に限らず認可/認証土台Storyにも適用範囲を拡張）：
@@ -189,3 +205,8 @@ DEVからSprint8計画フェーズでユーザーに直接確認した事項をS
 - 2026-08-16（Sprint8計画フェーズ、#4・D1）: 未ログイン（匿名）カートの在庫上限検証は、公開の冪等`GET /api/items/{itemId}/orderable?quantity=N`（orderable真偽＋reasonのみ返却・在庫数は非露出）を新設して対応。qty非露出（ID-28）を維持し、既存permitAll `GET /api/items/**`に収まるためSecurityConfig変更不要。次回Refinementで#4のAC5/AC-neg1または備考への反映を検討する。
 - 2026-08-16（Sprint8計画フェーズ、#4・D2）: カート画面ルートは公開ルート（`meta.requiresAuth`なし）で確定。AC3で未ログインもクライアントカートを閲覧するため。認証必須は`/api/cart/**` APIのみ。次回Refinementで#4のAC3備考への反映を検討する。
 - 2026-08-16（Sprint8計画フェーズ、#4・D3）: `t_cart_item`にversion列は付与しない方針で確定。単一所有者・暫定カート（在庫の実権威はE3のガード付き原子減算）でlast-write-win許容、加算はUPSERTでアトミック。backend-conventions §4.3（更新系エンティティにversion）は多編集者エンティティの後勝ち防止（409）が目的のため、単一所有者カートには適用外の意図的逸脱と判断。
+- 2026-08-16（Sprint9計画フェーズ、#6）: AC2「非数値quantity→400」実現のため`HttpMessageNotReadableException`→400のグローバル例外ハンドラを新設。既存catch-allで500になっていた不正JSONボディをSBD-10準拠で400に正規化する（全EPに影響するが厳密改善・副作用なしと判断。この1ハンドラのみ・グローバルJackson設定は変更しない）。
+- 2026-08-16（Sprint9計画フェーズ、#6）: XSRF-TOKEN CookieのSecure/SameSite設定は既存`jwt.cookie.secure`/`jwt.cookie.same-site`設定を再利用して統一する（ハードコードは不採用。環境設定可・非localhost HTTP環境でのfootgun回避）。
+- 2026-08-16（Sprint9計画フェーズ、#6）: 数量バリデーションはupdate=DTO層（boxed Integerで欠落と明示0を区別）・merge=サービス層throw（blank-itemId無視契約とBean Validation順序の衝突回避）の非対称配置を採用。
+- 2026-08-16（Sprint9計画フェーズ、#6）: Origin/SameSite検証はSameSite属性＋トークンで充足すると判定し、新規Originチェックフィルタは追加しない。
+- 2026-08-16（Sprint9計画フェーズ、#5）: updateで数量0を指定した場合はカート項目削除として維持（既存挙動どおり）。mergeで数量≤0が指定された場合は400とする。

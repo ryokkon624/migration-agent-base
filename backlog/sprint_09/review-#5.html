@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint 09 Review — #5 カートの価格はサーバ権威・クライアントは数量のみ受理する</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #f8f7f5; }
+
+  .page { max-width: 900px; margin: 0 auto; padding: 48px 24px; }
+
+  /* Header */
+  .sprint-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin-bottom: 8px; }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px; }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+  .badge-sprint { background: #e8f0fe; color: #1a56db; }
+  .badge-issue { background: #f0fdf4; color: #166534; }
+  .badge-security { background: #fef2f2; color: #b91c1c; }
+  .badge-epic { background: #fff7ed; color: #c2410c; }
+  .badge-repo { background: #f3f4f6; color: #374151; }
+  .story { font-size: 13px; color: #4b5563; margin-bottom: 32px; padding: 12px 16px; background: white; border: 1px solid #e5e5e5; border-radius: 8px; }
+  .story b { color: #1a1a1a; }
+
+  /* Sections */
+  section { margin-bottom: 40px; }
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #888; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e5e5e5; }
+  .section-sub { font-size: 12px; color: #6b7280; margin: -10px 0 16px; }
+
+  /* Problem box */
+  .problem-box { background: #fff8f0; border-left: 3px solid #f59e0b; border-radius: 0 8px 8px 0; padding: 16px 20px; margin-bottom: 16px; }
+  .problem-box .label { font-size: 11px; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .problem-box p { color: #451a03; font-size: 13px; }
+
+  /* Architecture change */
+  .arch-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: center; margin-bottom: 8px; }
+  .arch-box { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; }
+  .arch-box .arch-title { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .arch-box.before { border-color: #fca5a5; }
+  .arch-box.after { border-color: #86efac; }
+  .arch-arrow { font-size: 20px; color: #888; text-align: center; }
+  .flow-item { font-size: 12px; color: #374151; padding: 3px 0; display: flex; align-items: flex-start; gap: 6px; }
+  .flow-item .dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .dot-red { background: #ef4444; }
+  .dot-green { background: #22c55e; }
+  .dot-gray { background: #9ca3af; }
+
+  /* AC cards */
+  .ac-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+  .ac-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid #f0f0f0; }
+  .ac-check { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .ac-check.done { background: #dcfce7; color: #166534; }
+  .ac-num { font-size: 11px; font-weight: 700; color: #888; }
+  .ac-text { font-size: 13px; font-weight: 600; color: #1a1a1a; flex: 1; }
+  .ac-body { padding: 16px 18px; }
+  .ac-body p { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+
+  /* File change */
+  .file-change { margin-bottom: 16px; }
+  .file-name { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; background: #f3f4f6; color: #374151; padding: 5px 10px; border-radius: 4px 4px 0 0; border: 1px solid #e5e5e5; border-bottom: none; display: flex; justify-content: space-between; }
+  .diff-stat { color: #888; }
+  .code-block { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.7; background: #1e1e2e; color: #cdd6f4; padding: 14px 16px; border-radius: 0 0 6px 6px; overflow-x: auto; }
+  .code-line { display: flex; }
+  .line-num { color: #45475a; min-width: 32px; user-select: none; }
+  .line-add { background: rgba(166, 227, 161, 0.12); color: #a6e3a1; }
+  .line-del { background: rgba(243, 139, 168, 0.12); color: #f38ba8; }
+  .line-ctx { color: #cdd6f4; }
+  .line-prefix { min-width: 14px; }
+
+  /* Annotation */
+  .annotation { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-size: 12px; color: #78350f; display: flex; gap: 8px; }
+  .annotation-icon { font-size: 14px; flex-shrink: 0; }
+
+  /* Attack card (否定AC = 攻撃が失敗することの実証) */
+  .attack-card { background: white; border: 1px solid #fecaca; border-left: 4px solid #ef4444; border-radius: 8px; padding: 16px 18px; margin-bottom: 16px; }
+  .attack-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+  .attack-label { font-size: 11px; font-weight: 700; color: #b91c1c; text-transform: uppercase; letter-spacing: 0.06em; }
+  .attack-title { font-size: 13px; font-weight: 700; color: #1a1a1a; flex: 1; }
+  .attack-result { font-size: 11px; font-weight: 700; color: #166534; background: #dcfce7; padding: 3px 10px; border-radius: 12px; white-space: nowrap; }
+  .attack-desc { font-size: 12px; color: #4b5563; margin-bottom: 10px; }
+  .attack-request { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11.5px; background: #1e1e2e; color: #f38ba8; padding: 10px 12px; border-radius: 6px; margin-bottom: 8px; overflow-x: auto; white-space: pre; }
+  .attack-arrow-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #6b7280; margin: 6px 0; }
+  .attack-response { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11.5px; background: #f0fdf4; color: #166534; padding: 10px 12px; border-radius: 6px; border: 1px solid #bbf7d0; }
+  .attack-test-ref { font-size: 11px; color: #888; margin-top: 8px; }
+  .attack-test-ref code { background: #f3f4f6; padding: 1px 6px; border-radius: 3px; }
+
+  /* Verify section */
+  .verify-list { list-style: none; }
+  .verify-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; }
+  .verify-item:last-child { border-bottom: none; }
+  .verify-num { width: 22px; height: 22px; background: #e8f0fe; color: #1a56db; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .verify-content { flex: 1; }
+  .verify-content strong { font-size: 13px; color: #1a1a1a; display: block; margin-bottom: 3px; }
+  .verify-content span { font-size: 12px; color: #6b7280; }
+
+  /* Scope table */
+  .scope-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .scope-table th { text-align: left; padding: 8px 12px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .scope-table td { padding: 10px 12px; border: 1px solid #e5e5e5; color: #374151; vertical-align: top; }
+  .scope-table tr:hover td { background: #f9fafb; }
+  .tag-changed { font-size: 11px; font-weight: 600; background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 3px; white-space: nowrap; }
+  .tag-new { font-size: 11px; font-weight: 600; background: #e8f0fe; color: #1a56db; padding: 2px 6px; border-radius: 3px; white-space: nowrap; }
+  .tag-unchanged { font-size: 11px; font-weight: 600; background: #f3f4f6; color: #6b7280; padding: 2px 6px; border-radius: 3px; white-space: nowrap; }
+
+  /* Test summary */
+  .test-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .test-box { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; text-align: center; }
+  .test-box .label { font-size: 11px; color: #888; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+  .test-box .count { font-size: 30px; font-weight: 700; line-height: 1; color: #166534; }
+  .test-box .sublabel { font-size: 11px; color: #888; margin-top: 4px; }
+
+  /* Ledger note */
+  .ledger-box { background: #f3f4f6; border-radius: 8px; padding: 12px 16px; font-size: 12px; color: #4b5563; }
+  .ledger-box b { color: #1a1a1a; }
+
+  /* Commit list */
+  .commit-list { list-style: none; font-size: 13px; }
+  .commit-list li { padding: 6px 0; }
+  .commit-hash { font-family: 'SF Mono', 'Fira Code', monospace; background: #f3f4f6; padding: 1px 6px; border-radius: 4px; font-size: 12px; color: #374151; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="sprint-label">Sprint 09 Review</div>
+  <h1>#5 — [E2] カートの価格はサーバ権威・クライアントは数量のみ受理する</h1>
+  <div class="meta">
+    <span class="badge badge-sprint">Sprint 09</span>
+    <span class="badge badge-issue">#5</span>
+    <span class="badge badge-security">security</span>
+    <span class="badge badge-epic">E2 / F2.2</span>
+    <span class="badge badge-repo">backend</span>
+  </div>
+  <div class="story">
+    <b>As a</b> サイト運営者　<b>I want to</b> 価格をサーバのマスター値で決定し、クライアントからは数量のみ受理したい　<b>So that</b> 価格改ざん（マスアサインメント）を防ぐ
+  </div>
+
+  <!-- Problem -->
+  <section>
+    <h2>なぜこの改修が必要だったか</h2>
+    <div class="problem-box">
+      <div class="label">Sprint 8（#4）からの持ち越し課題</div>
+      <p>カートAPIの価格は Sprint 8 の時点で既にサーバ権威（<code>Item.listPrice</code> からサーバ算出・リクエストDTOに価格フィールドなし）として実装済みだった。しかし (1) 「価格フィールドを送っても無視される」ことを検証する明示的な回帰テストが無く、(2) 数量の下限バリデーションが add / update / merge の3経路で統一されていなかった（add はSprint 8のセキュリティレビュー指摘で修正済みだが、update は <code>int quantity</code> のまま無検証、merge は <code>quantity&lt;=0</code> を黙って無視していた）。</p>
+    </div>
+    <div class="arch-grid">
+      <div class="arch-box before">
+        <div class="arch-title">改修前（Sprint 8 時点）</div>
+        <div class="flow-item"><span class="dot dot-gray"></span>価格はサーバ算出・DTOに価格フィールドなし（既達・変更なし）</div>
+        <div class="flow-item"><span class="dot dot-red"></span>「価格注入が無視される」ことを検証する回帰テストが無い</div>
+        <div class="flow-item"><span class="dot dot-red"></span>update: <code>int quantity</code>・検証なし → 負数/非数値も無検証で通る</div>
+        <div class="flow-item"><span class="dot dot-red"></span>merge: <code>quantity&lt;=0</code> を <code>continue</code> で黙殺</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-box after">
+        <div class="arch-title">改修後</div>
+        <div class="flow-item"><span class="dot dot-gray"></span>価格はサーバ算出（不変・既達を維持）</div>
+        <div class="flow-item"><span class="dot dot-green"></span>価格注入無視のAC-neg1回帰テストを新規追加</div>
+        <div class="flow-item"><span class="dot dot-green"></span>update: <code>@NotNull @Min(0) Integer</code> → 欠落/負数400、0=削除は維持</div>
+        <div class="flow-item"><span class="dot dot-green"></span>merge: <code>quantity&lt;=0</code> → 400（黙殺廃止）</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AC breakdown -->
+  <section>
+    <h2>AC別 実装内容</h2>
+
+    <!-- AC1 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC1 (SBD-2)</div>
+        <div class="ac-text">小計・単価はサーバが Item.listPrice（マスター価格）から算出。クライアントは価格/itemId 以外の権威値を送れない。受理するのは数量のみ</div>
+      </div>
+      <div class="ac-body">
+        <p>この挙動自体は Sprint 8 で実装済み（既達）。今回は挙動そのものを変えず、「価格フィールドを注入しても無視される」ことを明示的に検証する回帰テスト（AC-neg1）を新規追加し、Phase 4 verify でそのまま流用できる形にした。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../application/service/CartApplicationService.java — toCartItem</span>
+            <span class="diff-stat">L199-211（既達・変更なし）</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">199</span><span class="line-prefix"> </span><span>private CartItem toCartItem(CartItemCustomEntity entity) {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">200</span><span class="line-prefix"> </span><span>  BigDecimal lineTotal = entity.getListPrice().multiply(BigDecimal.valueOf(entity.getQuantity()));</span></div>
+            <div class="code-line line-ctx"><span class="line-num">201</span><span class="line-prefix"> </span><span>  return new CartItem(</span></div>
+            <div class="code-line line-ctx"><span class="line-num">207</span><span class="line-prefix"> </span><span>      entity.getListPrice(),</span></div>
+            <div class="code-line line-ctx"><span class="line-num">208</span><span class="line-prefix"> </span><span>      lineTotal,</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>単価・小計は DB の <code>m_item.list_price</code>（JOIN結果の <code>entity.getListPrice()</code>）由来の値のみを使用する。リクエストボディの <code>listPrice</code>/<code>lineTotal</code> 等のフィールドは、そもそも <code>AddCartItemRequest</code>/<code>UpdateCartItemRequest</code> に定義が無いため参照すらできない（typed record DTO ＋ Jackson 既定の未知フィールド無視＝計画フェーズ確定事項③）。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC2 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC2</div>
+        <div class="ac-text">数量は正の整数として検証（as-is の &lt;1 削除・非数値無視という緩い挙動を、明示バリデーションに）</div>
+      </div>
+      <div class="ac-body">
+        <p>add は Sprint 8 で <code>@Min(1)</code>＋サービス層拒否まで既に対応済み（既達・無変更）。今回は残っていた update と merge の2経路を、計画フェーズ確定事項②の方針で明示検証化した。</p>
+
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../presentation/rest/CartController.java — UpdateCartItemRequest</span>
+            <span class="diff-stat">L88-95</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-del"><span class="line-num">-</span><span class="line-prefix">-</span><span>/** カート数量更新要求DTO（Controller層に閉じる）。 */</span></div>
+            <div class="code-line line-del"><span class="line-num">-</span><span class="line-prefix">-</span><span>public record UpdateCartItemRequest(int quantity) {}</span></div>
+            <div class="code-line line-add"><span class="line-num">89</span><span class="line-prefix">+</span><span>/**</span></div>
+            <div class="code-line line-add"><span class="line-num">90</span><span class="line-prefix">+</span><span> * カート数量更新要求DTO。quantity は必須かつ0以上の整数のみ許容する（#5 AC2）。</span></div>
+            <div class="code-line line-add"><span class="line-num">91</span><span class="line-prefix">+</span><span> * @NotNull=欠落400／@Min(0)=負数400。0は通過しサービス層で行削除になる（0=削除は維持）。</span></div>
+            <div class="code-line line-add"><span class="line-num">95</span><span class="line-prefix">+</span><span>public record UpdateCartItemRequest(@NotNull @Min(0) Integer quantity) {}</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span><code>quantity=0</code> は「行削除」という #4 で決めた既存の意図的セマンティクスのため<b>維持</b>する。今回400化するのは<b>欠落・負数・非数値のみ</b>（計画フェーズ確定事項②）。<code>int</code>→<code>Integer</code>（boxed型）にしたのは、欠落（null）と明示的な0を区別して <code>@NotNull</code> を効かせるため。</span>
+          </div>
+        </div>
+
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../application/service/CartApplicationService.java — merge</span>
+            <span class="diff-stat">L138-141</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">138</span><span class="line-prefix"> </span><span>for (CartLine line : clientLines) {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">139</span><span class="line-prefix"> </span><span>  if (line.quantity() &lt;= 0) {</span></div>
+            <div class="code-line line-del"><span class="line-num">-</span><span class="line-prefix">-</span><span>    continue;</span></div>
+            <div class="code-line line-add"><span class="line-num">140</span><span class="line-prefix">+</span><span>    throw new IllegalArgumentException("Merge line quantity must be a positive integer");</span></div>
+            <div class="code-line line-ctx"><span class="line-num">141</span><span class="line-prefix"> </span><span>  }</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>merge は Bean Validation ではなくサービス層で拒否する。<code>CartController#merge</code> の「itemId が空/欠落の行は無視する」フィルタ契約と Bean Validation の実行順序が衝突するため（add の <code>&lt;=0</code> 拒否と同型のサービス層検証）。<code>@Transactional</code> のためロールバックされ部分適用は起きない。</span>
+          </div>
+        </div>
+
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../presentation/rest/exception/GlobalExceptionHandler.java — handleMessageNotReadable（新規）</span>
+            <span class="diff-stat">L79-88</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">84</span><span class="line-prefix">+</span><span>@ExceptionHandler(HttpMessageNotReadableException.class)</span></div>
+            <div class="code-line line-add"><span class="line-num">85</span><span class="line-prefix">+</span><span>public ResponseEntity&lt;ErrorResponse&gt; handleMessageNotReadable(</span></div>
+            <div class="code-line line-add"><span class="line-num">86</span><span class="line-prefix">+</span><span>    HttpMessageNotReadableException e, HttpServletRequest request) {</span></div>
+            <div class="code-line line-add"><span class="line-num">87</span><span class="line-prefix">+</span><span>  return build(HttpStatus.BAD_REQUEST, "BAD_REQUEST", "Malformed request body", request);</span></div>
+            <div class="code-line line-add"><span class="line-num">88</span><span class="line-prefix">+</span><span>}</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span><code>{"quantity":"abc"}</code> のような非数値ボディはデシリアライズ時点で <code>HttpMessageNotReadableException</code> になる。専用ハンドラが無いと catch-all（<code>@ExceptionHandler(Exception.class)</code>）に落ちて 500 になっていた穴を、既存の TypeMismatch/MissingParameter 400 系と同じ正規化ファミリで埋めた（このハンドラ1つのみ追加。グローバルな Jackson 設定は変更しない）。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 否定AC = 攻撃が失敗することの実証 -->
+  <section>
+    <h2>否定AC 回帰テスト — 攻撃が失敗することの実証</h2>
+    <p class="section-sub">Phase 4（Verify）でそのまま再実行し「脆弱性が消滅していること」を確認する種となるテスト。実際に悪意あるリクエストを組み立て、それが失敗する（無視される／拒否される）ことを assert している。</p>
+
+    <div class="attack-card">
+      <div class="attack-head">
+        <span class="attack-label">🔒 AC-neg1（SBD-2）</span>
+        <span class="attack-title">価格改ざん（マスアサインメント）攻撃</span>
+        <span class="attack-result">✓ 攻撃失敗（無視される）</span>
+      </div>
+      <div class="attack-desc">攻撃者が本来クライアントから送れないはずの <code>listPrice</code>（単価）・<code>lineTotal</code>（小計）・<code>productName</code>（商品名）を注入して、極端に安い価格でカートに追加を試みる。</div>
+      <div class="attack-request">POST /api/cart/items
+{"itemId":"EST-1","quantity":2,"listPrice":0.01,"lineTotal":0.01,"productName":"HACKED"}</div>
+      <div class="attack-arrow-row">↓ サーバの応答</div>
+      <div class="attack-response">200 OK
+{"items":[{"itemId":"EST-1","listPrice":16.50,"productName":"Angelfish", ...}],"subtotal":33.00}</div>
+      <div class="attack-test-ref">テスト: <code>CartControllerSpec.groovy</code> — "#5 AC-neg1: 価格系フィールド(listPrice/lineTotal/productName)を注入しても無視されサーバのマスター値になる(SBD-2)"</div>
+    </div>
+
+    <div class="attack-card">
+      <div class="attack-head">
+        <span class="attack-label">🔒 AC2</span>
+        <span class="attack-title">不正な数量の直接送信（負数・欠落・非数値・merge黙殺値）</span>
+        <span class="attack-result">✓ 攻撃失敗（400で拒否）</span>
+      </div>
+      <div class="attack-desc">UIの通常操作ではあり得ない値（負の数量・パラメータ欠落・文字列）を API に直接送りつけてカート内容の破壊やバリデーション回避を試みる。</div>
+      <div class="attack-request">PUT /api/cart/items/EST-1  {"quantity":-1}        → 400
+PUT /api/cart/items/EST-1  {}                     → 400（@NotNull）
+PUT /api/cart/items/EST-1  {"quantity":"abc"}     → 400（非数値ボディ）
+POST /api/cart/merge  [{"itemId":"EST-1","quantity":0}]   → 400
+POST /api/cart/merge  [{"itemId":"EST-1","quantity":-1}]  → 400</div>
+      <div class="attack-arrow-row">↓ いずれも既存のカート内容は書き換わらない</div>
+      <div class="attack-response">GET /api/cart → items[0].quantity は攻撃前の値のまま（例: 2）</div>
+      <div class="attack-test-ref">テスト: <code>CartControllerSpec.groovy</code> の4テスト（AC2 negative系）＋ <code>CartApplicationServiceSpec.groovy</code> "#5 AC2(計画フェーズ確定②): mergeはquantity&lt;=0(#quantity)の行を黙殺せず例外を投げる"（<code>where: quantity &lt;&lt; [0, -1, -100]</code>）</div>
+    </div>
+
+    <div class="attack-card" style="border-color:#bbf7d0; border-left-color:#22c55e;">
+      <div class="attack-head">
+        <span class="attack-label" style="color:#166534;">↩ 回帰ロック</span>
+        <span class="attack-title">正当な操作（quantity=0での行削除）は攻撃ではなく引き続き成功する</span>
+        <span class="attack-result">✓ 意図通り動作</span>
+      </div>
+      <div class="attack-desc">400化の対象は「欠落・負数・非数値」のみ。<code>quantity=0</code> は #4 で決めた「行削除」の正規セマンティクスであり、誤って拒否対象に含めていないことを回帰テストで固定している。</div>
+      <div class="attack-test-ref">テスト: <code>CartControllerSpec.groovy</code> — "#5 AC2: PUTでquantity=0は引き続き行削除になる(確定事項②・0=削除セマンティクスの温存回帰)"</div>
+    </div>
+  </section>
+
+  <!-- Verify -->
+  <section>
+    <h2>動作確認ポイント（ユーザー確認用）</h2>
+    <ul class="verify-list">
+      <li class="verify-item">
+        <div class="verify-num">1</div>
+        <div class="verify-content">
+          <strong>カート画面で通常の数量変更・削除がこれまで通り正しく動作すること</strong>
+          <span>数量を0にすると行が消える挙動（既存動作）が変わっていないこと</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">2</div>
+        <div class="verify-content">
+          <strong>商品をカートに追加・数量変更したときの単価・小計が、商品詳細ページに表示された価格と一致していること</strong>
+          <span>常にサーバのマスター価格から計算されるため、画面操作だけでは価格はずれない</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">3</div>
+        <div class="verify-content">
+          <strong>（開発者向け確認）ブラウザの開発者ツールでカートAPIのリクエストボディに価格を書き換えて送信しても、レスポンス・カート画面の表示価格はマスター価格のまま変わらないこと</strong>
+          <span>上記「否定AC 回帰テスト」で自動化済み。手動でも同じ結果になることを一度確認すると安心</span>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- Test summary -->
+  <section>
+    <h2>テスト結果</h2>
+    <div class="test-grid">
+      <div class="test-box">
+        <div class="label">CartControllerSpec</div>
+        <div class="count">33</div>
+        <div class="sublabel">統合テスト（うち #5 新規10件）</div>
+      </div>
+      <div class="test-box">
+        <div class="label">CartApplicationServiceSpec</div>
+        <div class="count">19</div>
+        <div class="sublabel">単体テスト（merge例外化を更新）</div>
+      </div>
+      <div class="test-box">
+        <div class="label">影響範囲</div>
+        <div class="count">backend</div>
+        <div class="sublabel">frontend/database は無変更</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Ledger -->
+  <section>
+    <h2>台帳（脆弱性差分台帳）への記載</h2>
+    <div class="ledger-box">
+      <b>今回は台帳追記なし。</b> update の「0=削除」セマンティクスは #4 の意図的仕様のまま維持しており、外部挙動の非等価変更は発生していない（計画フェーズ確定事項②）。緩い黙殺挙動を明示的な検証に置き換えたのは"堅牢化"であり、spec/台帳上の差分ではない。カート価格サーバ権威（SBD-2）・SQLインジェクション無し（SBD-17）は「維持項目」として、本スプリントの否定AC回帰テストが Phase 4 でそのまま"維持"の検証に使える。
+    </div>
+  </section>
+
+  <!-- Scope -->
+  <section>
+    <h2>改修スコープ確認</h2>
+    <table class="scope-table">
+      <tr>
+        <th>ファイル</th>
+        <th>変更</th>
+        <th>内容</th>
+      </tr>
+      <tr>
+        <td><code>presentation/rest/CartController.java</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td><code>UpdateCartItemRequest</code> に <code>@NotNull @Min(0)</code> を付与</td>
+      </tr>
+      <tr>
+        <td><code>application/service/CartApplicationService.java</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>merge の <code>quantity&lt;=0</code> 黙殺（continue）を例外化（throw）</td>
+      </tr>
+      <tr>
+        <td><code>presentation/rest/exception/GlobalExceptionHandler.java</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td><code>HttpMessageNotReadableException</code>→400ハンドラを新規追加</td>
+      </tr>
+      <tr>
+        <td><code>CartControllerSpec.groovy</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>価格注入無視・数量バリデーション系の否定AC回帰テストを10件追加</td>
+      </tr>
+      <tr>
+        <td><code>CartApplicationServiceSpec.groovy</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>merge黙殺→例外化に合わせテスト更新（負数ケース追加）</td>
+      </tr>
+      <tr>
+        <td><code>domain/cart/Cart.java</code> / <code>CartCustomMapper.xml</code></td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td>価格算出ロジック自体はSprint 8のまま（既達）</td>
+      </tr>
+      <tr>
+        <td><code>AddCartItemRequest</code>（add経路）</td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td><code>@Min(1)</code>＋サービス層拒否はSprint 8で対応済み（既達）</td>
+      </tr>
+      <tr>
+        <td>frontend / database</td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td>本Issueは backend 集中・原則ノータッチ</td>
+      </tr>
+    </table>
+  </section>
+
+  <!-- Commits -->
+  <section>
+    <h2>コミット</h2>
+    <ul class="commit-list">
+      <li><span class="commit-hash">60774fe</span> backend — feat: カートの価格をサーバ権威にし数量検証を全経路で統一する (ryokkon624/jpetstore-manage#5)</li>
+    </ul>
+    <p class="section-sub" style="margin-top:8px;">ブランチ <code>feature/5-cart-price-csrf-hardening</code> は #6 と共用（backend 1PR に <code>closes #5</code> / <code>closes #6</code> を集約）。#6 側のコミット（<span class="commit-hash">ae03ea7</span>）は <a href="review-%236.html">review-#6.html</a> を参照。</p>
+  </section>
+
+</div>
+</body>
+</html>

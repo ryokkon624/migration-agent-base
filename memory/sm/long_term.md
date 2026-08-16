@@ -33,6 +33,8 @@
 - **計画前調査でサーバーカート永続基盤の皆無を発見→3-repo 確定**（Sprint 8・Sprint6 の「DDL ありデータなし」の発展）: STATELESS/JWT ゆえ「サーバーカート」= DB テーブルが実質必須なのに `t_cart`/`t_cart_item` が皆無、と計画前 Explore で判明→2-repo でなく **3-repo（database V010 新設）** を計画時点で確定。「永続化の実体（テーブル/セッション/インメモリ）の有無」まで計画前に確認する。
 - **spec 委譲論点の SM 計画確定を scrum-master-workflow ① へ正式昇格**（Sprint 8・Sprint5-8 で4連続）: long_term「次回発生で昇格判定」到達→① Planning の「対象Issue特定」直後に「spec/AC/台帳/architecture-conventions から委譲論点を洗い出し→既決 vs 実装未確定を区別→後者を計画で AskUserQuestion 確定」を明文化（SKILL.md 反映済）。Sprint8 は永続方式(DB)・マージ意味論(加算+クランプ)を確定＝reviewer churn ゼロ。
 
+- **tier分離9連続で有効・security ハードニング Story でも通用**（Sprint 9）: #5/#6（E2 カート価格権威＋CSRF/冪等・計6SP・backend 主体）でも計画=Opus で spec 委譲論点を確定→実装=Sonnet で手戻りゼロ完走・3観点クリーン。**Sprint 4 型「既達が大きい」ハードニング Story を再現**＝計画前 Explore で「既達 vs 未実装」を切り分け（#4 実装が価格サーバ権威・BigDecimal・SQLパラメタライズ・CSRF トークン・冪等メソッドまで概ね完成）→残作業を backend 4ファイル＋否定AC 回帰テストに集約し frontend/database ノータッチ。**security ハードニング Story は AC 文言に literal 準拠しすぎると新規機構（Origin フィルタ・グローバル FAIL_ON_UNKNOWN）を足す過剰実装に陥りやすい→計画フェーズ AskUserQuestion で「足さない範囲」を確定**（#6 Origin検証=SameSite＋トークンで充足・新規フィルタ無し／#5 update 0=削除維持・merge ≤0→400）＝spec 委譲かつ先行 Story(#4)/cart.md と**衝突する**論点の計画確定（Sprint5-8 の spec 委譲論点確定の「衝突解消」次元での5回目）で reviewer churn ゼロ。**perf 指摘（merge N+1）は SM が `git diff main...branch` で Sprint8 由来の既存問題と検証→非ブロッキング判定→backlog 化(#28)**（Sprint60 教訓の適用・過剰対応回避）。**reviewer 起動プロンプトに計画フェーズ確定事項を明記して churn を防止**（「新規 Origin フィルタ不在は意図的」等・初出＝次回再発で昇格判定）。
+
 ## DEVレビュー指摘の傾向
 
 - **DBスキーマ Story**（Sprint 1）: FK 列の明示セカンダリインデックスの一貫性（m_item.supplier_id）。InnoDB は FK 索引を自動生成するため機能影響は無いが、兄弟列に明示索引がある場合は揃える。2回目の発生で rules/database.md への昇格を判定。
@@ -49,6 +51,8 @@
 
 - **初の write ドメインで sec 1件（中）＝同種メソッド群の検証一貫性の抜け**（Sprint 8）: カートの `addItem` だけ数量**下限**（`<=0`）と int オーバーフローの検証を欠き（`updateItem`/`merge`/`checkOrderable` は下限処理済）、負数/0 が上限チェックを潜脱して永続化＝負 subtotal（SBD-2「数量は正の整数として検証」違反）。SM が実コードで CONFIRMED（偽陽性でも受容でもなく確定バグ）→修正（DTO `@Min(1)`＋サービス層 `<=0` 拒否＋`Math.addExact` オーバーフロー→400）→**delta 再レビュー（sec のみ）で解消確認**。教訓＝**新規に入力値を受理する経路が複数ある場合（add/update/merge）、検証（下限/上限/境界/オーバーフロー）の一貫性を横断チェックする**。SBD-10 系だけでなく **SBD-2 系（数量/金額の正当性）も否定AC で先回り指定**すると漏れにくい。DEV は初出（1回目・2回ルールで backend-conventions 未反映）、frontend-conventions §7 は localStorage パターンを即時反映。
 
+- **3観点クリーンが Sprint3/6/7 に続き4回目・security ハードニング Story でも通用**（Sprint 9）: #5/#6 は conv/sec 指摘0。要因＝①**固めた secure-by-default 土台＋#4 実装の再利用**（価格サーバ権威・BigDecimal・SQLパラメタライズ・CSRF基盤）②**否定AC を計画フェーズで先回り指定**（価格注入無視・外部オリジン拒否・数量検証統一を reviewer 起動プロンプトで具体化）③**計画フェーズで spec 委譲・衝突論点を確定**（実装が仕様どおり）。perf の merge N+1 は**Sprint8 由来の既存問題**＝今スプリント非導入で SM が `git diff main...branch` 検証→スコープ外・非ブロッキング（#28 backlog）。sec の軽微 FYI（updateItem にサービス層の下限重複チェックなし）は確定②「update=DTO層検証」に沿った意図的設計で呼び出し元 Controller のみ＝非exploitable＝対応不要（Sprint8 の「同種メソッド群の検証一貫性」教訓を計画で先回りし再発せず）。
+
 ## Sprint Reviewで発覚しやすいパターン
 
 - **Flyway 採番規約（versioned vs repeatable）**（Sprint 1）: 開発/テスト用シードを versioned で採番すると out-of-order 破綻の懸念。→ repeatable（`R__`）＋冪等を rules/database.md に明文化。**自動3reviewer は規約に無い観点は全員見逃す**（規約の明文化が再発防止の要）。
@@ -58,6 +62,8 @@
 - **計画前調査で「DDL ありデータなし」を先に潰した**（Sprint 6）: シード皆無は Sprint Review まで残さず**計画前の実地調査で発見**（→ 3-repo 化して database でシード新規作成）。Sprint 2 の「テスト green＝完成の盲点」の裏返し＝**実機で動かすのに必要なデータ/設定（シード・`mybatis.mapper-locations` 等）は自動 reviewer もテストも拾わない**ため、計画前調査 or DoD の実機起動＋主要 EP 疎通で先に潰す（Sprint 6 は実機 E2E 疎通も DoD で実施しクリーン）。
 
 - **write ドメインの入力検証漏れは Sprint Review 前に自動レビュー（sec）で捕捉できた**（Sprint 8）: addItem の数量下限漏れは sec reviewer が exploit 経路付きで発見→Sprint Review に持ち込まず解消。Sprint Review 指摘は**ゼロ**（クリーン）。secure-by-default 土台＋否定AC の先回り指定＋計画フェーズの設計確定が揃うと、write ドメインでも Sprint Review 前に品質を固められる（Sprint3/6/7 のクリーンパスに続く）。
+
+- **security ハードニングでも Sprint Review クリーン（指摘ゼロ）**（Sprint 9・Sprint3/6/7/8 に続く）: 否定AC 回帰テスト（攻撃が失敗することの実証）を主成果物として計画で先取り＋計画前 Explore の既達/未実装切り分け＋計画フェーズの spec 委譲/衝突論点確定が揃い、Sprint Review 前に品質が固まった。attack-card で攻撃失敗を可視化した Review HTML も奏功。**「既達が大きい」ハードニング Story はスコープを絞れる分クリーンに通りやすい**（計画前調査で残作業を最小化し過剰実装を回避したことが要因）。
 
 ## Skills更新履歴
 
@@ -88,6 +94,10 @@
   - SM: skill ファイル変更なし（今スプリントの SM 学びは 2回ルールで long_term 止まり）。long_term のみ：tier分離7連続・Epic 完成でも通用／計画前調査の**縮小**方向（2-repo）／複数 Issue の cross-repo closes を各 capstone repo に**分散**（#3→backend・#2→frontend）／spec 委譲論点の SM 計画確定が Sprint5/6/7 で3連続定着（**次回発生で scrum-master-workflow ① へ「spec 委譲論点の洗い出し→計画で AskUserQuestion 確定」を昇格判定**）／perf 軽微の非ブロッキング判定で再修正回避。
   - DEV: `backend-conventions` §9 に2点（**catch-all 例外ハンドラ棚卸しチェックリスト**＝`@RestControllerAdvice` catch-all の枠組例外丸め込みが Sprint3→7 で2回目の2回ルール昇格／**LIKE 等 SQL サニタイズを SQL非依存の純VOに隔離**＝ID-29 `ProductSearchTerms`）。#skills-changelog 投稿済。frontend-conventions は「ヘッダ検索 form 追加で SignonView.spec の form セレクタ衝突」が初出のため未反映（long_term 止まり）。卒業候補なし（各 repo 15スプリント基準未達）。
   - PO: `spec/intended-diff-ledger.md` に **ID-29**（LIKE メタ文字 `%`/`_` のリテラル化・ESCAPE 併用・SBD-17維持・関連 #2）追記／質問傾向を long_term 反映（新規2傾向＝「検索/フィルタ系 feature の UI 配置・検索対象範囲・異常系レスポンスが未定義になりやすい」「spec が PO へ確定を委譲した論点の計画フェーズ確認」、いずれも初出＝次回再発で昇格判定）。
+- **Sprint 9**:
+  - SM: **skill ファイル変更なし**（今スプリントの SM 学びは全て 2回ルールで long_term 止まり・Sprint 3/7 と同型）。long_term のみ：tier分離9連続・security ハードニングでも通用／「既達が大きい」ハードニングの過剰実装回避＝Sprint4 型再現（計画前 Explore で backend 4ファイルに集約）／spec 委譲かつ先行 Story と衝突する論点の計画確定（5回目・「衝突解消」次元）／perf 既存問題(merge N+1)の `git diff` 検証によるスコープ外判定→#28 backlog 化（Sprint60 教訓）／reviewer プロンプトに確定事項明記で churn 防止（初出）。#skills-changelog 投稿済。
+  - DEV: `backend-conventions` §9 の catch-all 横取り例外テーブルに `HttpMessageNotReadableException`（400）を追記（既昇格テーブルへの追加行＝2回ルール対象外）。MockMvc の csrf()/MockCookie 制約と bean 切り出しユニットテスト回避策・merge N+1 負債・XSRF Cookie の setCookieCustomizer 技法は初出（long_term 止まり）。卒業候補なし（backend 7スプリント・15基準未達）。#skills-changelog 投稿済。
+  - PO: `memory/po/long_term.md` に Sprint9 質問傾向＋意思決定ログ5件を追記。傾向1（security ハードニングの否定AC 実装レベル論点＝エラー正規化/Cookie属性/検証層配置）は**初出扱いで昇格見送り**（1 Sprint 内複数発生は正式昇格閾値=異なるレビュー時点2回以上に未達・次回同種 Story 再発で判定）。Origin/SameSite 確定は Sprint4 昇格済「新規セキュリティ機構の追加要否は既存機構の充足を先に確認」チェックリストの3件目として記録。台帳追記なし（SBD-2/17 は維持項目）。
 - **Sprint 8**:
   - SM: **`scrum-master-workflow` SKILL.md ① Planning に「spec 委譲論点の洗い出し」を昇格追加**（Sprint5-8 で4連続定着＝long_term「次回昇格判定」到達）。対象Issue特定直後に spec/AC/台帳/architecture-conventions から委譲論点を洗い出し、既決 vs 実装未確定を区別して後者を計画で AskUserQuestion 確定する手順を明文化。#skills-changelog 投稿済。その他 SM 学びは long_term 止まり（tier分離8連続・初 write ドメイン／計画前調査で永続基盤皆無→3-repo／sec の検証一貫性教訓／DEV の GCM push ハング→SM トークン URL push 運用）。
   - DEV: `frontend-conventions` §7 に localStorage 初導入パターン（cartStorage: 破損フォールバック/タブ間同期/型ガード）を追記（参照知識の即時反映）。`backend-conventions` は sec 指摘（同種メソッド群の検証一貫性）が初出のため未反映（2回ルール）。long_term に Math.addExact・単一表+UNIQUE 構造的整合（ID-17 是正）・orderable qty 非露出（D1）・C1 再検証を記録。卒業候補なし（backend6/frontend4/database3 スプリント・15基準未達）。

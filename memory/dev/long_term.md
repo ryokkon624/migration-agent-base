@@ -11,10 +11,11 @@
   3観点レビュー指摘0件だった。要因は下記「横断（database＋backend＋frontend）」参照。
 
 ### jpetstore-backend
-Sprint2（#23）・Sprint3（#18/#19）・Sprint4（#21/#20）・Sprint6（#1）・Sprint7（#2/#3）とも実装スプリントを
-終えたが、3観点レビュー（規約/セキュリティ/パフォーマンス）での**指摘は今のところ0件の繰り返しも無し**
-（Sprint3はレビュー指摘自体が0件、Sprint4は規約/パフォーマンスが0件・セキュリティは非ブロッキング2件、
-Sprint6は3観点とも0件、Sprint7はconvention/securityが0件・performanceのみ非ブロッキング1件で再修正不要）。
+Sprint2（#23）・Sprint3（#18/#19）・Sprint4（#21/#20）・Sprint6（#1）・Sprint7（#2/#3）・Sprint9（#5/#6）とも
+実装スプリントを終えたが、3観点レビュー（規約/セキュリティ/パフォーマンス）での**指摘は今のところ0件の
+繰り返しも無し**（Sprint3はレビュー指摘自体が0件、Sprint4は規約/パフォーマンスが0件・セキュリティは
+非ブロッキング2件、Sprint6は3観点とも0件、Sprint7はconvention/securityが0件・performanceのみ非ブロッキング
+1件で再修正不要、Sprint9は3観点とも指摘0件でクリーン）。
 以下の発見はいずれもDEV自身がTDD・実機検証中に見つけたもので初出＝1回目のため、2回ルールに従い本セクション
 ではなく「習得したこと」「技術的なハマりポイント」に記録する。ただし一部は参照知識/実装パターンとして
 初出からSkillへ即時反映した（詳細は「Skills更新履歴」）。
@@ -40,6 +41,18 @@ Sprint4のセキュリティ非ブロッキング2件（`AuthApplicationService.
   フローの検証方針が揃っているかを横断的に棚卸しする**必要がある（1メソッドだけ実装パターンを流用し忘れる
   形で漏れが生じた）。
   発生スプリント: Sprint8（#4、SecReviewer/SM指摘。初出のため2回ルールに従い本Skillには未反映）
+
+- [パフォーマンス][スコープ外・技術的負債として記録] **`CartApplicationService#merge`のループ内で
+  `cartCustomMapper.selectItemForCart`を1行ずつ呼び出しており（N+1）、backend-conventions §4a
+  「N+1問題の防止」に抵触する。** Sprint9（#5/#6）でperformance-reviewerが指摘したが、この実装は
+  Sprint8（#4）時点で導入済みの既存コードであり、Sprint9のスコープ（価格権威・数量検証統一／CSRF
+  ハードニング）はこのメソッドの`quantity<=0`ガードを追加しただけでクエリパターン自体には触れていない
+  ため、SMが「Sprint8由来の既存問題・本スプリントのスコープ外」と判定した（3観点レビュー指摘0件の
+  実績にはこの1件を数えない）。§4a自体は既にSkill化済みの汎用ルールのため新規チェックリスト項目は
+  不要だが、次に`CartApplicationService#merge`（または同メソッド群）へ着手するStoryで一括クエリ化
+  （例: `selectItemsForCart(List<String> itemIds, cartId)`でN行分をまとめて取得しMapへ変換してから
+  ループ処理する）を検討する必要がある未解消の技術的負債として記録する。
+  発生スプリント: Sprint9（#5/#6、performance-reviewer指摘・SMがスコープ外判定。根本原因はSprint8（#4）由来）
 
 ### jpetstore-frontend
 Sprint5（#24）が初のフロントエンド実装スプリント。3観点レビューでパフォーマンス1件・セキュリティ1件の
@@ -197,6 +210,20 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   `syncTestSchema`を実行してもbackendのTestcontainersには反映されない点に注意（Sprint4での
   `syncTestSchema`確認手順の教訓の続き）。
   発生スプリント: Sprint6（#1）
+- **Spring SecurityのCSRF Cookie属性（`SameSite`/`Secure`等）をテストで直接検証する場合、MockMvc経由の
+  統合テストは使えない。** 理由は2つ: (1) `SecurityMockMvcRequestPostProcessors.csrf()`は呼ばれた時点で
+  共有Springコンテキストの`CsrfTokenRepository`をセッションベースへ**恒久的に**差し替える（テストスイート
+  全体でリークする既知の挙動）ため、同一コンテキストで実行される他のCSRFテストがCookieを発行しなくなる。
+  (2) `MockHttpServletResponse`のSet-Cookieヘッダ再構築は`SameSite`属性を`MockCookie`型のオブジェクトのみ
+  見るため、`CookieCsrfTokenRepository`が発行する素の`jakarta.servlet.http.Cookie`のSameSite属性はヘッダ
+  文字列に反映されず、統合テストのレスポンスヘッダからは検証できない。回避策として、対象の
+  `CsrfTokenRepository` Beanを`SecurityConfig`のpublicファクトリメソッド（`csrfTokenRepository(boolean
+  secure, String sameSite)`）として切り出し、Springコンテキストを起動しないplain `Specification`
+  （`CsrfCookieFilterSpec`と同型）でリポジトリを直接構築し、`MockHttpServletRequest`/
+  `MockHttpServletResponse`に対して`saveToken`を呼んでCookieオブジェクトの属性（`getAttribute("SameSite")`・
+  `getSecure()`・`isHttpOnly()`）を直接assertする。
+  発生スプリント: Sprint9（#6、`SecurityConfigCsrfTokenRepositorySpec.groovy`実装時。初出のため2回ルールに
+  従い本Skillには未反映）
 
 ### jpetstore-frontend
 - **vue-i18n（v11・Composition API）のメッセージ文字列中の`@`はlinked message構文（`@:key`形式）として
@@ -373,6 +400,31 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   という薄いAPI設計で両立させた。同種の「機微値に基づく判定だけを匿名にも公開したい」ケース（与信判定・
   権限チェック等）で再利用できる考え方。
   発生スプリント: Sprint8（#4）
+- **リクエストボディの型不一致（非数値文字列等でのJSONデシリアライズ失敗）を400に正規化する
+  `HttpMessageNotReadableException`ハンドラは、既存のcatch-all横取り問題（`backend-conventions`§9の
+  該当例外テーブル）と同じ原因（専用ハンドラが無いと`handleUnexpected`に落ちて500になる）で必要になった。**
+  `UpdateCartItemRequest.quantity`に文字列`"abc"`を送るケースがAC2「非数値→400」の穴になっていたため
+  追加した。既存の型不一致ハンドラ群（`MethodArgumentTypeMismatchException`＝クエリ/パスパラメータ、
+  `MissingServletRequestParameterException`＝必須パラメータ欠落）とは発生段階（リクエストボディの
+  JSONデシリアライズ時）が異なるが、原因（catch-all横取り）と対処（専用ハンドラ追加）は同型のカテゴリ
+  のため、新規パターンの2回ルール判定は経ずに`backend-conventions`§9の既存テーブル（「見つかり次第
+  このリストへ追記する」と明記済み）へ直接追記した。
+  発生スプリント: Sprint9（#5、AC2非数値ケースで発覚）→ backend-conventionsへ即時反映（既存の
+  昇格済みテーブルへの追加行のため2回ルール対象外）
+- **DTOで『値が明示的に0』と『値自体が欠落』を区別したい場合、プリミティブ`int`ではなくboxed
+  `Integer`＋`@NotNull`を使う。** `UpdateCartItemRequest`は当初`int quantity`（Bean Validationの
+  `@Min`のみでは欠落時にJSONデシリアライズがデフォルト値0を埋めてしまい『明示的な0=削除』と『未指定』を
+  区別できない）だったが、`Integer quantity`（`@NotNull @Min(0)`）へ変更し、欠落は400・明示0は許容
+  （削除セマンティクス維持）・負数は400、という3値の区別を実現した。数量に限らず『0/false/空文字と
+  null(未指定)を区別する必要があるフィールド』を持つDTO全般で再利用できる型。
+  発生スプリント: Sprint9（#5、計画フェーズ確定②）
+- **CSRFトークン受け渡し用のXSRF-TOKEN Cookie自体（値ではなく属性）にSameSite/Secureを付与する場合、
+  `CookieCsrfTokenRepository#setCookieCustomizer`で`ResponseCookie.Builder`をカスタマイズし、既存の
+  JWT Cookie属性値（`jwt.cookie.secure`/`jwt.cookie.same-site`）をそのまま再利用して統一する設計が
+  有効。** 新しいプロパティキーを増やさず、全Cookie（JWT access/refresh＋XSRF-TOKEN）の属性を単一の
+  設定源で環境ごとに揃えられる（`SecurityConfig`に`@Value`2つを注入するだけで済み、`application.yml`
+  への新規プロパティ追加が不要）。
+  発生スプリント: Sprint9（#6、計画フェーズ確定①）
 
 ### jpetstore-frontend
 - **backendのSpring Security 7 CSRF設定（非XOR `CsrfTokenRequestAttributeHandler`・consume-then-
@@ -583,9 +635,34 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   `memory/dev/long_term.md`「習得したこと」「繰り返し指摘されるパターン」の該当セクションに記録した。
 - `#skills-changelog` へ `[DEV]` で投稿済み。
 
+### Sprint 9（#5/#6・カート価格権威・CSRF ハードニング・backend単独）
+
+- **`backend-conventions`**: `## 9. jpetstore-backend 固有の注意事項`のcatch-all横取り例外テーブルに
+  `HttpMessageNotReadableException`（400・リクエストボディの型不一致/JSON不正）を追記した。**2回ルールの
+  対象外**: 新規パターンの初出ではなく、Sprint3→Sprint7で既に2回ルール昇格済みの既存テーブル
+  （「見つかり次第このリストへ追記する」と明記済み）へ、同カテゴリの新規発見例外を1行追加しただけのため。
+- **`backend-conventions`へは反映しなかったもの**: 以下2件はいずれも「初出（1回目）」かつ新規の
+  再発防止/実装パターンのため、2回ルールに従い今回はSkillに反映せず`memory/dev/long_term.md`に
+  留めた（発生スプリント欄で待機）:
+  - MockMvc経由でCSRF Cookie属性（SameSite等）を検証できない制約（`SecurityMockMvcRequestPostProcessors.
+    csrf()`のコンテキストリーク・`MockHttpServletResponse`のSameSite反映が`MockCookie`型限定）と、
+    bean切り出し＋コンテキスト無しユニットテストによる回避策 → 「技術的なハマりポイント」に記録。
+  - performance-reviewerが指摘した`CartApplicationService#merge`のN+1（Sprint8由来・本スプリントの
+    スコープ外とSMが判定） → 「繰り返し指摘されるパターン」に技術的負債として記録。§4a自体は既存の
+    汎用N+1防止ルールのため新規チェックリスト項目は不要（次にmergeへ着手するStoryでの一括クエリ化検討
+    事項として記録のみ）。
+- **`memory/dev/long_term.md`「習得したこと」に記録し、Skill反映は見送ったもの**: XSRF-TOKEN Cookie
+  自体への`setCookieCustomizer`によるSameSite/Secure付与（既存`jwt.cookie.*`属性値の再利用）は、
+  Story固有の設計判断・具体的な実装技法の記録という位置づけで、Sprint8の`Math.addExact`オーバーフロー
+  安全化と同様にチェックリスト化はせず記録のみとした。
+- 3観点レビュー指摘0件（クリーン）は、#5/#6ともCSRF基盤（#23）・価格サーバ権威（#4）という既達の上に
+  積むハードニングStoryであり、Sprint4/6/7と同型の「土台再利用が効く」パターンの再確認のため、
+  プロセス上の教訓としては新規性が無くチェックリスト化しなかった。
+- `#skills-changelog` へ `[DEV]` で投稿済み。
+
 ## 卒業済みルール
 
 （該当なし。棚卸し対象となるルールが直近15スプリント基準に達していない。
-  jpetstore-backendはSprint2・3・4・6・7・8の6スプリントのみ、jpetstore-databaseはSprint1・3・6の3スプリントのみ、
-  jpetstore-frontendはSprint5・6・7・8の4スプリントのみのため、いずれも対象外。Sprint4・Sprint5・Sprint6・
-  Sprint7・Sprint8 Retroでも棚卸しを実施したが同様の理由で卒業候補なし）
+  jpetstore-backendはSprint2・3・4・6・7・8・9の7スプリントのみ、jpetstore-databaseはSprint1・3・6の
+  3スプリントのみ、jpetstore-frontendはSprint5・6・7・8の4スプリントのみのため、いずれも対象外。
+  Sprint4・Sprint5・Sprint6・Sprint7・Sprint8・Sprint9 Retroでも棚卸しを実施したが同様の理由で卒業候補なし）
