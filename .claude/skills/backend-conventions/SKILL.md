@@ -376,6 +376,23 @@ hw-hub-backendの`infrastructure.mybatis.custom.{entity,mapper}`慣習をjpetsto
 > ユーザーからの配置に関する質問を受けて`infrastructure.mybatis.custom.{entity,mapper}`へ
 > `AuditLogCustomEntity`/`AuditLogCustomMapper`として改名移設した。
 
+### 初のMyBatisカスタムXMLマッパー導入時は`mybatis.mapper-locations`の明示設定が必須
+
+MyBatis Generator生成物（`resources/mapper.generated`）しか使っていないプロジェクトで初めて手書きの
+`resources/mapper/custom/*.xml` を追加する場合、`application.yml` に以下を明示しないと
+`mapperLocations` が未設定（null相当）のままとなり、追加したXMLマッパーが一切ロードされない。
+
+```yaml
+mybatis:
+  mapper-locations: classpath:mapper/**/*.xml
+```
+
+起動時エラーにはならず、該当SQLが見つからない実行時失敗として顕在化するため気づきにくい。
+`mapper/**/*.xml` のようなワイルドカードでgenerated/customの両方を一括カバーする設定にすること。
+
+> **背景（Sprint 6 #1）**: `jpetstore-backend`本プロジェクト初のMyBatis XMLマッパー利用（カタログ参照系）
+> で発生。`application.yml`に`mybatis.mapper-locations`を追加して解消した。
+
 ### PasswordEncoderはDelegatingPasswordEncoderを使い、ハッシュに`{bcrypt}`等のプレフィックスを含める
 
 パスワードのハッシュ化・照合は Spring Security 標準の
@@ -456,9 +473,42 @@ public ResponseEntity<LoginResponse> me() {
 > `AuthController`に`GET /api/auth/me`を追加。既存の`login`応答DTO（`LoginResponse`）をそのまま
 > 再利用し新規DTOを増やさなかった。
 
+### 区分値をm_code化する場合、算出ロジックは生成enumに書かず非生成クラスに分離する
+
+`./gradlew generateEnums`（EnumGenerator）は**全`m_code` `code_type`を一括で`domain/enums/*.java`に生成**する
+（特定の`code_type`だけを選んで生成することはできない）。そのため、区分値に付随する算出ロジック（例:
+数量から在庫ステータスを判定する`of(qty)`）を生成対象のenumクラスに実装すると、次回の`generateEnums`実行で
+上書きされ消失する。
+
+- 生成されたenum（例: `StockStatus`）は区分値の**値と表示名のみ**を保持する生成物として扱い、編集しない
+- 算出ロジックは同じ`domain`パッケージ内の**別の非生成クラス**（例: `StockStatusCalculator#of(int quantity):
+  StockStatus`）に分離する
+- 閾値等のマジックナンバーは定数/configとして非生成クラス側に持たせる（生成enumには持たせない）
+
+> **背景（Sprint 6 #1）**: 在庫ステータスをm_code区分値として採用（ユーザー方針「区分値は基本的にm_codeに
+> 登録する」）。生成された`StockStatus.java`に`of(qty)`を実装すると再生成で消えるため、`StockStatusCalculator`
+> （非生成）に分離した。
+
+### 一覧APIの汎用ページングDTOは`Page`/`PageRequest`/`PageResponse<T>`の3型構成・1-index
+
+複数件を返す一覧API（カテゴリ内商品一覧・商品内item一覧等）のページングは、以下の3型構成に統一する。
+
+- `domain.common.PageRequest`（VO・リクエスト側。`page`/`size`を保持）
+- `domain.common.Page<T>`（Application層の戻り値。`content`/`page`/`size`/`totalElements`/`totalPages`）
+- `presentation.rest.dto.PageResponse<T>`（Controller層。`Page<T>`から変換してJSONへ返す）
+- **ページ番号は1-index**（`page=1`始まり。0-indexにしない）。既定`size`はAPIごとに定める（例: 既定12・
+  上限cap 100）
+- Application層はDomainの`Page<T>`のみを扱い、Presentation層のDTO（`PageResponse<T>`）には依存しない
+  （変換はController側で行う）
+
+> **背景（Sprint 6 #1）**: カタログ一覧API（category内product一覧・product内item一覧）で確立。
+> #2（商品検索）・#9（注文履歴一覧）が再利用する先例規約として明文化。
+
 > Swagger UIのpermitAll・`server.error.*`→`spring.web.error.*`・依存更新後のIDE lint staleness・
 > `@RestControllerAdvice`のcatch-allがフレームワーク例外（`HttpRequestMethodNotSupportedException`等）を
 > 意図しないステータスに丸める問題・CSRFトークンのconsume-then-regenerate挙動・セキュリティ上意味のある
 > 日時比較はDB側`NOW(6)`で行うべき問題（Sprint4）・`ON DUPLICATE KEY UPDATE`のSET句左→右評価順依存の
-> 二重計算（Sprint4）は、いずれも初出（1回目）のため、2回ルールに従い本Skillには未反映
-> （`memory/dev/long_term.md`「技術的なハマりポイント」参照）。2回目の発生でSkill昇格を検討する。
+> 二重計算（Sprint4）・`syncTestSchema`が`flyway/sql-test`を同期対象外とする点（Sprint6）・
+> `m_code.code_value`のVARCHAR(10)制約（Sprint6）は、いずれも初出（1回目）のため、2回ルールに従い
+> 本Skillには未反映（`memory/dev/long_term.md`「技術的なハマりポイント」参照）。2回目の発生でSkill昇格を
+> 検討する。

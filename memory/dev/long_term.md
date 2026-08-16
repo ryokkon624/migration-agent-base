@@ -7,11 +7,14 @@
   無く `product_id` にはある）。InnoDBのFK自動生成でスキャン自体は偽陽性だが、基盤スキーマの
   一貫性・自己文書化のため明示索引を推奨。
   発生スプリント: Sprint1（#22）
+- Sprint6（#1・カタログseed新規投入。本プロジェクト初のフルスタックドメイン機能・3-repo cross-repo）も
+  3観点レビュー指摘0件だった。要因は下記「横断（database＋backend＋frontend）」参照。
 
 ### jpetstore-backend
-Sprint2（#23）・Sprint3（#18/#19）・Sprint4（#21/#20）とも実装スプリントを終えたが、3観点レビュー
-（規約/セキュリティ/パフォーマンス）での**指摘は今のところ0件の繰り返しも無し**（Sprint3はレビュー指摘自体が
-0件、Sprint4は規約/パフォーマンスが0件・セキュリティは非ブロッキング2件）。以下の発見はいずれもDEV自身が
+Sprint2（#23）・Sprint3（#18/#19）・Sprint4（#21/#20）・Sprint6（#1）とも実装スプリントを終えたが、3観点
+レビュー（規約/セキュリティ/パフォーマンス）での**指摘は今のところ0件の繰り返しも無し**（Sprint3はレビュー
+指摘自体が0件、Sprint4は規約/パフォーマンスが0件・セキュリティは非ブロッキング2件、Sprint6は3観点とも
+0件＝カタログAPIをゼロから新規実装したスプリントとしては初のクリーン達成）。以下の発見はいずれもDEV自身が
 TDD・実機検証中に見つけたもので初出＝1回目のため、2回ルールに従い本セクションではなく「習得したこと」
 「技術的なハマりポイント」に記録する。ただし一部は参照知識/実装パターンとして初出からSkillへ即時反映した
 （詳細は「Skills更新履歴」）。
@@ -37,6 +40,34 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   （WHATWG URLパーサはタブ/改行を位置問わず除去して正規化するため将来的なバイパス経路になりうる）。
   文字列全体をcode point走査する`containsControlCharacter`に拡張して解消した。
   発生スプリント: Sprint5（#24）
+- Sprint6（#1・カタログ画面新規実装。2回目のフロントエンド実装スプリント）は、Sprint5より実装規模が
+  大きいにもかかわらず3観点とも指摘0件だった。Sprint5の2件（上記）はいずれも1回目のままで2回目の再発が
+  無いため、本セクションでの待機を継続する（次回同種発生時に2回目→Skill昇格を判定）。要因は下記
+  「横断（database＋backend＋frontend）」参照。
+
+### 横断（database＋backend＋frontend）
+- **Sprint6（#1）は3観点レビュー（規約/セキュリティ/パフォーマンス）が3-repoすべてで指摘0件だった。**
+  Sprint5（frontend初実装）ではパフォーマンス1件・セキュリティ1件の指摘があったのに対し、Sprint6は
+  規模がより大きい（3-repo cross-repo・カタログ階層API＋画面一式のフルスタック新規実装）にもかかわらず
+  全指摘0件で完走した。要因を次スプリント以降に活かせる形で整理する:
+  1. **secure-by-defaultな土台の上に積んだ**: #22（DB）・#23（backend認証/認可）・#24（frontend認証/CSRF）
+     で確立済みの土台（例外→404正規化・permitAllの限定列挙・CSRF自己修復・trace非露出）をそのまま再利用し、
+     カタログ機能側で新たなセキュリティ機構を自作しなかった。土台を薄いうちに固めておくほど、後続の
+     ドメイン機能実装でレビュー指摘の芽自体が減る。
+  2. **計画フェーズでレビュー観点を先回りしてACに落とし込んだ**（`backlog/sprint_06/sprint_backlog.md` C3
+     参照）: 計画時点で「qtyをレスポンスに一切出さない」（在庫数非露出・R3）・「`v-html`を使わない」
+     （AC-neg1・SBD-18）・「permitAllは`HttpMethod.GET`スコープで限定し非GETは405のまま維持」（AC4）を
+     明文化しAC・テストへ落とし込んでいたため、実装段階で規約・セキュリティ違反が生まれる余地自体が無かった。
+  3. **設計上の曖昧さを計画フェーズでユーザー承認により確定した**: 在庫ステータスの実装方式（m_code区分値
+     採用）・ページングDTOの形（1-index・`Page`/`PageRequest`/`PageResponse<T>`）を実装開始前にユーザー
+     承認まで得て確定していたため、実装中に規約から外れた自己流の設計判断をする必要が無かった。
+
+  **次に活かす教訓**: レビュー指摘を減らす最も効果的な手段は「実装後にレビューで直す」ことではなく、
+  **計画フェーズでレビュー観点（規約/セキュリティ/パフォーマンス）を先回りしてACに明文化し、設計論点を
+  ユーザー承認で確定してから実装に入る**ことである。#2（検索）・#3（参照堅牢化）・#4（カート）等の
+  後続Storyでも、計画フェーズのAC整備でこの3点（土台再利用の徹底／レビュー観点の先回りAC化／設計論点の
+  事前確定）を意識する。
+  発生スプリント: Sprint6（#1）
 
 ## 技術的なハマりポイント
 
@@ -54,6 +85,12 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   `seedDevData` タスクで `flyway/sql-test` のみを渡すと、`flyway/sql` 側が1本でも適用済みだと
   Flywayのvalidateが `Detected applied migration not resolved locally` で失敗する
   （`flywayMigrate → seedDevData` の実運用フローでも同じ問題を確認。Sprint1 #22）。
+- **`m_code.code_value` は `VARCHAR(10)` のため、意味のある英語コード値でも10文字を超えると登録できない。**
+  在庫ステータスの区分値として`OUT_OF_STOCK`（12文字）を登録しようとしたが列幅超過のため`OUT_STOCK`
+  （9文字）に短縮した。Javaのenum定数名は生成ルール上`display_name_en`（`Out of Stock`）から導出されるため
+  `OUT_OF_STOCK`のまま生成され、DB上の`code_value`とJava定数名が完全一致しない非対称が生じる（意図した
+  仕様であり不具合ではないが、新規`code_type`追加時は先に`code_value`の文字数を確認すること）。
+  発生スプリント: Sprint6（#1）
 
 ### jpetstore-backend
 - **Spring Security の `permitAll` は springdoc のリダイレクトエントリポイント `/swagger-ui.html` を
@@ -102,6 +139,23 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   複数列を同一`INSERT ... ON DUPLICATE KEY UPDATE`文で更新する際は、この評価順依存の二重計算・
   ズレに注意する。
   発生スプリント: Sprint4（#20、IT実行で発見）
+- **本プロジェクト初のMyBatisカスタムXMLマッパー導入時、`application.yml`に`mybatis.mapper-locations`を
+  明示しないとXMLが一切ロードされない。** それまではMyBatis Generator生成物（`resources/mapper.generated`）
+  しか無くマッパーXMLの読み込み設定自体が不要だったため気づきにくい。`classpath:mapper/**/*.xml`を
+  `application.yml`へ追加して解消した（起動時エラーにはならず、該当SQLが見つからない実行時失敗になる
+  ため発見しづらい）。
+  発生スプリント: Sprint6（#1）→ backend-conventionsへ即時反映（参照知識の例外・2回ルール対象外）
+- **`./gradlew generateEnums`（EnumGenerator）は全`m_code` `code_type`を一括で`domain/enums/*.java`に
+  再生成し、既存ファイルへの手書き追記は次回実行で消える。** 在庫ステータスの閾値算出`of(qty)`を生成対象の
+  `StockStatus.java`に直接書くと再生成のたびに消失するため、非生成の別クラス`StockStatusCalculator`
+  （`domain`パッケージ）に分離して解消した。
+  発生スプリント: Sprint6（#1）→ backend-conventionsへ即時反映（参照知識の例外・2回ルール対象外）
+- **`./gradlew syncTestSchema`は`flyway/sql`（versioned migration）のみをbackendのtest resourcesへ同期し、
+  `flyway/sql-test`（repeatable migration・フィクスチャ）は対象外。** 今回はdatabase側のカタログseedを
+  `flyway/sql`（本番相当）に追加したため問題化しなかったが、`flyway/sql-test`側だけに変更を加えた場合
+  `syncTestSchema`を実行してもbackendのTestcontainersには反映されない点に注意（Sprint4での
+  `syncTestSchema`確認手順の教訓の続き）。
+  発生スプリント: Sprint6（#1）
 
 ### jpetstore-frontend
 - **vue-i18n（v11・Composition API）のメッセージ文字列中の`@`はlinked message構文（`@:key`形式）として
@@ -121,6 +175,12 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   含む変更を書いた直後に必ずReadツールで実際の書き込み内容を確認すること**（テストが green でも
   意図と異なるロジックがコミットされるリスクがあるため、テストケースの網羅性だけに頼らない）。
   発生スプリント: Sprint5（#24。1回目・2回目とも同一セッション内で発生）
+- **`import.meta.glob(..., { eager: true })`はViteのビルド時静的解析でファイルパスパターンを解決するため、
+  パターン文字列を変数化・動的生成すると対象を拾えなくなる。** カタログ画像（category5枚・product16枚）を
+  1つずつimportせず`import.meta.glob('../assets/catalog/*.png', { eager: true })`で一括取り込みし、
+  `resolveCatalogImage(kind, id)`で解決・未存在はplaceholderへフォールバックする実装で採用した
+  （実装パターン自体はfrontend-conventions §7へ即時反映）。
+  発生スプリント: Sprint6（#1）→ frontend-conventionsへ即時反映（参照知識の例外・2回ルール対象外）
 
 ## 習得したこと
 
@@ -207,6 +267,18 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   「解決済み所有者を`CurrentUserProvider`と突き合わせる」処理（`OwnershipAuthorizationService`・再利用）を
   分離する形で組み込む（`backend-conventions` §9へ即時反映済み。詳細は「Skills更新履歴」）。
   発生スプリント: Sprint4（#21）
+- **カタログのような読み取り専用・階層・ページングを伴う一覧系は、カスタム手書きXMLマッパー
+  （`infrastructure.mybatis.custom.{entity,mapper}`）でJOIN・LIMIT/OFFSET・COUNTを1SQLにまとめ、Service層
+  でのN+1を構造的に避けるパターンを確立した。** category→products一覧・product→items一覧はそれぞれ
+  `item×inventory`（在庫）・`item×product`（商品名）のJOINをXML側で行い、Service層はページング済みの
+  結果をそのまま変換するだけにした（ループ内クエリなし）。今後カタログに類する参照系一覧（#2検索・
+  #9注文履歴等）を実装する際の型として再利用できる。
+  発生スプリント: Sprint6（#1）
+- **汎用ページングDTO（`domain.common.Page`/`PageRequest`（VO）→`presentation.rest.dto.PageResponse<T>`）を
+  1-index（`page=1`始まり）で確立し、#2（検索）・#9（注文履歴一覧）が再利用できる先例規約とした。**
+  Application層はDomainの`Page<T>`のみを扱い、Presentation層のController側で`PageResponse<T>`へ変換する
+  分離を維持している（backend-conventions §9へ即時反映。詳細は「Skills更新履歴」）。
+  発生スプリント: Sprint6（#1）→ backend-conventionsへ即時反映（参照知識の例外・2回ルール対象外）
 
 ### jpetstore-frontend
 - **backendのSpring Security 7 CSRF設定（非XOR `CsrfTokenRequestAttributeHandler`・consume-then-
@@ -237,6 +309,25 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   `GET /api/auth/me`追加のみに絞り、`SecurityConfig`は無変更で済ませたことで、cross-repoでも
   レビュー対象・コンフリクトリスクを小さく保てた。
   発生スプリント: Sprint5（#24）
+- **ドメイン一覧/カード/ページネーション/在庫バッジ等のUI部品は、既に`main.css`で整備済みの`.jps-*`
+  ユーティリティクラス（#24で確立）を適用するだけの薄い`.vue`ラッパとして実装できた。** 独自スタイルを
+  新設せずCSSクラスを貼るだけで済んだため、カタログ画面（`ProductCard.vue`・`Pagination.vue`・
+  `StockBadge.vue`等）はロジック（props/イベント）に集中して実装できた。#2（検索）・#9（注文履歴）でも
+  同じ既達クラスを再利用できる見込み（frontend-conventions §7へ即時反映。詳細は「Skills更新履歴」）。
+  発生スプリント: Sprint6（#1）→ frontend-conventionsへ即時反映（参照知識の例外・2回ルール対象外）
+
+### 横断（database＋backend＋frontend）
+- **区分値をm_codeに新規登録する際の3-repo横断フロー**を在庫ステータスで実地確認した:
+  (1) database: `flyway/sql`のseedで新規`code_type`（`display_name_ja`/`display_name_en`付き）を登録。
+  (2) database→frontend: `./gradlew generateEnums`（MultiEnumGenerator）で生成された`code.constants.ts`を
+  frontendへコピー。
+  (3) database→backend: `./gradlew generateEnums`（EnumGenerator）で`domain/enums/*.java`にJava enumを
+  生成（**全`code_type`を一括生成するため既存enumも道連れで再生成される**点に注意＝上記「技術的な
+  ハマりポイント」参照）。
+  (4) frontendの生成定数の表示文言と既存i18nキー（例: `home.tokens.stockIn/stockLow/stockOut`）が重複する
+  場合はreconcile（統合）する。
+  今後の区分値追加（ユーザー方針「区分値は基本的にm_codeに登録する」）で同じ手順を辿れる。
+  発生スプリント: Sprint6（#1）
 
 ## Skills更新履歴
 
@@ -317,9 +408,32 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   `memory/dev/long_term.md`に留めた。
 - `#skills-changelog` へ `[DEV]` で投稿済み。
 
+### Sprint 6（#1・初のドメイン機能・3-repo cross-repo）
+
+- **`backend-conventions`**: `## 9. jpetstore-backend 固有の注意事項` に以下3点を追記
+  （初出だが「知らないと書けない参照知識・実装パターン」の2回ルール例外として即時反映）:
+  - 初のMyBatisカスタムXMLマッパー導入時は `mybatis.mapper-locations` の明示設定が必須
+  - 区分値をm_code化する場合、`generateEnums`が全`code_type`を上書き生成するため、算出ロジック
+    （閾値判定等）は生成enumに書かず非生成の別クラス（例: `XxxCalculator`）に分離する
+  - 一覧APIの汎用ページングDTOは `Page`/`PageRequest`/`PageResponse<T>` の3型構成・1-indexに統一する
+    （#2/#9が再利用する先例規約）
+  - `syncTestSchema`が`flyway/sql`のみを同期し`flyway/sql-test`を対象外とする点・`m_code.code_value`の
+    VARCHAR(10)制約は、いずれも「注意すれば防げる系」の初出（1回目）のため2回ルールに従い今回はSkillに
+    反映せず`memory/dev/long_term.md`「技術的なハマりポイント」に留めた
+- **`frontend-conventions`**: `## 7. jpetstore-frontend 固有の注意事項` に以下2点を追記
+  （同じく2回ルール例外の参照知識・実装パターンとして即時反映）:
+  - ドメイン一覧/カード/ページネーション/バッジは既達`.jps-*` CSSクラスの薄い`.vue`ラッパで実装する
+  - ドメイン画像は `import.meta.glob(eager)` で一括取り込み＋`resolveXxxImage`によるplaceholderフォールバック
+  - `m_code`生成定数と既存i18nキーの重複reconcileは「注意すれば防げる系」の初出（1回目）のため
+    今回はSkillに反映せず`memory/dev/long_term.md`に留めた
+- 3観点レビュー全指摘0件の要因分析（secure-by-default土台の再利用／レビュー観点の先回りAC化／設計論点の
+  計画フェーズ確定）は、チェックリスト項目ではなくプロセス上の教訓のためSkillには反映せず
+  `memory/dev/long_term.md`「繰り返し指摘されるパターン」の「横断」に記録した。
+- `#skills-changelog` へ `[DEV]` で投稿済み。
+
 ## 卒業済みルール
 
 （該当なし。棚卸し対象となるルールが直近15スプリント基準に達していない。
-  jpetstore-backendはSprint2・3・4の3スプリントのみ、jpetstore-databaseもSprint1・3の実装2スプリントのみ、
-  jpetstore-frontendはSprint5の1スプリントのみのため、いずれも対象外。Sprint4・Sprint5 Retroでも棚卸しを
-  実施したが同様の理由で卒業候補なし）
+  jpetstore-backendはSprint2・3・4・6の4スプリントのみ、jpetstore-databaseはSprint1・3・6の3スプリントのみ、
+  jpetstore-frontendはSprint5・6の2スプリントのみのため、いずれも対象外。Sprint4・Sprint5・Sprint6 Retroでも
+  棚卸しを実施したが同様の理由で卒業候補なし）

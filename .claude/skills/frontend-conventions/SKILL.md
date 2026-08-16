@@ -257,6 +257,37 @@ Piniaストアも失敗理由を保持・分岐せず、boolean の成否フラ�
 > **背景（Sprint 5 #24・セキュリティレビュー指摘）**: 初回実装は制御文字判定が先頭1文字目のみだった
 > ため、`/\t/evil.com`のようなバイパスを見逃していた。文字列全体をcode point走査する形に修正した。
 
+### ドメイン一覧/カード/ページネーション/バッジは既達`.jps-*` CSSクラスの薄い`.vue`ラッパで実装する
+
+`main.css`の共通ユーティリティ（`.jps-product-card`・`.jps-pagination`・`.jps-badge`系＋
+`.badge-jps-stock-*`等）が既に定義されている場合、新規ドメイン画面のコンポーネント（`ProductCard.vue`・
+`Pagination.vue`・`StockBadge.vue`等）は独自スタイルを新設せず、既存クラスを適用するだけの薄いラッパとして
+実装する。ロジック（props/イベント）に専念でき、スタイルの重複・カラートークンからの逸脱も防げる。
+
+> **背景（Sprint 6 #1）**: `.jps-product-card`・`.jps-pagination`・`.badge-jps-stock-*`は#24（土台）で
+> 既に整備済みだったため、カタログ画面のVueコンポーネントは薄いラッパで完結した。#2（検索）・#9（注文履歴）
+> でも同じ既達クラスを再利用する想定。
+
+### ドメイン画像は`import.meta.glob(eager)`で一括取り込み＋placeholderフォールバック
+
+`spec/design/images`等の静的な商品/カテゴリ画像をfrontendへ取り込む場合、個別importを列挙せず
+`import.meta.glob(pattern, { eager: true })`でディレクトリ単位に一括読み込みし、`resolveXxxImage(kind, id)`
+のような解決関数で「該当画像が無ければplaceholder」にフォールバックさせる。
+
+```ts
+const images = import.meta.glob('../assets/catalog/*.png', { eager: true })
+function resolveCatalogImage(kind: 'category' | 'product', id: string): string {
+  const path = `../assets/catalog/${kind}_${id}.png`
+  return (images[path] as { default: string } | undefined)?.default ?? placeholderUrl
+}
+```
+
+`import.meta.glob`はViteのビルド時静的解析でパターン文字列を解決するため、パターン自体を変数化・動的生成
+すると対象を拾えなくなる点に注意（グロブ対象のパスは常にリテラルで書く）。
+
+> **背景（Sprint 6 #1）**: カタログ画像（category5枚/product16枚）の取り込みで採用。itemは対応productIdの
+> 画像を流用し、欠落時は`placeholder.svg`にフォールバックする。
+
 ### i18n（vue-i18n v11・`domain.context.key`）
 
 キー構造は`domain.context.key`（例: `auth.signon.error`）。
@@ -265,5 +296,9 @@ Piniaストアも失敗理由を保持・分岐せず、boolean の成否フラ�
   場合（例: `@layer`）は`\@`とエスケープしないとメッセージのコンパイルが構文エラーになる
 - `legacy: false`（Composition API・`useI18n()`）で構成する
 - 生HTMLを含む可能性のあるメッセージは`v-html`で描画しない（`{{ t(...) }}`の自動エスケープのみを使う）
+
+> m_code由来の生成表示定数（例: `code.constants.ts`の在庫ステータス表示名）と既存i18nキーが重複する場合の
+> reconcile（統合）は、初出（1回目・Sprint6 #1）のため2回ルールに従い本Skillには未反映
+> （`memory/dev/long_term.md`「習得したこと」参照）。2回目の発生でSkill昇格を検討する。
 
 ---

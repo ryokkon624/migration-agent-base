@@ -317,7 +317,7 @@ curl -s -X PATCH \
 
 > **cross-repo（複数リポジトリにまたがる実装・Sprint 3/4 実績で確立）**:
 > - 各リポジトリに**同名ブランチ＋各リポジトリで PR** を作成する（同じブランチ名を全 repo で使う）。
-> - **Issue の `closes` は主リポジトリ（通常 backend）の PR に集約**し、従リポジトリ（database 等）の PR body は `Related: ryokkon624/jpetstore-manage#N` に留める（従 PR が先にマージされて Issue が早期クローズするのを避ける）。別 repo の PR マージからでも cross-repo `closes` が機能することは確認済（Sprint 3）。
+> - **Issue の `closes` は主リポジトリ（＝Story の主成果物／ユーザー価値の実現層＝capstone のある repo）の PR に集約**し、従リポジトリ（database 等）の PR body は `Related: ryokkon624/jpetstore-manage#N` に留める（従 PR が先にマージされて Issue が早期クローズするのを避ける）。**主は backend とは限らない**：backend 主体の Story（認証・API 土台等）は backend、**フロント主体のドメイン機能／画面 Story は frontend が主**（Sprint 5 #24・**Sprint 6 #1**＝frontend 主で closes 集約が正しく機能・2回実証）。別 repo の PR マージからでも cross-repo `closes` が機能することは確認済（Sprint 3）。
 > - SM は各リポジトリで `git diff origin/main...[ブランチ名] --name-only` を実行して変更ファイルを把握する（ローカル main が stale な場合があるため origin/main 基準で取る・Sprint 4 教訓）。
 > - #20 のロックアウトのように backend が database の Flyway を参照する場合、backend で `./gradlew syncTestSchema` により test resources が同期済であることを確認する。
 
