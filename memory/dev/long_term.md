@@ -28,6 +28,19 @@ Sprint4のセキュリティ非ブロッキング2件（`AuthApplicationService.
 再発パターンではないため本セクションでは追跡しない（根拠は「習得したこと」に記録。詳細は
 `backlog/sprint_04/implementation-notes.md`）。
 
+- [セキュリティ] **同種のミューテーションメソッド群のうち1つだけ数量（状態変更値）の下限バリデーション・
+  intオーバーフロー検証が漏れていた**。`CartApplicationService`の`addItem`/`updateItem`/`merge`/
+  `checkOrderable`は全て数量を扱うが、`updateItem`（quantity<=0で削除）・`merge`（quantity<=0を無視）・
+  `checkOrderable`（quantity<=0を`INVALID_QUANTITY`扱い）は下限を処理済みだったのに対し、`addItem`だけ
+  `requestedQuantity<=0`のチェックが無く、かつ既存数量との加算がintをオーバーフローすると負の巨大な値に
+  ラップし`newQuantity > stockQuantity`の上限チェックを迂回して負の数量が永続化されうる状態だった
+  （SBD-2違反。SMが実コードでCONFIRMED）。DTO`@Min(1)`＋サービス層`<=0`拒否（400）＋`Math.addExact`による
+  オーバーフロー検出で修正した（`backlog/sprint_08/implementation-notes.md`参照）。新しい数量/状態変更値を
+  受け取るメソッド群を実装する際は、**同じ入力（quantity等）を扱う兄弟メソッド全体で下限・上限・オーバー
+  フローの検証方針が揃っているかを横断的に棚卸しする**必要がある（1メソッドだけ実装パターンを流用し忘れる
+  形で漏れが生じた）。
+  発生スプリント: Sprint8（#4、SecReviewer/SM指摘。初出のため2回ルールに従い本Skillには未反映）
+
 ### jpetstore-frontend
 Sprint5（#24）が初のフロントエンド実装スプリント。3観点レビューでパフォーマンス1件・セキュリティ1件の
 指摘があった（規約は指摘なし）。いずれも初出（1回目）のため、2回ルールに従いSkillのチェックリストへは
@@ -80,6 +93,19 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   クリーン実装により、「secure-by-defaultな土台の上に積む」「先例を再利用する」パターンが偶然ではなく
   再現可能な設計原則であることが確認できた。
   発生スプリント: Sprint7（#2/#3）
+- **Sprint8（#4・カート）はSprint6/7の読み取り専用ドメインと異なり、初のwrite（状態変更・在庫ガード）
+  ドメインでのC1チャレンジ再検証だった。土台再利用（`CurrentUserProvider`・`GlobalExceptionHandler`・
+  `StockStatusCalculator`・CSRF/認証既定・`SecurityConfig`変更ゼロ）は成功したが、conv/perfは指摘0件・
+  secのみ1件（`addItem`の数量下限バリデーション欠落）発生し、Sprint6/7の「3観点とも0件」の連続記録は
+  途切れた。** 要因は、土台（認可・例外正規化・CSRF等の横断的関心事）の再利用だけでは、**ストーリー固有の
+  ドメインロジック（今回は「数量」という新しい入力の妥当性検証）まではカバーされない**こと。土台再利用が
+  防げるのは「車輪の再発明で作り込む新規バグ」であり、「新しいドメイン値に対する検証の作り込み漏れ」は
+  ストーリーごとに個別に注意する必要がある。計画フェーズでレビュー観点を先回りしてAC化する際、「新しく
+  受け取る値（数量・金額等）の妥当性検証（下限/上限/型/オーバーフロー）を全ての受理経路で横断的に洗い出す」
+  観点をAC/実装チェックリストに含めることが今後の再発防止に有効（Sprint6/7で確立した3点＝土台再利用・
+  レビュー観点先回りAC化・設計論点事前確定、に「新規入力値の受理経路横断チェック」を加える形で次スプリント
+  以降に活かす）。
+  発生スプリント: Sprint8（#4）
 
 ## 技術的なハマりポイント
 
@@ -320,6 +346,33 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   ワイルドカードパターンでカバーされていないかを確認してから追加要否を判断すると、Security設定の
   肥大化・レビュー対象の増加を避けられる。
   発生スプリント: Sprint7（#2）
+- **数量・カウンタ等の状態変更値を受け取るミューテーションメソッドは、既存値との加算を`Math.addExact`で
+  行いオーバーフローを例外化するのが安全側の既定パターンとして再利用できる。** cart（#4）の`addItem`修正で
+  採用。上限チェック（`newQuantity > stockQuantity`）だけでは、intのオーバーフローでラップした負の値が
+  チェックを迂回してしまう（`current + requested`が`Integer.MAX_VALUE`を超えると負に反転し、負の値は
+  常に正のstockQuantityより小さいため上限判定を素通りする）。**「非拒否（クランプのみ）」方針のメソッド
+  （merge等）では、オーバーフロー時に例外化せず上限値へ直接クランプすることで既存の非拒否ポリシーを保った
+  まま安全化できる**（`catch (ArithmeticException e) { clamped = stockQuantity; }`のように、例外を握り
+  つぶして安全な既定値にフォールバックする）。同じ数量入力を複数メソッドで扱うドメイン（今後の注文数量・
+  在庫調整等）でこの型を再利用できる。
+  発生スプリント: Sprint8（#4）
+- **構造的な整合性制約（DBのUNIQUE制約等）は、アプリケーションロジックでの個別バリデーションより
+  堅牢にバグクラス全体を排除できる。** legacyのCart（Struts1）は`itemMap`/`itemList`という2つの独立した
+  コレクションでカート内容を保持しており、削除処理の実装ミス（片方のコレクションからしか消さない）が
+  「幽霊行」バグ（ID-17）を生んでいた。afterでは単一表`t_cart_item`＋`UNIQUE(cart_id, item_id)`という
+  スキーマ制約自体で「同一アイテムの重複行」というバグクラスをそもそも作れない設計にした（アプリ側の
+  削除ロジックが将来どう変わっても、DB制約が最後の防波堤として機能する）。二重構造（map+list等）で状態を
+  保持する既存/将来のドメインを見直す際、「削除経路を正しく実装する」より「重複を構造的に作れなくする」
+  設計を優先できないか検討する価値がある。
+  発生スプリント: Sprint8（#4）
+- **匿名（未認証）でもserver-side検証を効かせたいが機微な内部値（在庫数等）は露出したくない場合、
+  「真偽値＋安定した理由コードのみ」を返す専用の判定APIを公開するパターンが有効。** cart（#4）の
+  `GET /api/items/{itemId}/orderable?quantity=N`（D1）で採用。既存の`/api/items/**`（GETスコープ
+  permitAll）にそのまま収まるため`SecurityConfig`変更ゼロで実現できた。qty非露出（ID-28）と匿名での
+  在庫上限強制（AC-neg1）という一見両立しにくい要件を、「露出するのは判定結果（orderable/reason）のみ」
+  という薄いAPI設計で両立させた。同種の「機微値に基づく判定だけを匿名にも公開したい」ケース（与信判定・
+  権限チェック等）で再利用できる考え方。
+  発生スプリント: Sprint8（#4）
 
 ### jpetstore-frontend
 - **backendのSpring Security 7 CSRF設定（非XOR `CsrfTokenRequestAttributeHandler`・consume-then-
@@ -364,6 +417,17 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   アカウント欄を右寄せに保つ）になった。**将来使う想定のCSS/コンポーネントを先行スプリントで
   「未配線のまま」用意しておく設計は、実装コストをほぼゼロで後続Storyに前借りできる。**
   発生スプリント: Sprint7（#2）
+- **本プロジェクト初のlocalStorage導入（`utils/cartStorage.ts`）で、`stores/auth.ts`が確立していた
+  「Piniaはメモリのみ・永続化しない」方針とは別に、未ログインカート専用の限定的なlocalStorage利用パターンを
+  確立した。** 要点は3つ: (1) `load/save/clear`いずれも`try/catch`で例外を握りつぶし空配列/no-opへ
+  フォールバックする（破損JSON・非配列・プライベートブラウジング等の書き込み拒否のいずれでもアプリを
+  落とさない）、(2) 保存前に配列要素の形（`{itemId: string, quantity: number}`）を型ガード関数で検証し、
+  不正な要素だけを`filter`で除外する（配列全体を捨てない）、(3) `window.addEventListener('storage', ...)`
+  で他タブでの変更を検知できるようにする（同一タブ内の変更ではブラウザ仕様上発火しないため、呼び出し側が
+  自タブの変更は自前で反映する前提）。今後localStorageを使う機能（下書き保存等）が出た場合の型として
+  再利用できる（frontend-conventionsへ即時反映。詳細は「Skills更新履歴」）。
+  発生スプリント: Sprint8（#4）→ frontend-conventionsへ即時反映（初のlocalStorage導入パターン・
+  2回ルール例外＝Sprint5 CSRF/Sprint6 MyBatisXMLマッパー等と同じ位置づけ）
 
 ### 横断（database＋backend＋frontend）
 - **区分値をm_codeに新規登録する際の3-repo横断フロー**を在庫ステータスで実地確認した:
@@ -500,9 +564,28 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   教訓のためSkillには反映せず`memory/dev/long_term.md`「繰り返し指摘されるパターン」の「横断」に記録した。
 - `#skills-changelog` へ `[DEV]` で投稿済み。
 
+### Sprint 8（#4・カート・初のwriteドメイン・3-repo cross-repo）
+
+- **`frontend-conventions`**: `## 7. jpetstore-frontend 固有の注意事項` に「localStorageを新規導入する
+  場合は『破損耐性』『タブ間同期』をセットで設計する」を追記した（初出だが「知らないと書けない参照知識・
+  実装パターン」の2回ルール例外として即時反映。Sprint5 CSRF・Sprint6 MyBatisXMLマッパー/import.meta.glob
+  と同じ位置づけ＝本プロジェクト初のlocalStorage導入という具体的な新規パターン導入時の実装指針）。
+- **`backend-conventions`へは反映しなかったもの**: sec指摘（`addItem`の数量下限バリデーション欠落・
+  SBD-2）は「同種メソッド群での検証一貫性の棚卸し漏れ」という**注意すれば防げる系**の初出（1回目）のため、
+  2回ルールに従い今回はSkillに反映せず`memory/dev/long_term.md`「繰り返し指摘されるパターン」（backend）
+  に留めた。次回同種（新しい数量/状態変更値を受け取るメソッド群で下限/上限/オーバーフロー検証が一部漏れる）
+  の発生でSkill昇格を検討する。ただし修正で採用した`Math.addExact`によるオーバーフロー安全化の実装技法
+  自体は、再利用可能な参照パターンとして`memory/dev/long_term.md`「習得したこと」（backend）に記録した
+  （チェックリストではなく設計技法の記録のため、2回ルールの対象外の扱い）。
+- 単一表+UNIQUE制約による構造的整合性強制（幽霊行=ID-17是正）・orderable EPによるqty非露出のまま匿名でも
+  在庫上限を検証するパターン（D1）・C1チャレンジ（初のwriteドメインでの土台再利用検証、conv/perf 0件・
+  sec 1件という結果分析）は、いずれも本Story固有の設計判断/プロセス上の教訓のためSkillには反映せず
+  `memory/dev/long_term.md`「習得したこと」「繰り返し指摘されるパターン」の該当セクションに記録した。
+- `#skills-changelog` へ `[DEV]` で投稿済み。
+
 ## 卒業済みルール
 
 （該当なし。棚卸し対象となるルールが直近15スプリント基準に達していない。
-  jpetstore-backendはSprint2・3・4・6・7の5スプリントのみ、jpetstore-databaseはSprint1・3・6の3スプリントのみ、
-  jpetstore-frontendはSprint5・6・7の3スプリントのみのため、いずれも対象外。Sprint4・Sprint5・Sprint6・
-  Sprint7 Retroでも棚卸しを実施したが同様の理由で卒業候補なし）
+  jpetstore-backendはSprint2・3・4・6・7・8の6スプリントのみ、jpetstore-databaseはSprint1・3・6の3スプリントのみ、
+  jpetstore-frontendはSprint5・6・7・8の4スプリントのみのため、いずれも対象外。Sprint4・Sprint5・Sprint6・
+  Sprint7・Sprint8 Retroでも棚卸しを実施したが同様の理由で卒業候補なし）

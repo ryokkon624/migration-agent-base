@@ -301,4 +301,38 @@ function resolveCatalogImage(kind: 'category' | 'product', id: string): string {
 > reconcile（統合）は、初出（1回目・Sprint6 #1）のため2回ルールに従い本Skillには未反映
 > （`memory/dev/long_term.md`「習得したこと」参照）。2回目の発生でSkill昇格を検討する。
 
+### localStorageを新規導入する場合は「破損耐性」「タブ間同期」をセットで設計する
+
+`stores/auth.ts`はトークンをhttpOnly Cookie前提とし、Piniaは非機密な識別情報のみメモリ保持する方針
+（localStorage/sessionStorageへは一切書き込まない）だが、**未ログイン中もクライアント側で状態を保持し
+たい機能**（カート等）では、この方針の対象外として限定的にlocalStorageを導入してよい。導入する際は
+以下3点をセットにする。
+
+1. **`load`/`save`/`clear`いずれも`try/catch`で例外を握りつぶし、安全なフォールバック値（空配列等）を
+   返す**。破損したJSON・想定外の型（非配列等）・書き込み不可な環境（プライベートブラウジング等）の
+   いずれでもアプリを落とさない。
+2. **保存前に配列要素の形を型ガード関数（`value is T`）で検証し、不正な要素だけを`filter`で除外する**
+   （配列全体を捨てず、壊れた要素だけを無害化する）。
+3. **`window.addEventListener('storage', ...)`で他タブでの変更を検知できるようにする**。同一タブ内の
+   変更ではブラウザ仕様上`storage`イベントは発火しないため、呼び出し側が自タブの変更は自前で状態に
+   反映する前提で設計する。
+
+```ts
+// OK: 破損耐性 + 型ガードで要素単位フィルタ
+export function loadCart(): StoredCartLine[] {
+  try {
+    const raw = window.localStorage.getItem(CART_STORAGE_KEY)
+    if (raw === null) return []
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter(isStoredCartLine)
+  } catch {
+    return []
+  }
+}
+```
+
+> **背景（Sprint 8 #4）**: フロント初のlocalStorage導入（`utils/cartStorage.ts`・未ログインカートの
+> クライアント状態保持）で採用。
+
 ---

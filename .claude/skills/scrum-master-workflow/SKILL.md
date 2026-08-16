@@ -28,6 +28,9 @@ DEV・reviewerをteammateとして起動し、SendMessageで直接メッセー�
    - Issue番号が特定できたら、各IssueのBodyを取得する（`github-issues` スキル参照）
    - 各IssueのBodyからAC・ブランチ名・コミット番号を確認する
    - **各IssueのLabelsを確認し、`bug` ラベルが付いているIssueをメモする**
+   - **【spec 委譲論点の洗い出し（Sprint5-8 で4連続定着→Sprint8 Retro で昇格）】**: 対象Issue特定の直後に、各Issueの挙動spec（`spec/behavior/*.md`）・AC・`intended-diff-ledger.md`・`architecture-conventions.md` を読み、**spec/AC/規約が「PO/仕様/実装に確定を委譲」している論点**を洗い出す。例: `architecture-conventions §3.1/§4.3` の判断委譲・永続方式（DB vs session）・マージ/衝突の意味論・区分値（m_code）・定量パラメータ（閾値/ページ件数）・UI 配置/保護境界。
+     - **既決（Refinement 済＝AC/台帳に反映）の論点と、実装レベルで未確定の論点を区別**し、後者を**計画フェーズで AskUserQuestion により先に確定**する。これで reviewer churn とスコープ手戻り（cross-repo 化の後出し等）を防ぐ。
+     - 実証: Sprint5 再水和 /me・Sprint6 m_code/採番・Sprint7 LIKE ハードニング/カテゴリフィルタ・Sprint8 カート永続方式(DB)/マージ意味論(加算+クランプ)。**もはや例外でなく標準手順**。
 
 2. スプリントゴールを策定する
 3. リスクとチャレンジ項目を明示する

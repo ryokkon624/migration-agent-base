@@ -29,6 +29,10 @@
 - **複数 Issue の cross-repo closes は各 Issue の capstone repo に分散**（Sprint 7・Sprint3-6 の「1 Issue×主repo closes」の複数Issue版）: #3（backend 主＝例外正規化がコア）→ backend PR に `closes #3`、#2（frontend 主＝検索UIが capstone）→ frontend PR に `closes #2`、各他方は `Related:`。2 repo 同名ブランチ `feature/2-catalog-search-hardening` を**同時マージ**し、Issue #2/#3 とも closed（completed）を確認。各 Issue の closes を1つの PR にだけ置けば早期クローズ問題は起きない。
 - **spec 委譲論点の SM 計画フェーズ確定が3スプリント連続で定着**（Sprint5 /me・Sprint6 m_code/N/index・Sprint7 LIKE ハードニング/カテゴリフィルタ）: spec/AC/台帳が PO・仕様に委譲した論点を SM が AskUserQuestion で先に確定→ reviewer churn ゼロ。**もはや例外でなく標準手順**（次回1件でも追加発生で scrum-master-workflow ① の「対象Issue特定」直後に「spec 委譲論点の洗い出し→計画で AskUserQuestion 確定」を組み込む昇格を判定）。PO も同傾向を質問ログで追跡中。
 
+- **tier分離が8スプリント連続で有効・初の write ドメイン（状態変更）でも通用**（Sprint 8）: 8SP・3-repo・カート（追加/更新/削除/表示＋在庫ガード＋所有者スコープ＋ログイン時マージ）でも計画=Opus で spec 委譲論点（永続方式・マージ意味論）を確定→実装=Sonnet で完走。read 主体（カタログ・検索）に続き**書き込み/状態変更ドメインでも tier 分離が効く**。C1（先例再利用）成功＝E1 土台（IDOR 対策・StockStatusCalculator・GlobalExceptionHandler・httpClient・StockBadge）を無改造再利用、**SecurityConfig 無変更**で `/api/cart/**` が認証必須＆CSRF 自動・**cartId 非受理でカートを principal から導出＝IDOR 面ゼロ**（所有者チェックより強い設計）。
+- **計画前調査でサーバーカート永続基盤の皆無を発見→3-repo 確定**（Sprint 8・Sprint6 の「DDL ありデータなし」の発展）: STATELESS/JWT ゆえ「サーバーカート」= DB テーブルが実質必須なのに `t_cart`/`t_cart_item` が皆無、と計画前 Explore で判明→2-repo でなく **3-repo（database V010 新設）** を計画時点で確定。「永続化の実体（テーブル/セッション/インメモリ）の有無」まで計画前に確認する。
+- **spec 委譲論点の SM 計画確定を scrum-master-workflow ① へ正式昇格**（Sprint 8・Sprint5-8 で4連続）: long_term「次回発生で昇格判定」到達→① Planning の「対象Issue特定」直後に「spec/AC/台帳/architecture-conventions から委譲論点を洗い出し→既決 vs 実装未確定を区別→後者を計画で AskUserQuestion 確定」を明文化（SKILL.md 反映済）。Sprint8 は永続方式(DB)・マージ意味論(加算+クランプ)を確定＝reviewer churn ゼロ。
+
 ## DEVレビュー指摘の傾向
 
 - **DBスキーマ Story**（Sprint 1）: FK 列の明示セカンダリインデックスの一貫性（m_item.supplier_id）。InnoDB は FK 索引を自動生成するため機能影響は無いが、兄弟列に明示索引がある場合は揃える。2回目の発生で rules/database.md への昇格を判定。
@@ -43,6 +47,8 @@
 
 - **2スプリント連続クリーン（Sprint6→7）＝secure-by-default 土台＋先例再利用の効果**（Sprint 7）: #3/#2 は conv/sec 指摘0・perf 軽微のみ。**catch-all 例外ハンドラの取りこぼし**（`@RestControllerAdvice` の catch-all が枠組例外＝`MethodArgumentTypeMismatchException`／`MissingServletRequestParameterException`／`NoResourceFoundException` 等を 500 に丸める）が Sprint3→7 で2回目発生→ **DEV が backend-conventions §9 に「catch-all 例外ハンドラ棚卸しチェックリスト」を昇格**（2回ルール）。**SBD-10 系 Story は「型不一致・必須param欠落・未知パス」の 4xx 正規化を起動プロンプトで先回り検証依頼**すると漏れない。perf 軽微（①存在確認クエリ=Sprint6 既存パターン②検索画面カテゴリ fetch=onMounted 1回・[L2]固定5件）は **SM verification で非ブロッキング判定→再修正ラウンドなし**（Sprint5/6 の「影響を裏取りして今対応 vs バックログ送り」の適用＝過剰対応の回避）。
 
+- **初の write ドメインで sec 1件（中）＝同種メソッド群の検証一貫性の抜け**（Sprint 8）: カートの `addItem` だけ数量**下限**（`<=0`）と int オーバーフローの検証を欠き（`updateItem`/`merge`/`checkOrderable` は下限処理済）、負数/0 が上限チェックを潜脱して永続化＝負 subtotal（SBD-2「数量は正の整数として検証」違反）。SM が実コードで CONFIRMED（偽陽性でも受容でもなく確定バグ）→修正（DTO `@Min(1)`＋サービス層 `<=0` 拒否＋`Math.addExact` オーバーフロー→400）→**delta 再レビュー（sec のみ）で解消確認**。教訓＝**新規に入力値を受理する経路が複数ある場合（add/update/merge）、検証（下限/上限/境界/オーバーフロー）の一貫性を横断チェックする**。SBD-10 系だけでなく **SBD-2 系（数量/金額の正当性）も否定AC で先回り指定**すると漏れにくい。DEV は初出（1回目・2回ルールで backend-conventions 未反映）、frontend-conventions §7 は localStorage パターンを即時反映。
+
 ## Sprint Reviewで発覚しやすいパターン
 
 - **Flyway 採番規約（versioned vs repeatable）**（Sprint 1）: 開発/テスト用シードを versioned で採番すると out-of-order 破綻の懸念。→ repeatable（`R__`）＋冪等を rules/database.md に明文化。**自動3reviewer は規約に無い観点は全員見逃す**（規約の明文化が再発防止の要）。
@@ -50,6 +56,8 @@
 - **IDE 由来の指摘の切り分け**（Sprint 2）: 依存版更新後（例 jjwt 0.11.5→0.12.6）の IDE lint（`parser() deprecated`/`verifyWith`/`subject` undefined 等）は、`./gradlew compileJava` が green なら**実装は正・IDE のクラスパス staleness**。コードを旧 API に直すとビルドが壊れる。SM が真因を verification してから DEV に回す（コード修正不要と判断できる）。IDE 設定は gitignore 済でリポジトリに影響なし。
 
 - **計画前調査で「DDL ありデータなし」を先に潰した**（Sprint 6）: シード皆無は Sprint Review まで残さず**計画前の実地調査で発見**（→ 3-repo 化して database でシード新規作成）。Sprint 2 の「テスト green＝完成の盲点」の裏返し＝**実機で動かすのに必要なデータ/設定（シード・`mybatis.mapper-locations` 等）は自動 reviewer もテストも拾わない**ため、計画前調査 or DoD の実機起動＋主要 EP 疎通で先に潰す（Sprint 6 は実機 E2E 疎通も DoD で実施しクリーン）。
+
+- **write ドメインの入力検証漏れは Sprint Review 前に自動レビュー（sec）で捕捉できた**（Sprint 8）: addItem の数量下限漏れは sec reviewer が exploit 経路付きで発見→Sprint Review に持ち込まず解消。Sprint Review 指摘は**ゼロ**（クリーン）。secure-by-default 土台＋否定AC の先回り指定＋計画フェーズの設計確定が揃うと、write ドメインでも Sprint Review 前に品質を固められる（Sprint3/6/7 のクリーンパスに続く）。
 
 ## Skills更新履歴
 
@@ -80,3 +88,7 @@
   - SM: skill ファイル変更なし（今スプリントの SM 学びは 2回ルールで long_term 止まり）。long_term のみ：tier分離7連続・Epic 完成でも通用／計画前調査の**縮小**方向（2-repo）／複数 Issue の cross-repo closes を各 capstone repo に**分散**（#3→backend・#2→frontend）／spec 委譲論点の SM 計画確定が Sprint5/6/7 で3連続定着（**次回発生で scrum-master-workflow ① へ「spec 委譲論点の洗い出し→計画で AskUserQuestion 確定」を昇格判定**）／perf 軽微の非ブロッキング判定で再修正回避。
   - DEV: `backend-conventions` §9 に2点（**catch-all 例外ハンドラ棚卸しチェックリスト**＝`@RestControllerAdvice` catch-all の枠組例外丸め込みが Sprint3→7 で2回目の2回ルール昇格／**LIKE 等 SQL サニタイズを SQL非依存の純VOに隔離**＝ID-29 `ProductSearchTerms`）。#skills-changelog 投稿済。frontend-conventions は「ヘッダ検索 form 追加で SignonView.spec の form セレクタ衝突」が初出のため未反映（long_term 止まり）。卒業候補なし（各 repo 15スプリント基準未達）。
   - PO: `spec/intended-diff-ledger.md` に **ID-29**（LIKE メタ文字 `%`/`_` のリテラル化・ESCAPE 併用・SBD-17維持・関連 #2）追記／質問傾向を long_term 反映（新規2傾向＝「検索/フィルタ系 feature の UI 配置・検索対象範囲・異常系レスポンスが未定義になりやすい」「spec が PO へ確定を委譲した論点の計画フェーズ確認」、いずれも初出＝次回再発で昇格判定）。
+- **Sprint 8**:
+  - SM: **`scrum-master-workflow` SKILL.md ① Planning に「spec 委譲論点の洗い出し」を昇格追加**（Sprint5-8 で4連続定着＝long_term「次回昇格判定」到達）。対象Issue特定直後に spec/AC/台帳/architecture-conventions から委譲論点を洗い出し、既決 vs 実装未確定を区別して後者を計画で AskUserQuestion 確定する手順を明文化。#skills-changelog 投稿済。その他 SM 学びは long_term 止まり（tier分離8連続・初 write ドメイン／計画前調査で永続基盤皆無→3-repo／sec の検証一貫性教訓／DEV の GCM push ハング→SM トークン URL push 運用）。
+  - DEV: `frontend-conventions` §7 に localStorage 初導入パターン（cartStorage: 破損フォールバック/タブ間同期/型ガード）を追記（参照知識の即時反映）。`backend-conventions` は sec 指摘（同種メソッド群の検証一貫性）が初出のため未反映（2回ルール）。long_term に Math.addExact・単一表+UNIQUE 構造的整合（ID-17 是正）・orderable qty 非露出（D1）・C1 再検証を記録。卒業候補なし（backend6/frontend4/database3 スプリント・15基準未達）。
+  - PO: 台帳 `ID-19` を「client+server 加算・在庫数クランプ」に具体化・由来更新。先回りチェックリスト2昇格（新ドメイン feature の UI 配置＋ルーティング保護境界〔Sprint7#2/Sprint8#4〕／architecture-conventions の PO 判断委譲項目〔§3.1・§4.3〕の確定値・適用可否〔Sprint6#1/Sprint8#4〕）。質問傾向 Sprint8 追記（傾向1=先行台帳エントリの後続 API 制約未参照＝初出・見送り）。
