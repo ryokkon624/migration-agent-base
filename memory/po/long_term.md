@@ -210,6 +210,22 @@ SM経由でSM/DEV確定7件（いずれもユーザー承認済み）を中継�
 
 **判定**: 傾向1は3件目の再発のため、既存チェックリスト項目の実例として引用リストに追記する（正式昇格は完了済みのため再昇格は不要）。傾向2は初出のため、次回以降の同種発生時に正式昇格を判断する。
 
+### Sprint 13（2026-08-17）— E6系（#30 Repository層全展開）計画フェーズより
+
+DEVからSprint13計画フェーズでユーザーに直接確認した設計論点3件（Q1 Order集約 vs orchestrationの線引き・Q2 read/write Repository命名統一・Q3 InventoryRepositoryのパッケージ配置）をSM経由で中継され、3件を質問ログに記録した（3件ともバックログ修正候補）。#30は#29で確立したテンプレをCatalog/Account/Orderへ横展開するStory。
+
+- Q1: backend-conventions §9「書き込み側は集約リポジトリにする」をOrderにも適用し、rich な Order 集約を新設するか、#8の並行オーケストレーション（原子引当・item_id固定順・all-or-nothing・監査）をApplicationに残すかの確認。Issue #30の方針欄「Order は #29 の集約パターンに準拠する」はrich集約化を示唆するように読めたが、実際は案A（rich集約は作らずorchestrationを残す）で確定した。
+- Q2: read/write Repositoryの命名を分けるか（DEV推奨のread=`...Query`／write=`...Repository`分離）の確認。統一`...Repository`命名採用（ユーザーオーバーライド）。
+- Q3: `InventoryRepository`のパッケージ配置の確認。新規`domain/inventory`（`domain/cart`と並行構造）で確定。
+
+**傾向1（既存チェックリスト項目「architecture-conventionsのPO判断委譲パターン」の3件目の再発）**: Q1は、Sprint6 #1（§3.1）・Sprint8 #4（§4.3）に続き、backend-conventions §9という一般規則がOrder固有の既存複雑オーケストレーション（#8）への適用深度までは規定しておらず、PO判断が必要になった事例。既存チェックリスト項目に該当するため新規昇格は不要（引用リストへ追記）。
+
+**傾向2（既存チェックリスト項目「先例規約未定義」の4件目・5件目の再発）**: Q2・Q3は、Sprint5 #24（i18nライブラリ/キー構造）・Sprint6 #1（ページ採番）・Sprint12 #29（集約の型戦略・save粒度）に続き、後続Story群が踏襲する先例規約（Repository命名・パッケージ構造）の確定値がAC/方針欄に書き切れていなかった事例。Q2はIssue #30自身が方針欄で「Repository / Query インターフェイス」と書き分けを示唆する表現を使っていたにもかかわらず確定値が未記載だった点が特徴的。既存チェックリスト項目に該当するため新規昇格は不要（引用リストへ追記）。
+
+**付記（傾向としては非昇格）**: Q2はDEV推奨（read=Query/write=Repository分離）をユーザーが統一Repository命名にオーバーライドした事例。Sprint5 #24・Sprint6 #1でも同様のユーザーオーバーライドが発生しているが、DEVの技術提案の当否自体はAC先回り明記になじまない実装時判断の性質が強いため、「オーバーライド」自体は独立の傾向として追跡しない（命名規約という結果面は傾向2に計上済み）。
+
+**判定**: 傾向1・傾向2はいずれも既存チェックリスト項目の再発のため新規昇格は不要。引用リストへ〔Sprint13 #30〕を追記する。
+
 ## バックログ起票時の先回りチェックリスト
 
 **土台Story（DB移行・backend/frontend土台・認可/認証基盤など、新規リポジトリ・新規レイヤー・新規ドメイン横断機構に着手するStory）を起票・詳細化する際は、以下をAC/備考に先回り明記できないか確認する**（Sprint1 #22・Sprint2 #23の計11件中9件がAC/備考の先回り明記で防止できたと判定され、2Sprint連続発生のため正式昇格。Sprint4 #21で「E6基盤系」に限らず認可/認証土台Storyにも適用範囲を拡張）：
@@ -225,9 +241,9 @@ SM経由でSM/DEV確定7件（いずれもユーザー承認済み）を中継�
 - [ ] セキュリティ対策（secure-by-default機構）の新規追加要否を判断する前に、既存実装で要件を満たしている可能性を確認し、「既存機構Xで達成済み・新規実装不要」または「新規実装が必要な理由」をAC/備考に明記する〔Sprint4 #20（SBD-9）・#21（AC2）〕
 - [ ] Vue3 SPA化に伴うfeature/security Storyでフロント側に波及する要素（画面文言・プリフィル値・遷移UX等）がある場合は、対象内/対象外を明示し、対象外なら持ち越し先Issue番号をAC/備考に明記する〔Sprint3 #18・Sprint4 #20〕
 - [ ] AC等に定量パラメータ（閾値・回数・期間・上限など）が定性的表現のみで書かれていないか。既存踏襲値がある場合は先回り明記し、新規UX値で具体値を決め切れない場合も「計画フェーズで確定が必要」である旨と決定候補を備考に明記する〔Sprint4 #20（レート制限閾値）・Sprint6 #1（残少バッジ閾値N）〕
-- [ ] 初のドメイン機能/土台Storyが、後続Story群が再利用する先例規約（採番方式・命名規則・DTO形・横断ライブラリの技術選定等）を確立する場合、その規約の確定値をAC/備考に先回り明記できないか確認する。Issueの論点として存在は認識されていても、具体的な確定値が書かれていなければ計画フェーズで確認が発生しうる〔Sprint5 #24（i18nライブラリ/キー構造）・Sprint6 #1（ページ採番）・Sprint12 #29（集約の型戦略・save粒度）〕
+- [ ] 初のドメイン機能/土台Storyが、後続Story群が再利用する先例規約（採番方式・命名規則・DTO形・横断ライブラリの技術選定等）を確立する場合、その規約の確定値をAC/備考に先回り明記できないか確認する。Issueの論点として存在は認識されていても、具体的な確定値が書かれていなければ計画フェーズで確認が発生しうる〔Sprint5 #24（i18nライブラリ/キー構造）・Sprint6 #1（ページ採番）・Sprint12 #29（集約の型戦略・save粒度）・Sprint13 #30（Repository命名統一・Inventoryパッケージ配置）〕
 - [ ] 新ドメインfeature Story（検索/フィルタ系に限らず、カート・チェックアウト等の状態変更を伴うfeatureを含む）の画面は、UI配置・ルーティング保護境界（`meta.requiresAuth`の要否・未ログイン利用可否）に加え、前提状態が満たされない場合の異常系UI遷移（例：空カートで注文フォームへ進入した際の誘導先・エラー表示）までAC/備考に先回り明記できないか確認する〔Sprint7 #2（UI配置・検索対象範囲・異常系レスポンス）／Sprint8 #4（カート画面のルート保護境界）／Sprint10 #7（空カート誘導UX）〕
-- [ ] architecture-conventionsが一般規約を示しつつ個別確定をPO判断に委ねている項目（例: §3.1区分値のm_code採用、§4.3更新系エンティティのversion列）に該当するStoryを起票/Refinementする際は、その規約の確定値・適用可否をAC/備考に先回り明記できないか確認する〔Sprint6 #1（§3.1）／Sprint8 #4（§4.3）〕
+- [ ] architecture-conventionsが一般規約を示しつつ個別確定をPO判断に委ねている項目（例: §3.1区分値のm_code採用、§4.3更新系エンティティのversion列）に該当するStoryを起票/Refinementする際は、その規約の確定値・適用可否をAC/備考に先回り明記できないか確認する〔Sprint6 #1（§3.1）／Sprint8 #4（§4.3）／Sprint13 #30（§9・Order集約深度）〕
 - [ ] 機能Story（土台Story限定ではない）のACが未着手の上流Feature/Epicのデータ・APIに依存する場合（例：他ドメインからのプリフィル・参照系データ取得）、必要な取得手段（cross-repoでのAPI新設要否を含む）をAC/備考に先回り明記できないか確認する〔Sprint5 #24（認証状態再水和・`GET /api/auth/me`新設）／Sprint10 #7（配送先プリフィル・`GET /api/account/me`新設）〕
 - [ ] 異常系/否定AC（在庫不足・不正入力・競合等による失敗）を含むStoryは、対応するHTTPステータスコードを既存の先例パターン（例：楽観ロック競合=409、不正入力=400）に揃えるか新規定義するかをAC/備考に先回り明記できないか確認する〔Sprint9 #6（非数値quantity→400ハンドラ）／Sprint11 #8（在庫競合・空カート→409）〕
 - [ ] Storyの起票/Refinement時に、対象ドメイン・データに関連する`spec/intended-diff-ledger.md`の既存エントリを確認し、新機能の設計・データ項目がその制約範囲内か（新規実装が必要か、既存決定で充足済みか）をAC/備考に先回り明記できないか確認する〔Sprint8 #4（D1・ID-28がAC-neg1に及ぼす制約）／Sprint11 #8（ID-8/ID-21で支払・email・phone扱いが充足済みと確認）〕
@@ -288,3 +304,6 @@ SM経由でSM/DEV確定7件（いずれもユーザー承認済み）を中継�
 - 2026-08-17（Sprint12計画フェーズ、運用ルール）: 今後の新規StoryはRepository経由で実装し、新規driftの発生を止める。#30は既存分のretrofitに純化する。E4（#13〜17）Refinement時に各Issueへこの方針を反映する。
 - 2026-08-17（Sprint12計画フェーズ、#29・D1）: Cart集約の型戦略は単一`Cart`/`CartItem`型のrich化を採用。`stockQuantity`はprivate内部保持・外向きは射影アクセサのみ公開してID-28（qty非露出）を型で強制する。書込集約と読取read-modelを物理分離する完全CQRS（案B）は型/Converter二重化でYAGNIと判断し不採用。
 - 2026-08-17（Sprint12計画フェーズ、#29・D2）: `CartRepository`の書込メソッド面は、細粒度`upsertItem`/`removeItem`をドメイン語彙メソッドとして残す方針を採用（1ユースケース=1行書込・余分な書込ゼロ）。集約全体差分の`save(Cart)`一本化は不採用。
+- 2026-08-17（Sprint13計画フェーズ、#30・Q1）: Order集約はrichな集約を新設せず、#8のorchestration（原子引当・item_id固定順・all-or-nothing・監査）をOrderApplicationServiceに残す方針（案A）を採用。過剰抽象（YAGNI）回避。
+- 2026-08-17（Sprint13計画フェーズ、#30・Q2）: read/write Repositoryの命名は統一`...Repository`を採用（DEV推奨のread=`...Query`／write=`...Repository`分離をユーザーがオーバーライド）。`CatalogRepository`/`AccountRepository`等、read/write問わず`...Repository`。意味論（CQRS射影）は不変。
+- 2026-08-17（Sprint13計画フェーズ、#30・Q3）: `InventoryRepository`は新規`domain/inventory`パッケージ（`domain/cart`と並行構造）に配置する方針で確定。

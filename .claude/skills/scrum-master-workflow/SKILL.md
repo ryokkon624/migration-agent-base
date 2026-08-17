@@ -559,6 +559,19 @@ Sprint Review ファイルをブラウザで開いて動作確認をお願いし
 
 11. **`memory/sm/short_term.md` をリセット**（「Sprint XX 完了。次スプリント開始時にリセット済み」）
 
+12. **【毎スプリント標準手順】`migration-agent-base`（本リポジトリ）のスプリント成果物をコミット & PR & マージする**（2026-08-17 ユーザー決定で標準化。**Retro 完了後**＝DEV/PO/SM の memory 更新・リセット・Skills 更新まで済んでから実施する）：
+   - **対象**＝今スプリントで生じた agent-base の変更全部: `backlog/sprint_XX/`（`sprint_backlog.md`・`implementation-notes.md`・`review-#N.html` 等）／`memory/{sm,dev,po}/{short_term,long_term}.md`／更新した `.claude/skills`・`rules`・`agents` 等。`git status --short` で漏れなく拾う。
+   - **`rules/git.md` に従い main 直 push は禁止**。ブランチを切って PR→マージ。ブランチ名は `docs/sprint-XX-<短い説明>`、コミットは `docs: Sprint XX 完了(...) (ryokkon624/jpetstore-manage#N)`（docs プレフィックス）。コミットメッセージ末尾に Co-Authored-By トレーラを付ける（ハーネス規約）。
+   - **リポジトリは `ryokkon624/migration-agent-base`**（Issue ホストの `jpetstore-manage` とは**別 repo**）。PR body は該当 Issue を **`Related: ryokkon624/jpetstore-manage#N`** に留める（`closes` にしない＝Issue は既に各プロダクト repo の PR マージでクローズ済みのため、二重クローズ・早期クローズを避ける）。
+   - **手順**（cwd=agent-base ルート `C:\work\java-migration\migration-agent-base`）:
+     1. `git checkout -b docs/sprint-XX-xxx` → `git add -A`
+     2. メッセージファイル（heredoc）で `git commit -F <file>`（日本語安全化）
+     3. トークン URL 埋め込みで push（認証プロンプト回避）: `git push "https://x-access-token:${GITHUB_PERSONAL_ACCESS_TOKEN}@github.com/ryokkon624/migration-agent-base.git" docs/sprint-XX-xxx`
+     4. PR body を Write で JSON 化 → `curl -s -X POST ... "https://api.github.com/repos/ryokkon624/migration-agent-base/pulls" --data-binary "@<json>"`（`html_url`/`number` を取得）
+     5. マージ: commit_title/message を JSON 化 → `curl -s -X PUT ".../pulls/[PR番号]/merge" --data-binary "@<json>"`
+     6. `git checkout main && git pull` で local main を同期（次スプリントが stale main で始まらないように）
+   - **既存の agent-base PR が同一スプリントで既にある稀なケース以外は新規 PR**（通常は毎スプリント新規ブランチ・新規 PR）。
+
 ---
 
 ## チャレンジの判断基準

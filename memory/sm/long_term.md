@@ -41,6 +41,8 @@
 
 - **tier分離12連続で有効・初のリファクタ Story／初の集約導入でも通用**（Sprint 12）: #29（Cart を Repository 層導入＋集約化・refactor・SP5・backend 単一 repo）でも計画=Opus／実装=Sonnet で手戻りゼロ完走。**「振る舞いを変えない構造リファクタ」でも tier 分離が効く**（feature/security/write/並行制御に続く新種）。**spec 委譲論点の確定タイミングの新パターン**＝設計方針が memory（`repository-layer-refactor-plan`）で既にユーザー合意済みの場合、SM 計画前の先出し AskUserQuestion は投げず（再確認は冗長・DEV 分析前で時期尚早）、DEV 計画報告後に D1（型戦略＝#30 テンプレ）/D2（save 粒度）を AskUserQuestion 確定（Sprint11 型2段階の後段主体・初出）。**reviewer の false negative（見落とし）も SM 独立 verification で拾う**＝3観点 reviewer 全員「perf 指摘なし」だったが、SM がコア7ファイル精読で perf 純増（カート書込ごとに `findByUserId` 二重呼び＝+2クエリ・冒頭の全カートロード未使用）を独立発見→ユーザー承認で是正（baseline クエリ数へ）→delta 3観点再レビュー全員クリア。既存「SM が verification してから DEV に回す」（reviewer 指摘の真偽判定）の発展＝**reviewer が見逃した非機能差分も SM が呼び出し側フロー単位で拾う**（初出・次回再発で昇格判定）。
 
+- **tier分離13連続・初の複数 bounded context 横断（読取 CQRS 射影×書込集約 混在）でも通用**（Sprint 13）: #30（Repository 層を Catalog/Account/Order へ展開・refactor・SP8）でも計画=Opus／実装=Sonnet で手戻りゼロ完走・3観点＋SM verification 全クリーン。**計画前 Explore で3 context の drift・複雑度（Account 小＜Catalog 中＜Order 大）を把握→スコープ判断（一括 vs 子 Issue 分割）を AskUserQuestion でユーザー確定**（一括を選択）。**実装順を読取先行（Account→Catalog）→ Order にしてレビュー分散〔一括ゆえの R2〕を緩和**＝reviewer に context 別に整理して渡し観点集中。**#29 テンプレを無改造で横展開**（record→class+reconstruct／CQRS 射影 record 返し／Repository モック合成のクエリ数証明 UT）＝先例再利用（Sprint7 型）の Repository 版・C2 実効性検証成功。**teammate 成果物の stale read**（Sprint11「反映遅延の行き違い」の変種）＝read で成果物を検証する際、直近編集とのラグを考慮（今回 DEV の命名修正済みを stale 版で見て是正依頼→実害なし・初出）。
+
 ## DEVレビュー指摘の傾向
 
 - **DBスキーマ Story**（Sprint 1）: FK 列の明示セカンダリインデックスの一貫性（m_item.supplier_id）。InnoDB は FK 索引を自動生成するため機能影響は無いが、兄弟列に明示索引がある場合は揃える。2回目の発生で rules/database.md への昇格を判定。
@@ -65,6 +67,8 @@
 
 - **refactor Story は3観点初回クリアでも SM verification が perf 純増を拾える**（Sprint 12）: #29 は conv/sec 初回クリア・perf も reviewer は「指摘なし」だったが、SM 精読で書込4操作の `findByUserId` 二重呼び（+2クエリ/操作・冒頭 items 未使用・`ensureCart` 二重）を発見→是正（`ensureCart(userId):Long`＋`findByCartId(cartId):Cart` へ分離し baseline へ）。**reviewer の「クエリ数=従来同等」判定は `findByUserId` を単体で見て『書込ごとに2回呼ばれる』呼び出し側の文脈を見落とした**（reviewer は個別メソッドの健全性は見るが、呼び出し側フローの重複呼びまでは追い切れないことがある）。教訓＝**リファクタ Story では「新規に持ち込んだ非機能差分（クエリ数・余分書込）」を SM が呼び出し側フロー単位で verification する**。DEV は Spock 罠（given 裸stub vs then 引数一致で then 優先）を Sprint11 に続き2回目発生で `backend-conventions §9` へ昇格。
 
+- **refactor 3観点＋SM verification が全クリーン＝教訓の横展開が効いた**（Sprint 13）: #30 は conv/sec/perf 指摘0・SM 精読も0件。**#29 で SM が発見した perf 純増（識別子解決と最終応答を同一 `findByUserId` で済ませる二重呼び）が Order（同型の Repository 新規導入）で再発しなかった**＝DEV が Sprint12 教訓（`ensureCart`/`findByCartId` 使い分け）を自発適用。**教訓を long_term/§9 に記録すると、次の同型 Story で reviewer 段階どころか実装段階で回避される**ことを実証（Sprint12 は SM が拾ったが Sprint13 は DEV が事前回避）。Spock 罠は3回目発生も §9 昇格済ルールで即解消＝**2回ルール昇格の効果が実証された初のケース**。DEV は §9 に「書込集約の適用範囲（rich 集約 vs 薄い書込 record＋orchestration 残置＝Cart 型/Order 型の判断軸）」を追記（#29 テンプレの機械的全適用を戒める・PO の「Issue 本文が rich 集約と読めた」指摘を先回り）。
+
 ## Sprint Reviewで発覚しやすいパターン
 
 - **Flyway 採番規約（versioned vs repeatable）**（Sprint 1）: 開発/テスト用シードを versioned で採番すると out-of-order 破綻の懸念。→ repeatable（`R__`）＋冪等を rules/database.md に明文化。**自動3reviewer は規約に無い観点は全員見逃す**（規約の明文化が再発防止の要）。
@@ -82,6 +86,8 @@
 - **Sprint Review クリーン（指摘ゼロ）継続・初の書込系トランザクション×並行制御でも**（Sprint 11・Sprint3/6/7/8/9/10 に続く）: #8 は Sprint Review 指摘ゼロ。**並行安全（AC-neg2 二重発注で売り越さない）を Testcontainers 実DBで先取り実証**＝Sprint Review に「同時発注で売り越す」等の並行バグを持ち込まなかった。Sprint8「write ドメインの入力検証漏れを sec で捕捉」の発展＝**write/並行ドメインは Sprint Review 前に実DB並行テスト（ExecutorService+CountDownLatch）で品質を固める**。計画前調査で database ノータッチ（全既達）を確定していたため実機ギャップも出ず。
 
 - **refactor Story は挙動不変ゆえ Sprint Review 指摘ゼロ・非機能差分は SM verification で事前に潰す**（Sprint 12・Sprint3/6/7/8/9/10/11 のクリーンパスに続く7回目）: #29 は Sprint Review 指摘ゼロ（内部リファクタで UI 変化なし・「問題ありません」）。ただし **perf 純増（`findByUserId` 二重呼び）のような「reviewer も UT も green だが SM 精読で見つかる非機能差分」は Sprint Review 前に SM verification で発見・是正**（Sprint2「テスト green＝完成の盲点」の SM 精読版＝reviewer/テストが拾わない非機能劣化を SM が呼び出し側フローで拾う）。
+
+- **refactor は挙動不変ゆえ Sprint Review 指摘ゼロ・SM verification 段階でも問題ゼロ**（Sprint 13・Sprint3/6/7/8/9/10/11/12 に続く8回目）: #30 は Sprint Review 指摘ゼロ（内部リファクタ・「OK」）。#8 並行保証（`OrderConcurrencyIntegrationSpec`）を退行ガードにグリーン維持。**Sprint12 の perf 教訓を DEV が自発適用したため、今回は SM verification 段階でも非機能差分ゼロ**（Sprint12 は SM が拾ったが、教訓の横展開で Sprint13 は実装段階で回避）＝「テスト green の盲点」の非機能面が**教訓蓄積で自然に閉じていく**好例。
 
 ## Skills更新履歴
 
@@ -132,3 +138,7 @@
   - SM: **skill ファイル変更なし**（Sprint3/7/9/11 と同型・今スプリントの SM 学びは全て 2回ルールで long_term 止まり）。long_term のみ：tier分離12連続・初のリファクタ Story／集約導入でも通用／spec 委譲論点の確定タイミング新パターン（memory 合意済なら SM 計画前先出しを投げず DEV 報告後確定）／**reviewer の false negative（perf 純増の見落とし）を SM 独立 verification で発見→是正**（初出・次回再発で「reviewer 全クリアでも SM が呼び出し側フロー単位で非機能 verification する」の昇格判定）。#skills-changelog は SM 変更なしのため投稿なし。
   - DEV: `backend-conventions §9` に2点（**Spock の `then:` インタラクションは `given:` の裸stubより優先**＝Sprint11 初出→Sprint12 で2回目の2回ルール昇格／**#29 PoC で確立した実装パターン**＝record→class+`reconstruct()`／`Cart.identity` 軽量ハンドル／Repository モック合成による DB 非依存クエリ数証明 UT の3点を #30 先例テンプレとして即時反映）。#skills-changelog 投稿済。卒業候補なし（backend 10スプリント・15基準未達）。
   - PO: 質問傾向 Sprint12 追記（傾向1=D1/D2＝既昇格「先例規約未定義」チェックリストの3件目〔引用追記のみ・再昇格せず〕／傾向2=リファクタ/是正 Story 起票時の実コード未裏取りでスコープずれ〔#30 Order漏れ・Auth誤含め〕＝初出・次回昇格判定）。意思決定ログ7件追記。台帳追記なし（#28〜30/D1/D2 は API・レスポンス不変の内部リファクタと判定）。
+- **Sprint 13**:
+  - SM: **`scrum-master-workflow` ⑧ Retrospective に step 12「agent-base 成果物のコミット&PR&マージ（毎スプリント標準）」を追記**（2026-08-17 ユーザー指示で標準化＝従来の都度口頭指示を恒久ルール化。2回ルールでなくユーザー直接指示のため即時反映）。#skills-changelog 投稿済。その他 SM 学びは long_term 止まり（tier分離13連続・複数 context 横断・スコープ判断のユーザー確定・#29 テンプレ無改造横展開・stale read 行き違い）。
+  - DEV: `backend-conventions §9` に「書込集約の適用範囲（rich 集約 vs 薄い書込 record＋orchestration 残置・Cart 型/Order 型の判断軸）」を追記（#29 テンプレの機械的全適用を戒める・PO の「Issue 本文が rich 集約と読めた」指摘を先回り）。Spock 罠3回目は §9 昇格済で追加変更なし（棚卸し＝2回ルール昇格の効果実証）。#skills-changelog 投稿済。卒業候補なし。
+  - PO: 質問傾向 Sprint13 追記（Q1=「PO 判断委譲パターン」3件目／Q2・Q3=「先例規約未定義」4/5件目・いずれも引用追記のみ再昇格なし）。意思決定ログ3件。台帳追記なし（#30 は内部リファクタ）。

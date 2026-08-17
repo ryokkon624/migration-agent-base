@@ -718,3 +718,28 @@ def "ensureCartはcartIdを返す"() {
 > **背景（Sprint12 #29）**: SMが3reviewer全員クリア後にコア精読で発見したperf差分（書込4操作の
 > `findByUserId`二重呼び・+2クエリ/操作）の是正で確立。詳細な設計判断は`memory/dev/long_term.md`
 > 「習得したこと」（jpetstore-backend）参照。
+
+### 書込集約の適用範囲（rich集約 vs 薄い書込record＋orchestration残置・#30で確定）
+
+上記1（record→class＋reconstruct）は**すべての書込系Repositoryに機械的に適用するパターンではない**。適用可否は
+「集約の不変条件がどれだけ濃いか」で判断する。
+
+- **rich集約（record→class＋reconstruct、上記1）が適するケース**: `Cart`/`CartItem`のように、在庫上限・
+  オーバーフロー検出・mergeクランプ等の**item単位の不変条件**がドメインモデル自身のメソッドで表現できる場合。
+- **薄い書込record＋orchestration残置が適するケース**: `Order`のように、並行制御（`@Transactional`の
+  all-or-nothing・item_id昇順固定順ループ・ガード付きアトミック減算・`REQUIRES_NEW`失敗監査）が
+  **persistence/txの関心**であり、item単位の不変条件が薄い場合。この場合はrich集約（private ctor＋
+  `reconstruct()`＋不変条件メソッド）を作らず、`NewOrder`/`OrderLine`のような最小の書込み用record（VO）のみを
+  新設し、オーケストレーション（トランザクション境界・固定順ループ・`AffectedRows.requireUpdated`の呼び出し・
+  監査記録）はApplication Serviceに残す。Repositoryは単文アトミック委譲＋Entity構築＋WHOカラム解決に純化する。
+
+過剰にrich集約化すると、tx/並行制御の関心事がドメインモデルのメソッドに漏れ出し、`@Transactional`境界や
+固定順ループの意味がドメイン層とApplication層に分散してしまう（YAGNI違反）。新規に書込系Repositoryを設計する
+際は、まず対象集約の不変条件がitem単位でどれだけ濃いか（Cart型）か、tx/並行制御がどれだけ支配的か（Order型）
+かを見極めてから、上記1を適用するかどうかを判断すること。
+
+> **背景（Sprint13 #30・O1）**: `OrderApplicationService`のRepository化で、当初は#29と同じrich集約化を
+> 踏襲する想定だったが、DEVが計画フェーズで「#8の並行制御はpersistence/txの関心でありCartのようなitem単位の
+> 不変条件が薄い」と分析し、ユーザー承認のうえ薄い書込record＋orchestration残置（案A）を採用した。POから
+> 「Issue本文の『#29集約パターンに準拠』という文言がrich集約と読めた」との指摘があり、本節でこの判断軸を
+> 明文化した。詳細は`memory/dev/long_term.md`「習得したこと」（jpetstore-backend）参照。
