@@ -25,6 +25,7 @@ Presentation層  →  Application層  →  Domain層
 - Controller は Application Service を呼び出す。Repository を直接呼ばない
 - Request/Response DTO は Controller 層に閉じる。Application Service には渡さない
 - Entity（MyBatis Generator生成）は Infrastructure 層に閉じる。上位層へ出さない
+- Application Service は **Domain 層の Repository インターフェイス**を注入して永続化にアクセスする。MyBatis の Mapper（`*Mapper` / `*CustomMapper`）・Entity（`*Entity` / `*CustomEntity`）を Application 層へ注入・import しない。Repository 実装は Infrastructure 層に置き、Mapper 呼び出しと Entity→Domain 変換（§2）をそこに閉じる（依存性逆転＝上図：Infrastructure が Domain のインターフェイスを実装する）
 - `com.hwhub.backend.domain.enums` 配下の自動生成Enumは編集禁止
 
 ### オブジェクト種別と層ごとの依存ルール
@@ -36,6 +37,7 @@ Presentation層  →  Application層  →  Domain層
 | Domain         | Model                       |      ○       |      ○      |   ○    |       ○        | 業務的な単位・業務処理あり                                 |
 | Domain         | 参照系Model                 |      ○       |      ○      |   ○    |       ○        | record で実装                                              |
 | Domain         | 検索条件VO                  |      ○       |      ○      |   ○    |       ○        | record で実装（MyBatis mapper のパラメータとして対応済み） |
+| Domain         | Repository interface        |      ×       |      ○      |   ○    |       ○        | 実装はInfrastructure層（DIで注入）。永続化アクセスの唯一の入口 |
 | Infrastructure | generated entity            |      ×       |      ×      |   ×    |       ○        | MBG生成・テーブルと1対1                                    |
 | Infrastructure | custom entity               |      ×       |      ×      |   ×    |       ○        | JOINの結果を受け取るための手書きEntity                     |
 
@@ -43,6 +45,7 @@ Presentation層  →  Application層  →  Domain層
 
 - `generated entity` / `custom entity` は Infrastructure 層に閉じる。Service / Controller には絶対に出さない
 - Presentation 層の DTO は Controller 内で完結させ、Service には渡さない
+- Application Service は Repository インターフェイス（Domain層）経由でのみ永続化にアクセスする。`*Mapper` / `*CustomMapper` や `*Entity` / `*CustomEntity` を Application 層へ注入・import しない（jpetstore の現状ドリフトと目標形は §9「Application Service は Repository 経由」を参照）
 
 ---
 
@@ -50,6 +53,7 @@ Presentation層  →  Application層  →  Domain層
 
 - Domainクラスのコンストラクタは `private` とし、再構築には `reconstruct()` ファクトリメソッドを使用する
 - Infrastructure層からDomainに変換する際は、手書きの `XxxConverter` を作成し `toModel` メソッド内で `reconstruct()` を呼ぶ
+- `XxxConverter` は **Repository の実装クラス（Infrastructure層）から呼び出す**。これにより Application 層は Entity を一切見ず Domain モデルのみを受け取る（§1・§9）。参照系Model（record）は `reconstruct()` を必須とせず直接生成してよいが、Entity→record 変換自体も Repository 実装内に閉じる
 - Enumは `m_code` テーブルから生成する（自動生成ファイルは編集禁止）
 
 ```java
@@ -591,6 +595,37 @@ try {
 > **背景（Sprint 11 #8）**: 注文確定の在庫不足・空カート失敗時にも監査記録を残す要件（SM決定：成功/失敗の
 > 両方を記録）で、`AuditLogRecorder#recordStateChangeIndependently`として新設した。本プロジェクト初の
 > `REQUIRES_NEW`利用。
+
+### Application Service は Repository 経由で永続化にアクセスする（MyBatis Mapper を直接注入しない）
+
+§1 / §2 のとおり、Application Service は **Domain 層の Repository インターフェイス**を注入し、MyBatis の
+`*CustomMapper` や `*CustomEntity`（Infrastructure層）を Application 層へ import・注入してはならない。
+jpetstore-backend は Story 単位で Sprint を進める過程で Service が `CatalogCustomMapper` /
+`CartCustomMapper` を直接注入し `*CustomEntity` を Application 層で扱う実装に**ドリフトしている**
+（§1「Entity は Infrastructure 層に閉じる」違反）。HwHub 由来の §1/§2（依存性逆転・Repository 経由）が
+jpetstore で未追認のまま Mapper-first に流れたもの。以下の目標形へ是正する（convention-reviewer は
+Application 層に `infrastructure.mybatis.*` への依存が残っていないかを確認する）。
+
+- **インターフェイスは Domain 層、実装は Infrastructure 層**に置く（依存性逆転）。
+  - 例（Cart）: `domain.cart.CartRepository`（interface・ドメイン語彙 `findByUserId` / `save`）／
+    実装 `infrastructure.mybatis.cart.MyBatisCartRepository`（`CartCustomMapper` と `XxxConverter` を保持し、
+    戻り値は Domain モデルのみ。`*CustomEntity` を Application 層へ出さない）
+- **書き込み側は集約リポジトリ**にする。在庫上限・加算オーバーフロー（`Math.addExact`）・merge クランプ等の
+  不変条件は Service ではなく `Cart` / `CartItem` ドメインモデルのメソッドに置く（現状の anemic domain ＋
+  トランザクションスクリプトからの脱却）。在庫qty（`stockQuantity`）は不変条件の強制に必要なため集約内では
+  保持してよいが、Application / Presentation の外向き表現では落とす（在庫数非露出＝ID-28。業務不変条件は
+  ドメイン、露出制御は presentation の責務）。
+- **読み取り側（カタログ一覧・検索・詳細）は CQRS 射影**として扱う。Domain 層に query インターフェイスは
+  置くが、返すのは read-model の record（`Product` / `ItemSummary` / `Page<T>`）のままでよく、集約の
+  `reconstruct()` 再構築を強制しない（過剰抽象を避ける）。Entity→record 変換は Repository 実装内で行う。
+- 動機の優先順位: 「MySQL→別DB / ファイルへ差し替え可能に」は弱い（YAGNI）。実利益は ①層純化で在庫qty
+  非露出を型で強制 ②Repository インターフェイスのモックで Service を DB 非依存の Spock UT ③N+1（§4a）・
+  IDOR（§5）・`OwnershipAuthorizationService`（§9）等が前提とする永続化アクセスの単一チョークポイント。
+
+> **背景（2026-08-17 ユーザー合意 / #29 #30）**: HwHub 時代からの DDDライク3層設計者（ユーザー）と、
+> Application Service の Mapper 直呼びドリフトを確認して是正方針を確定。まず本規約を明文化（本エントリ・
+> §1/§2 追記）、次に Cart を参照実装として Repository ＋集約化を PoC（#29）、その後 Catalog/Account/Auth へ
+> 展開（#30）。実装は各 Story で対応するため、本追記時点ではコードは未変更。
 
 > Swagger UIのpermitAll・`server.error.*`→`spring.web.error.*`・依存更新後のIDE lint staleness・
 > CSRFトークンのconsume-then-regenerate挙動・セキュリティ上意味のある日時比較はDB側`NOW(6)`で
