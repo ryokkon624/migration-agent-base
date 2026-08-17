@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint 15 Review — #12 支払をプレースホルダ化し実カード情報を保持しない</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #f8f7f5; }
+
+  .page { max-width: 860px; margin: 0 auto; padding: 48px 24px; }
+
+  /* Header */
+  .sprint-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin-bottom: 8px; }
+  h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px; }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+  .badge-sprint { background: #e8f0fe; color: #1a56db; }
+  .badge-issue { background: #f0fdf4; color: #166534; }
+  .badge-feature { background: #ecfdf5; color: #047857; }
+  .badge-repo { background: #fff7ed; color: #c2410c; }
+
+  /* Sections */
+  section { margin-bottom: 40px; }
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #888; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e5e5e5; }
+
+  /* Problem box */
+  .problem-box { background: #fff8f0; border-left: 3px solid #f59e0b; border-radius: 0 8px 8px 0; padding: 16px 20px; margin-bottom: 16px; }
+  .problem-box .label { font-size: 11px; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .problem-box p { color: #451a03; font-size: 13px; }
+
+  /* Architecture change */
+  .arch-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: center; margin-bottom: 8px; }
+  .arch-box { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; }
+  .arch-box .arch-title { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .arch-box.before { border-color: #fca5a5; }
+  .arch-box.after { border-color: #86efac; }
+  .arch-arrow { font-size: 20px; color: #888; text-align: center; }
+  .flow-item { font-size: 12px; color: #374151; padding: 3px 0; display: flex; align-items: flex-start; gap: 6px; }
+  .flow-item .dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .dot-red { background: #ef4444; }
+  .dot-green { background: #22c55e; }
+
+  /* AC cards */
+  .ac-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+  .ac-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid #f0f0f0; }
+  .ac-check { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .ac-check.done { background: #dcfce7; color: #166534; }
+  .ac-num { font-size: 11px; font-weight: 700; color: #888; }
+  .ac-text { font-size: 13px; font-weight: 600; color: #1a1a1a; flex: 1; }
+  .ac-body { padding: 16px 18px; }
+  .ac-body p { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+
+  /* File change */
+  .file-change { margin-bottom: 16px; }
+  .file-name { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; background: #f3f4f6; color: #374151; padding: 5px 10px; border-radius: 4px 4px 0 0; border: 1px solid #e5e5e5; border-bottom: none; display: flex; justify-content: space-between; }
+  .diff-stat { color: #888; }
+  .code-block { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.7; background: #1e1e2e; color: #cdd6f4; padding: 14px 16px; border-radius: 0 0 6px 6px; overflow-x: auto; }
+  .code-line { display: flex; }
+  .line-num { color: #45475a; min-width: 28px; user-select: none; }
+  .line-add { background: rgba(166, 227, 161, 0.12); color: #a6e3a1; }
+  .line-del { background: rgba(243, 139, 168, 0.12); color: #f38ba8; }
+  .line-ctx { color: #cdd6f4; }
+  .line-prefix { min-width: 14px; }
+
+  /* Annotation */
+  .annotation { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-size: 12px; color: #78350f; display: flex; gap: 8px; }
+  .annotation-icon { font-size: 14px; flex-shrink: 0; }
+
+  /* Verify section */
+  .verify-list { list-style: none; }
+  .verify-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; }
+  .verify-item:last-child { border-bottom: none; }
+  .verify-num { width: 22px; height: 22px; background: #e8f0fe; color: #1a56db; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .verify-content { flex: 1; }
+  .verify-content strong { font-size: 13px; color: #1a1a1a; display: block; margin-bottom: 3px; }
+  .verify-content span { font-size: 12px; color: #6b7280; }
+
+  /* Scope table */
+  .scope-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .scope-table th { text-align: left; padding: 8px 12px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .scope-table td { padding: 10px 12px; border: 1px solid #e5e5e5; color: #374151; vertical-align: top; }
+  .scope-table tr:hover td { background: #f9fafb; }
+  .tag-changed { font-size: 11px; font-weight: 600; background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 3px; }
+  .tag-unchanged { font-size: 11px; font-weight: 600; background: #f3f4f6; color: #6b7280; padding: 2px 6px; border-radius: 3px; }
+
+  /* Mock placeholder preview */
+  .placeholder-mock { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px 18px; margin-top: 8px; }
+  .placeholder-mock .mock-title { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .placeholder-mock .mock-text { font-size: 13px; color: #6b7280; padding: 10px 12px; background: #f9fafb; border-radius: 6px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="sprint-label">Sprint 15 Review</div>
+  <h1>#12 — 支払をプレースホルダ化し<br>実カード情報を保持しない</h1>
+  <div class="meta">
+    <span class="badge badge-sprint">Sprint 15</span>
+    <span class="badge badge-issue">#12</span>
+    <span class="badge badge-feature">feature / E3</span>
+    <span class="badge badge-repo">frontend + backend</span>
+  </div>
+
+  <!-- Problem -->
+  <section>
+    <h2>なぜこの改修が必要だったか</h2>
+    <div class="problem-box">
+      <div class="label">問題</div>
+      <p>チェックアウト確認画面の支払欄には既にカード入力欄が無く、プレースホルダ文言のみが表示されていた（#7/#8で既達）。しかし文言は <code>"Payment details will be added in a future update."</code>（将来的にカード機能を追加する予定であるかのような表現）のままで、意図差分台帳 <strong>ID-8</strong> が定める「実カード情報を意図的に扱わない」という方針が文言から読み取れなかった。また backend/frontend ともに「カード関連の項目が一切存在しない」ことを固定する自動テストが無く、将来の変更でカード項目が紛れ込んでも検知できない状態だった。</p>
+    </div>
+    <div class="arch-grid">
+      <div class="arch-box before">
+        <div class="arch-title">改修前</div>
+        <div class="flow-item"><span class="dot dot-red"></span>frontend: 「将来追加予定」の文言</div>
+        <div class="flow-item"><span class="dot dot-red"></span>backend: カード項目非存在の回帰テスト無し</div>
+        <div class="flow-item"><span class="dot dot-red"></span>frontend: プレースホルダ/入力欄非存在を<br>固定するテスト無し</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-box after">
+        <div class="arch-title">改修後</div>
+        <div class="flow-item"><span class="dot dot-green"></span>frontend: 「収集/保持しない」ことを明示</div>
+        <div class="flow-item"><span class="dot dot-green"></span>backend: card系フィールド注入無視の<br>回帰テストを追加</div>
+        <div class="flow-item"><span class="dot dot-green"></span>frontend: 新文言描画+input非存在を<br>回帰テストで固定</div>
+      </div>
+    </div>
+    <div class="placeholder-mock">
+      <div class="mock-title">支払欄プレースホルダ文言（変更後）</div>
+      <div class="mock-text">This demo does not collect or store card details.</div>
+    </div>
+  </section>
+
+  <!-- AC breakdown -->
+  <section>
+    <h2>AC別 実装内容</h2>
+
+    <!-- AC1 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC1</div>
+        <div class="ac-text">カード列・入力欄・必須バリデーションをDTO/API/DBから除外。支払は明示的プレースホルダ表示</div>
+      </div>
+      <div class="ac-body">
+        <p>カード入力欄・DTO/API/DBのカード項目はいずれも元々存在しない（#7/#8/#22で既達）。今回はプレースホルダ文言を ID-8 の意図に合わせて確定し、frontend側の回帰テストで固定した。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/i18n/locales/en.ts（frontend）</span>
+            <span class="diff-stat">+2 / -2</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">168</span><span class="line-prefix"> </span><span>      paymentTitle: 'Payment',</span></div>
+            <div class="code-line line-del"><span class="line-num">169</span><span class="line-prefix">-</span><span>      // AC3: カード入力欄は置かず明示プレースホルダのみ表示する(F3.6承認済)。</span></div>
+            <div class="code-line line-del"><span class="line-num">170</span><span class="line-prefix">-</span><span>      paymentPlaceholder: 'Payment details will be added in a future update.',</span></div>
+            <div class="code-line line-add"><span class="line-num">169</span><span class="line-prefix">+</span><span>      // #12 AC3(ID-8): カード入力欄は置かず、実カード情報を「扱わない」ことを明示するプレースホルダのみ表示する。</span></div>
+            <div class="code-line line-add"><span class="line-num">170</span><span class="line-prefix">+</span><span>      paymentPlaceholder: 'This demo does not collect or store card details.',</span></div>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/components/checkout/__tests__/CheckoutConfirmStep.spec.ts（frontend・新規）</span>
+            <span class="diff-stat">+49 / -0</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">36</span><span class="line-prefix">+</span><span>it('#12 AC3(ID-8): 支払プレースホルダに「収集/保持しない」ことを明示する新文言を描画する', async () => {</span></div>
+            <div class="code-line line-add"><span class="line-num">37</span><span class="line-prefix">+</span><span>  const wrapper = await mountCheckoutConfirmStep()</span></div>
+            <div class="code-line line-add"><span class="line-num">38</span><span class="line-prefix">+</span><span>  expect(wrapper.text()).toContain('This demo does not collect or store card details.')</span></div>
+            <div class="code-line line-add"><span class="line-num">39</span><span class="line-prefix">+</span><span>})</span></div>
+            <div class="code-line line-add"><span class="line-num">41</span><span class="line-prefix">+</span><span>it('#12 AC1: 支払セクションにカード入力欄(&lt;input&gt;)を一切持たない(...)', async () => {</span></div>
+            <div class="code-line line-add"><span class="line-num">42</span><span class="line-prefix">+</span><span>  const wrapper = await mountCheckoutConfirmStep()</span></div>
+            <div class="code-line line-add"><span class="line-num">43</span><span class="line-prefix">+</span><span>  const paymentSection = wrapper</span></div>
+            <div class="code-line line-add"><span class="line-num">44</span><span class="line-prefix">+</span><span>    .get('.checkout-confirm-step__payment-placeholder')</span></div>
+            <div class="code-line line-add"><span class="line-num">45</span><span class="line-prefix">+</span><span>    .element.closest('section')</span></div>
+            <div class="code-line line-add"><span class="line-num">46</span><span class="line-prefix">+</span><span>  expect(paymentSection).not.toBeNull()</span></div>
+            <div class="code-line line-add"><span class="line-num">47</span><span class="line-prefix">+</span><span>  expect(paymentSection?.querySelectorAll('input').length).toBe(0)</span></div>
+            <div class="code-line line-add"><span class="line-num">48</span><span class="line-prefix">+</span><span>})</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>支払セクション（プレースホルダ段落の祖先<code>&lt;section&gt;</code>）に限定して<code>&lt;input&gt;</code>が0件であることをassertする。既存の<code>HomeView.spec.ts</code>のマウントパターン（pinia/i18n/memory router）を踏襲した。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC2 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC2</div>
+        <div class="ac-text">実カード番号を保存しない（as-isのダミー既定値のハードコードも持たない）</div>
+      </div>
+      <div class="ac-body">
+        <p>DBのカード列は #22 で既に非保持（<code>V00_000_005</code>「カード関連列は持たない」明記）。backend DTO/entity/mapper/serviceのいずれにもカード項目は元々存在しない。本Storyでの変更は無く、下記AC-neg1の回帰テストで裏取りした。</p>
+      </div>
+    </div>
+
+    <!-- AC-neg1 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC-neg1</div>
+        <div class="ac-text">DB/APIのどこにもカード番号・有効期限・種別の列/項目が存在しない</div>
+      </div>
+      <div class="ac-body">
+        <p><code>OrderControllerSpec</code>（backend）に、余分な <code>creditCard</code>/<code>cardNumber</code>/<code>cardType</code>/<code>expiryDate</code> 等のJSONフィールドを注文確定APIへ送っても正常に処理され（201）、応答JSONにカード関連キーが一切含まれないことを検証する回帰テストを追加した。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/test/groovy/.../presentation/rest/OrderControllerSpec.groovy（backend）</span>
+            <span class="diff-stat">+30 / -0</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">299</span><span class="line-prefix">+</span><span>def "#12 AC1/AC2/AC-neg1(ID-8): creditCard/cardNumber/expiryDate等を注入しても無視され201になり、</span></div>
+            <div class="code-line line-add"><span class="line-num"> </span><span class="line-prefix"> </span><span>    レスポンスにcard関連キーは一切含まれない"() {</span></div>
+            <div class="code-line line-add"><span class="line-num">304</span><span class="line-prefix">+</span><span>    mockMvc.perform(post("/api/orders").with(csrf()).cookie(accessTokenCookie)</span></div>
+            <div class="code-line line-add"><span class="line-num">306</span><span class="line-prefix">+</span><span>            .content(placeOrderBody('"creditCard":"4111...","cardNumber":"4111...",</span></div>
+            <div class="code-line line-add"><span class="line-num"> </span><span class="line-prefix"> </span><span>                "cardType":"VISA","expiryDate":"12/2030"')))</span></div>
+            <div class="code-line line-add"><span class="line-num">307</span><span class="line-prefix">+</span><span>            .andExpect(status().isCreated())</span></div>
+            <div class="code-line line-add"><span class="line-num">312</span><span class="line-prefix">+</span><span>def "#12 AC-neg1(ID-8): 注文確定レスポンスJSONにcard/creditCard関連フィールドは存在しない"() {</span></div>
+            <div class="code-line line-add"><span class="line-num">324</span><span class="line-prefix">+</span><span>    def body = result.response.contentAsString.toLowerCase()</span></div>
+            <div class="code-line line-add"><span class="line-num">325</span><span class="line-prefix">+</span><span>    !body.contains("card")</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>Jackson3の未知プロパティ無視既定＋DTOにcard項目自体が無い構造の組み合わせで、余分なJSONが自動的に無視されることを実際のend-to-end応答で裏取りした。既存の<code>totalPrice</code>/<code>username</code>注入無視テストと同じ<code>placeOrderBody(extraJson)</code>ヘルパーパターンを踏襲。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Implementation notes -->
+  <section>
+    <h2>実装メモ（仕様外の判断・変更・妥協点）</h2>
+    <div class="ac-body" style="background:white;border:1px solid #e5e5e5;border-radius:10px;padding:16px 18px;">
+      <p><strong>孤立カード型残骸（backend <code>domain/enums/CardType.java</code>・frontend <code>constants/code.constants.ts</code> の <code>CARD_TYPE</code> 等）は撤去せず両repoとも温存に確定した</strong>（計画時点の初期方針=撤去から、実装時の精読を経て温存へ改定）。</p>
+      <ul style="margin: 8px 0 0 18px; font-size: 13px; color: #4b5563;">
+        <li style="margin-bottom:6px;">backend: <code>CardType.java</code> は <code>EnumGenerator</code> が <code>m_code</code> の <code>code_type=0002</code> から自動生成する生成物。手で削除しても <code>./gradlew generateEnums</code> の次回実行で再生成され、削除が非永続かつ「生成物を手編集した」という誤解を招く。</li>
+        <li style="margin-bottom:6px;">frontend: <code>code.constants.ts</code> の <code>CARD_TYPE</code> 等も同様に <code>jpetstore-database</code> の <code>MultiEnumGenerator</code> が m_code 0002 から生成する生成物。<code>src/constants/README.md</code> が「手編集しない・再生成で上書きされる」旨を明記しており、生成物とバイト一致することも確認済み。</li>
+        <li>結果、<strong>両repoともカード型の実削除はゼロ</strong>。カード情報は実際には一切保持/処理しないため（DTO/API/DBにカード列・項目は無い）、残存する型/定数は単なる区分マスタの生成物であり実害は無い。</li>
+      </ul>
+      <p style="margin-top:10px;"><strong>スコープ外にしたもの</strong>: 独立したpayment画面/ステップは新設しない（確認ステップ内のプレースホルダで充足）。EnumGenerator/MultiEnumGenerator側の変更（0002除外ロジック等）も新機構の追加のため行っていない。database（m_code）は完全ノータッチ。</p>
+    </div>
+  </section>
+
+  <!-- Verify -->
+  <section>
+    <h2>動作確認ポイント（ユーザー確認用）</h2>
+    <ul class="verify-list">
+      <li class="verify-item">
+        <div class="verify-num">1</div>
+        <div class="verify-content">
+          <strong>チェックアウトの確認画面（住所入力の次のステップ）で、支払欄に新しい文言が表示されること</strong>
+          <span>「This demo does not collect or store card details.」という文言が確認画面のPaymentセクションに表示されているか</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">2</div>
+        <div class="verify-content">
+          <strong>支払欄にクレジットカード番号等を入力する欄が一切無いこと</strong>
+          <span>カード番号・有効期限・セキュリティコード等の入力フォームが存在しないことを目視確認</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">3</div>
+        <div class="verify-content">
+          <strong>（開発者向け）余分なカード情報をAPIに直接送りつけても、注文自体は正常に成立すること</strong>
+          <span>API直叩きでcreditCard等のフィールドを送っても201が返り、レスポンスにカード情報が含まれないことを確認済み（自動テスト化）</span>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- Scope -->
+  <section>
+    <h2>改修スコープ確認</h2>
+    <table class="scope-table">
+      <tr>
+        <th>ファイル</th>
+        <th>変更</th>
+        <th>内容</th>
+      </tr>
+      <tr>
+        <td><code>en.ts</code>（frontend）</td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td><code>paymentPlaceholder</code>文言を「扱わない」明示表現へ変更</td>
+      </tr>
+      <tr>
+        <td><code>CheckoutConfirmStep.spec.ts</code>（frontend・新規）</td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>新文言描画・カード入力欄非存在の回帰テストを追加</td>
+      </tr>
+      <tr>
+        <td><code>CheckoutConfirmStep.vue</code>（frontend）</td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td>UI自体は#7/#8で既に確認ステップ内プレースホルダ表示のまま</td>
+      </tr>
+      <tr>
+        <td><code>OrderControllerSpec.groovy</code>（backend）</td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>card系フィールド注入無視・応答非露出の回帰テストを2件追加</td>
+      </tr>
+      <tr>
+        <td><code>OrderController.java</code>・DTO群（backend）</td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td>元々カード項目を持たない構造のまま</td>
+      </tr>
+      <tr>
+        <td><code>domain/enums/CardType.java</code>（backend）</td>
+        <td><span class="tag-unchanged">変更なし（温存）</span></td>
+        <td>m_code 0002由来のcodegen生成物のため撤去せず（実装メモ参照）</td>
+      </tr>
+      <tr>
+        <td><code>constants/code.constants.ts</code>のCARD_TYPE等（frontend）</td>
+        <td><span class="tag-unchanged">変更なし（温存）</span></td>
+        <td>同上、MultiEnumGenerator生成物のため撤去せず</td>
+      </tr>
+      <tr>
+        <td>database（m_code 0002等）</td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td>完全ノータッチ（cross-repo 2-repoを維持）</td>
+      </tr>
+    </table>
+  </section>
+
+</div>
+</body>
+</html>

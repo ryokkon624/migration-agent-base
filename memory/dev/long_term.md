@@ -19,7 +19,8 @@ performanceのみ非ブロッキング1件で再修正不要、Sprint9は3観点
 （read-only住所API・既達custom mapper/entityパターンの再利用）も3観点とも指摘0件でクリーン、Sprint13
 （#30・Repository層をCatalog/Account/Orderへ全展開）も3観点とも指摘0件かつSMコア精読でも指摘0件でクリーン、
 Sprint14（#9/#10・注文履歴一覧/詳細。`OwnershipAuthorizationService`の初の実ドメイン適用）も3観点とも
-指摘0件でクリーン）。
+指摘0件でクリーン、Sprint15（#11/#12/#28。既達Story群のハードニング＝回帰テスト＋明文化＋カートマージ
+N+1バッチ化retrofit）も3観点とも指摘0件かつSM独立verificationでも指摘0件でクリーン＝tier分離15連続）。
 以下の発見はいずれもDEV自身がTDD・実機検証中に見つけたもので初出＝1回目のため、2回ルールに従い本セクション
 ではなく「習得したこと」「技術的なハマりポイント」に記録する。ただし一部は参照知識/実装パターンとして
 初出からSkillへ即時反映した（詳細は「Skills更新履歴」）。
@@ -204,6 +205,17 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   伴う書込みドメインという最も難度の高いクラスでも計画フェーズでのAskUserQuestion確定（在庫不足時の
   ステータス・監査粒度・完了画面スコープ）が実装フェーズでの手戻りを事前に防いだ。
   発生スプリント: Sprint11（#8）
+- **[DEV自己発見・reviewer指摘ではない] 撤去/リファクタ対象のコードが「孤立している＝未参照に見える」だけで
+  実削除すると、それがcodegen（コード生成）の生成物だった場合、削除が非永続（次回生成タスク実行で復活）かつ
+  「生成物を手編集した」という規約違反になりうる。** #12（支払プレースホルダ化）で、backlog計画時点では
+  backend `domain/enums/CardType.java`・frontend `constants/code.constants.ts`の`CARD_TYPE`等を「孤立enum/定数の
+  撤去」としてACに含めていたが、DEVが撤去前にコードベースを確認したところ、両者ともそれぞれ`EnumGenerator`
+  （backend）・`MultiEnumGenerator`（frontend）が`m_code`の`code_type=0002`から自動生成する生成物であること
+  （frontend側は`constants/README.md`の「手編集禁止・再生成で上書き」宣言＋`jpetstore-database/build/generated/
+  frontend/code.constants.ts`とのバイト一致で確認）が判明し、撤去方針を「両repoとも温存」へ計画修正した。
+  **撤去/削除系のACに着手する際は、対象が本当に手書きコードか、それとも生成タスク（`generateEnums`等）の
+  生成物かを、README・生成元コマンド・生成物ディレクトリとの比較で撤去前に必ず確認する**必要がある。
+  発生スプリント: Sprint15（#12、backend/frontend両repoで同時発生。初出のため2回ルールに従い本セクション止まり）
 
 ## 技術的なハマりポイント
 
@@ -651,6 +663,29 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   `t_order_line ⋈ m_item ⋈ m_product`の2段JOINで、Sprint6時点で「#2/#9が再利用する先例」と明記していた
   設計が3スプリント越しで実際に機能した（Sprint7の#2に続く2例目の再利用実証）。
   発生スプリント: Sprint14（#9/#10）
+- **型自体が撤去/非依存のフレームワーク機能（Spring 6+で撤去済みのremoting系エクスポータ等）の構造的不在は、
+  `Class.forName(fqcn)`→`ClassNotFoundException`のclasspath不在UTで固定する技法を確立した。** Springコンテキスト
+  へのBean不在assertは型参照自体ができないため使えない場面（型がそもそもクラスパスに存在しない）での代替技法。
+  Sprint4のSBD-9（オープンリダイレクトsink不在の回帰固定）と同じ「不在の実証」哲学を、「削除対象コードが元々
+  存在しない既達判定Story」に適用する具体的な実装パターンとして`backend-conventions`§9へ即時反映した（詳細は
+  「Skills更新履歴」）。
+  発生スプリント: Sprint15（#11、`RemotingSurfaceAbsenceSpec`。初出だが参照知識のため2回ルール対象外で即時反映）
+- **refactorの「挙動不変」ACは、バックログが仮定するデータ構造をそのまま信じず、実装着手前に実コードで裏取り
+  する習慣が手戻りを防いだ。加えて、逐次処理をバッチ化する際の挙動パリティは、対象の集約関数が単調
+  （monotonic）であることを示せれば数学的に証明できる。** #28（カートマージN+1バッチ化）で、バックログは
+  「localStorageはitemIdキーのmap（dedup済み）」と仮定していたが、DEVが計画フェーズで実コード
+  （`utils/cartStorage.ts`/`stores/cart.ts`）を読み直し、実体は`StoredCartLine[]`**配列**でdedupはcartストアの
+  書込ロジック（find→更新 or push）が担保し、`loadCart()`自体はdedupしないことを発見した（バックログ前提の
+  誤りを実装前に訂正）。この訂正を踏まえ、`CartApplicationService#merge`を「①quantity≤0をfail-fastで検証
+  →②clientLinesをitemId単位でcoalesce（`Math.addExact`＋オーバーフロー時`Integer.MAX_VALUE`飽和）→③findStocks
+  1回のバッチ取得→④ループ適用」へ再設計した。**coalesce-then-clampが逐次accumulate-then-clampと厳密パリティを
+  持つ数学的根拠**: 在庫クランプは`min(合算値, 在庫数)`という単調非減少関数のため、一度クランプが発動すると
+  以降どれだけ加算しても結果は在庫数に張り付き、クランプ未発動なら単純合計が一致する（オーバーフロー分岐も
+  同様に収束することを個別ケース分析で確認）。この「単調関数でクランプする処理は、逐次適用でも一括適用でも
+  結果が変わらない」という一般原則は、今後同種のN+1解消retrofit（ループ内の逐次クランプ処理を1回のバッチ処理へ
+  まとめる場面全般）で再利用できる証明の型として記録する。
+  発生スプリント: Sprint15（#28。初出のため2回ルールに従い本セクション止まり。coalesce技法自体は
+  `CartApplicationService.merge`のJavadocにも根拠を明記済み）
 
 ### jpetstore-frontend
 - **backendのSpring Security 7 CSRF設定（非XOR `CsrfTokenRequestAttributeHandler`・consume-then-
@@ -1031,11 +1066,30 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   「習得したこと」（jpetstore-backend・横断）に記録した。
 - `#skills-changelog` へ `[DEV]` で投稿済み。
 
+### Sprint 15（#11/#12/#28・既達Story群のハードニング＋カートマージN+1バッチ化retrofit）
+
+- **`backend-conventions`**: `## 9. jpetstore-backend 固有の注意事項`の「書込集約の適用範囲」直後に「型自体が
+  撤去/非依存のフレームワーク機能の構造的不在は、Bean不在ではなくクラス不在（`Class.forName`）で回帰テスト
+  固定する」を新設した。**初出だが「知らないと書けない参照知識・実装パターン」の2回ルール例外として即時反映**:
+  再発防止のためのチェックリスト項目ではなく、Spring 6+でremoting系エクスポータの型自体が撤去済みという
+  前提知識が無いと書けない具体的なテスト技法（`RemotingSurfaceAbsenceSpec`）のため。あわせて、露出面をREST
+  限定に明文化する`package-info.java`の置き場所（ADR不採用・パッケージJavadocコメント方式）も記載した。
+- **`backend-conventions`へは反映しなかったもの**: 以下2件はいずれも「初出（1回目）」のため、2回ルールに
+  従い今回はSkillに反映せず`memory/dev/long_term.md`に留めた:
+  - 撤去対象コードがcodegen（`EnumGenerator`/`MultiEnumGenerator`）の生成物かどうかを撤去前に確認する
+    習慣（#12） → 「繰り返し指摘されるパターン」（横断）に記録。
+  - refactorの挙動不変ACでバックログ仮定のデータ構造を実コードで裏取りし、coalesce＋クランプ単調性で
+    厳密パリティを数学的に証明する技法（#28） → 「習得したこと」（jpetstore-backend）に記録。
+- 3reviewer・SM独立verificationとも指摘0件（tier分離15連続クリーン）は、チェックリスト項目ではなくプロセス上
+  の教訓のためSkillには反映せず`memory/dev/long_term.md`「繰り返し指摘されるパターン」（jpetstore-backend冒頭）
+  に記録した。
+- `#skills-changelog` へ `[DEV]` で投稿済み。
+
 ## 卒業済みルール
 
 （該当なし。棚卸し対象となるルールが直近15スプリント基準に達していない。
-  jpetstore-backendはSprint2・3・4・6・7・8・9・10・11・12・13・14の12スプリントのみ、jpetstore-databaseは
-  Sprint1・3・6・14の4スプリントのみ、jpetstore-frontendはSprint5・6・7・8・10・11・14の7スプリントのみの
-  ため、いずれも対象外。§9昇格済みの最古ルール（catch-all例外横取り・Sprint7昇格）でも昇格から7スプリント
-  （Sprint8〜14）しか経過しておらず15スプリントに満たない。Sprint4〜Sprint13 Retroに続きSprint14 Retroでも
+  jpetstore-backendはSprint2・3・4・6・7・8・9・10・11・12・13・14・15の13スプリントのみ、jpetstore-databaseは
+  Sprint1・3・6・14の4スプリントのみ、jpetstore-frontendはSprint5・6・7・8・10・11・14・15の8スプリントのみの
+  ため、いずれも対象外。§9昇格済みの最古ルール（catch-all例外横取り・Sprint7昇格）でも昇格から8スプリント
+  （Sprint8〜15）しか経過しておらず15スプリントに満たない。Sprint4〜Sprint14 Retroに続きSprint15 Retroでも
   棚卸しを実施したが同様の理由で卒業候補なし）
