@@ -14,6 +14,14 @@ description: JPetStore Migration スクラムチームのScrum Masterとして�
 **Agent Teamsではチームリードとして機能する。**
 DEV・reviewerをteammateとして起動し、SendMessageで直接メッセージをやりとりする。
 
+> ⚠️ **teammate の完了は「idle 通知」で判断しない（Sprint 11/13/16 で3回発生し昇格）。**
+> `idle_notification`（`idleReason: available`）はシステムの待機通知であって完了報告ではない。teammate の完了は
+> **(a) teammate 本人の明示的な SendMessage 報告**＋**(b) 成果物の直接確認**（memory ファイルの Read・
+> Discord スレッドの読取・branch/commit の確認）の**両方**で判断する。**成果物が未反映のまま次段
+> （Sonnet 再起動・reviewer 起動・PR 作成 等）へ進まない**。未反映なら nudge して反映を待つ（teammate の書込みと
+> こちらの read の間にはラグがあり得る＝Sprint11「反映遅延」/Sprint13「stale read」）。verify してから進めば
+> stale 状態で誤って前進するのを防げる（実績: Sprint16 で idle 後に memory/スレッド未反映→verify→nudge→反映確認後に前進・二重投稿ゼロ）。
+
 ---
 
 ## スクラムイベントの進行責任

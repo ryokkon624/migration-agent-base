@@ -1,8 +1,14 @@
 # PO 短期記憶（今スプリント）
 
-## Sprint 15 Retro（2026-08-17）で棚卸し済み
+## Sprint 16 Retro（2026-08-18）で棚卸し済み
 
-Sprint 14 Retro以降の文脈（Sprint15計画フェーズでのDEV→ユーザー確認5件：#11 remoting/WS getOrder廃止の成果物定義・#12 支払プレースホルダ文言/孤立カード型撤去範囲/CardType.java削除永続性・#28 カートマージバッチ化の重複itemId挙動）はSprint 15 Retroで棚卸し済み。要点は `memory/po/long_term.md`（質問傾向へSprint15セクション追記・チェックリストへ1件新規昇格〔Sprint12傾向2「リファクタ/是正Story起票時のスコープが実コード未裏取りでずれる」を、Sprint15 #12（CardType.javaのcodegen生成物由来未確認）・#28（localStorageのデータ構造前提の誤り）の2件の再発を受け、対象を「スコープ」から「前提（データ構造・削除対象の生成物由来等）」まで含む形に拡張して正式昇格〕・既存チェックリスト項目「secure-by-default機構の既存充足確認」へ引用追記1件〔Sprint15 #11・4件目の再発〕・意思決定ログ6件追記）に反映済み。`spec/intended-diff-ledger.md`のID-8記述も強化済み（支払プレースホルダ文言が「扱わない/保持しない」旨を明示する点・孤立型残骸の撤去範囲を追記。Sprint11 RetroのID-22強化と同型の運用）。
+Sprint 15 Retro以降の文脈（Sprint16計画フェーズでのDEV→ユーザー確認9件〔E1〜E9〕・SM先回り確定3件、計12件の中継）はSprint 16 Retroで棚卸し済み。要点は `memory/po/long_term.md`（質問傾向へSprint16セクション追記・意思決定ログ追記）に反映済み。team-lead依頼の3件も本Retroで判定・実施済み：
+
+- **E1（登録レート制限のDB-backed化）のfirmup**: `spec/architecture-conventions.md` にD7（secure-by-default系カウンタの永続化＝DB-backed）を新設してfirmup済み（Sprint14「DB索引ハイジーン」節と同型の対応。PO内チェックリストへの昇格ではなくspec直接firmup）。
+- **メール検証プレースホルダ（#13 Q1）の別バックログ化**: 重複確認（`mcp__github__list_issues` state:open）のうえ新規Issue **#32**「[E4] 登録時のメールアドレス所有権を検証する（メール確認リンク）」をReady=NotReady（deferred）で起票済み。
+- **intended-diff-ledgerへの反映**: ID-11（認証堅牢化）を拡張し登録試行の列挙対策（`t_register_attempt`）を関連Story#13として追加。メール検証プレースホルダ自体はlegacyも元々持たない機能で実装差分が生じていないため新規ID起票は見送り（#32着手時に再判定）。
+
+なお#13・#14は本Retro実施中に完了・クローズ済みを確認（`state_reason: completed`）。#13〜#14のAC/備考へSprint16確定事項を反映する旨の従来TODOはissue closeにより消化済み（今後のRefinement対象外）とみなし、以下の未解決リストから除外した。
 
 ### 未解決の判断事項
 
@@ -21,19 +27,21 @@ Sprint 14 Retro以降の文脈（Sprint15計画フェーズでのDEV→ユーザ
 - #11のAC/備考へ、Sprint15計画フェーズで確定した成果物定義（remoting面の構造的な既達＝回帰テスト＋明文化で固定）を反映するかは次回Refinementでユーザーに確認のうえ判断する。
 - #12のAC/備考へ、Sprint15計画フェーズで確定した3点（支払プレースホルダ文言を「扱わない」明示に変更／孤立カード型enum・定数のみ撤去しDB m_code 0002は温存／backend `CardType.java`はcodegen生成物のため削除しない旨の注記）を反映するかは次回Refinementでユーザーに確認のうえ判断する。
 - #28のAC/備考へ、Sprint15計画フェーズで確定したバッチ化の重複itemId挙動保持方針（coalesceで挙動不変を厳守）と、バックログ前提記述の訂正（localStorageは配列であり itemIdキーmapではない）を反映するかは次回Refinementでユーザーに確認のうえ判断する。
+- #32（メール検証・本Retro新規起票）は現状NotReady（deferred）。実SMTP基盤・検証トークン表の着手判断が出た時点でReady昇格の要否を判断する。
 
 ### 次回PO稼働時のTODO
 
-- 残りの Ready昇格＋SP付与: #13〜#17（E4）＋#26（E6依存版currency）。#27（refactor・SP1・Draft）はスプリント差し込み時にReady昇格。**#13〜17（E4）Refinement 時は「新規 Story は Repository 経由で実装」の運用ルール（2026-08-17決定）を各 Issue の AC/備考に反映すること。**
+- 残りの Ready昇格＋SP付与: #15〜#17（E4・入力検証/CSRF/PW再認証）＋#26（E6依存版currency）。#27（refactor・SP1・Draft）はスプリント差し込み時にReady昇格。**#15〜17（E4）Refinement 時は「新規 Story は Repository 経由で実装」の運用ルール（2026-08-17決定）を各 Issue の AC/備考に反映すること。**
 - E3継続（#9/#10 注文照会・履歴）が次スプリント候補。#29/#30でRepository層全展開が完了したため、**#9/#10 Refinement時も「新規StoryはRepository経由で実装」の運用ルール（2026-08-17決定）をAC/備考に反映すること。**
 - #30のRefinement時、#29計画フェーズで確定した先例規約2点（集約の型戦略＝単一rich型・`stockQuantity`はprivate内部保持＋外向きは射影アクセサのみ公開／Repository書込メソッド粒度＝細粒度`upsertItem`/`removeItem`をドメイン語彙メソッドで残す）をAC/備考に反映できないか確認する。
 - 確認メール（#8備考）の将来Feature化（Issue起票 or ドロップ）の判断。
 - #23のAC/備考へ、Sprint2質問ログで判明した5観点（スコープ境界・実証手段・監査ログ範囲・秘密管理・他repo連携）を反映（着手可否含め次回Refinementで判断）。
-- 振る舞いを変える新判断が出たら都度 `spec/intended-diff-ledger.md` への追記要否を判定する（Sprint6はID-28、Sprint7はID-29、Sprint8はID-19具体化、Sprint10はID-30を追記済み・Sprint9は追記なし〔SBD-2/17は既存維持項目のため台帳対象外と判定〕・Sprint11はID-22の説明強化のみ追記〔新規差分IDの追加なし〕・Sprint12は台帳追記なし〔#28〜30/D1/D2はいずれもAPI仕様・レスポンス形状に影響しない内部実装リファクタと判定〕・Sprint13は台帳追記なし〔#30はQ1〜Q3含めAPI仕様・レスポンス形状不変の内部リファクタと判定〕・Sprint14は追記なし・Sprint15はID-8の説明強化のみ追記〔新規差分IDの追加なし。#28は挙動不変のためAC上も台帳対象外と判定〕）。
-- architecture-conventionsのPO判断委譲パターン（§3.1区分値のm_code採用・§4.3更新系エンティティのversion列・§9集約深度）は3セクションで再発しチェックリストへ正式昇格済み（Sprint8 Retro。Sprint13 #30・§9で3件目の実例追加）。architecture-conventions文書自体の一般原則firmup（個別確認を減らす明文化）要否は、さらなる再発またはユーザーとの次回接点で判断する。
+- 振る舞いを変える新判断が出たら都度 `spec/intended-diff-ledger.md` への追記要否を判定する（Sprint6はID-28、Sprint7はID-29、Sprint8はID-19具体化、Sprint10はID-30を追記済み・Sprint9は追記なし〔SBD-2/17は既存維持項目のため台帳対象外と判定〕・Sprint11はID-22の説明強化のみ追記〔新規差分IDの追加なし〕・Sprint12は台帳追記なし〔#28〜30/D1/D2はいずれもAPI仕様・レスポンス形状に影響しない内部実装リファクタと判定〕・Sprint13は台帳追記なし〔#30はQ1〜Q3含めAPI仕様・レスポンス形状不変の内部リファクタと判定〕・Sprint14は追記なし・Sprint15はID-8の説明強化のみ追記〔新規差分IDの追加なし。#28は挙動不変のためAC上も台帳対象外と判定〕・Sprint16はID-11の拡張のみ追記〔新規差分IDの追加なし。メール検証プレースホルダは実装差分が生じていないため台帳対象外と判定・別Issue #32へ分離〕）。
+- architecture-conventionsのPO判断委譲パターン（§3.1区分値のm_code採用・§4.3更新系エンティティのversion列・§9集約深度・§4.2 account/profileのversion単一/二重トークン）は4セクションで再発しチェックリストへ正式昇格済み（Sprint8 Retro。Sprint13 #30・§9で3件目、Sprint16 #14・§4.2で4件目の実例追加）。architecture-conventions文書自体の一般原則firmup（個別確認を減らす明文化）要否は、さらなる再発またはユーザーとの次回接点で判断する。
 - Sprint7傾向3（specがPOへ確定を委譲した論点の計画フェーズ確認）は初出のため、次回以降の同種発生時に正式昇格を判断する。
 - Sprint11傾向2（監査ログACの成功/失敗粒度未定義）は初出のため、次回以降の同種Story（監査ログを扱うStory）で再発した場合、正式昇格を判断する。
 - Sprint15傾向3（intended-diff-ledgerとの整合確認対象をUI表示文言のニュアンスへ拡張できないか）は初出のため、次回以降の同種発生時（既存ledger決定とUI表示文言のニュアンスの不整合）に正式昇格を判断する。
+- Sprint16傾向5（DTO optionalフィールドの登録画面UI表示要否が未定義）は初出のため、次回以降の同種発生時に正式昇格を判断する。
 
 ## SMやDevから受けた質問ログ
 
