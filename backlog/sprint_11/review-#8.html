@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint 11 Review — #8 注文確定でサーバ再計算・在庫の原子的引当・整合性を保証する</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #f8f7f5; }
+
+  .page { max-width: 900px; margin: 0 auto; padding: 48px 24px; }
+
+  /* Header */
+  .sprint-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin-bottom: 8px; }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px; }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+  .badge-sprint { background: #e8f0fe; color: #1a56db; }
+  .badge-issue { background: #f0fdf4; color: #166534; }
+  .badge-feature { background: #eff6ff; color: #1d4ed8; }
+  .badge-security { background: #fef2f2; color: #b91c1c; }
+  .badge-cross { background: #f5f3ff; color: #6d28d9; }
+
+  /* Sections */
+  section { margin-bottom: 40px; }
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #888; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e5e5e5; }
+
+  /* Problem box */
+  .problem-box { background: #fff8f0; border-left: 3px solid #f59e0b; border-radius: 0 8px 8px 0; padding: 16px 20px; margin-bottom: 16px; }
+  .problem-box .label { font-size: 11px; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .problem-box p { color: #451a03; font-size: 13px; }
+  .problem-box ul { margin: 8px 0 0 18px; color: #451a03; font-size: 13px; }
+
+  /* Architecture change */
+  .arch-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: center; margin-bottom: 8px; }
+  .arch-box { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; }
+  .arch-box .arch-title { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .arch-box.before { border-color: #fca5a5; }
+  .arch-box.after { border-color: #86efac; }
+  .arch-arrow { font-size: 20px; color: #888; text-align: center; }
+  .flow-item { font-size: 12px; color: #374151; padding: 3px 0; display: flex; align-items: flex-start; gap: 6px; }
+  .flow-item .dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .dot-red { background: #ef4444; }
+  .dot-green { background: #22c55e; }
+
+  /* AC cards */
+  .ac-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+  .ac-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid #f0f0f0; }
+  .ac-check { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .ac-check.done { background: #dcfce7; color: #166534; }
+  .ac-num { font-size: 11px; font-weight: 700; color: #888; }
+  .ac-text { font-size: 13px; font-weight: 600; color: #1a1a1a; flex: 1; }
+  .ac-body { padding: 16px 18px; }
+  .ac-body p { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+
+  /* File change */
+  .file-change { margin-bottom: 16px; }
+  .file-name { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; background: #f3f4f6; color: #374151; padding: 5px 10px; border-radius: 4px 4px 0 0; border: 1px solid #e5e5e5; border-bottom: none; display: flex; justify-content: space-between; }
+  .diff-stat { color: #888; }
+  .code-block { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.7; background: #1e1e2e; color: #cdd6f4; padding: 14px 16px; border-radius: 0 0 6px 6px; overflow-x: auto; }
+  .code-line { display: flex; }
+  .line-num { color: #45475a; min-width: 32px; user-select: none; }
+  .line-add { background: rgba(166, 227, 161, 0.12); color: #a6e3a1; }
+  .line-del { background: rgba(243, 139, 168, 0.12); color: #f38ba8; }
+  .line-ctx { color: #cdd6f4; }
+  .line-prefix { min-width: 14px; }
+
+  /* Annotation */
+  .annotation { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-size: 12px; color: #78350f; display: flex; gap: 8px; }
+  .annotation-icon { font-size: 14px; flex-shrink: 0; }
+
+  /* Verify section */
+  .verify-list { list-style: none; }
+  .verify-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; }
+  .verify-item:last-child { border-bottom: none; }
+  .verify-num { width: 22px; height: 22px; background: #e8f0fe; color: #1a56db; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .verify-content { flex: 1; }
+  .verify-content strong { font-size: 13px; color: #1a1a1a; display: block; margin-bottom: 3px; }
+  .verify-content span { font-size: 12px; color: #6b7280; }
+
+  /* Scope table */
+  .scope-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 20px; }
+  .scope-table th { text-align: left; padding: 8px 12px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .scope-table td { padding: 10px 12px; border: 1px solid #e5e5e5; color: #374151; vertical-align: top; }
+  .scope-table tr:hover td { background: #f9fafb; }
+  .tag-changed { font-size: 11px; font-weight: 600; background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 3px; }
+  .tag-new { font-size: 11px; font-weight: 600; background: #e8f0fe; color: #1a56db; padding: 2px 6px; border-radius: 3px; }
+  .tag-unchanged { font-size: 11px; font-weight: 600; background: #f3f4f6; color: #6b7280; padding: 2px 6px; border-radius: 3px; }
+  .repo-label { font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; margin: 20px 0 8px; }
+
+  /* API call count (repurposed for oversell comparison) */
+  .api-count-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .api-count-box { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; text-align: center; }
+  .api-count-box .label { font-size: 11px; color: #888; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+  .api-count-box .count { font-size: 30px; font-weight: 700; line-height: 1; }
+  .api-count-box .sublabel { font-size: 11px; color: #888; margin-top: 4px; }
+  .count-before { color: #ef4444; }
+  .count-after { color: #22c55e; }
+
+  /* Test proof box */
+  .test-box { background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 14px 16px; margin-top: 8px; }
+  .test-box .test-title { font-size: 11px; font-weight: 700; color: #166534; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+  .test-box p { font-size: 12px; color: #14532d; margin: 0; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="sprint-label">Sprint 11 Review</div>
+  <h1>#8 — 注文確定でサーバ再計算・在庫の原子的引当・整合性を保証する</h1>
+  <div class="meta">
+    <span class="badge badge-sprint">Sprint 11</span>
+    <span class="badge badge-issue">#8</span>
+    <span class="badge badge-feature">feature</span>
+    <span class="badge badge-security">security / E3</span>
+    <span class="badge badge-cross">cross-repo: backend + frontend</span>
+  </div>
+
+  <!-- Problem -->
+  <section>
+    <h2>なぜこの改修が必要だったか</h2>
+    <div class="problem-box">
+      <div class="label">問題（legacy JPetStoreの脆弱性）</div>
+      <p>legacyの注文確定は以下の3点で「クライアントを信頼しすぎる」実装だった。</p>
+      <ul>
+        <li>確定操作が <code>GET newOrder.do?confirmed=true</code>（冪等でない状態変更がGETリンク・CSRFトークンなし）</li>
+        <li>金額はセッション/フォームの値をそのまま使い、サーバー側での再計算をしていない</li>
+        <li>在庫はガード無しの単純な減算で、同時に複数人が注文すると在庫がマイナスになりうる（売り越し）</li>
+      </ul>
+    </div>
+    <div class="arch-grid">
+      <div class="arch-box before">
+        <div class="arch-title">改修前（legacy Struts1）</div>
+        <div class="flow-item"><span class="dot dot-red"></span>確定 = GET確定リンク（CSRF無し・冪等でないGET）</div>
+        <div class="flow-item"><span class="dot dot-red"></span>金額 = セッション/フォーム値をそのまま信頼</div>
+        <div class="flow-item"><span class="dot dot-red"></span>在庫 = ガード無し減算（同時発注で売り越し可能）</div>
+        <div class="flow-item"><span class="dot dot-red"></span>採番 = select→+1→update（非アトミック）</div>
+        <div class="flow-item"><span class="dot dot-red"></span>注文作成の監査記録なし</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-box after">
+        <div class="arch-title">改修後（本Story）</div>
+        <div class="flow-item"><span class="dot dot-green"></span>確定 = 非冪等 <code>POST /api/orders</code>（CSRF必須）</div>
+        <div class="flow-item"><span class="dot dot-green"></span>金額 = 確定時点の <code>m_item.list_price</code> でサーバ再計算</div>
+        <div class="flow-item"><span class="dot dot-green"></span>在庫 = ガード付きUPDATE（affected rows==0で失敗・行ロックで直列化）</div>
+        <div class="flow-item"><span class="dot dot-green"></span>採番 = AUTO_INCREMENT（原子採番）</div>
+        <div class="flow-item"><span class="dot dot-green"></span>成功・失敗とも監査ログへ記録（失敗は別トランザクション）</div>
+      </div>
+    </div>
+    <div class="api-count-grid" style="margin-top:16px;">
+      <div class="api-count-box">
+        <div class="label">在庫qty=1へ2ユーザーが同時注文（改修前の設計だと）</div>
+        <div class="count count-before">-1</div>
+        <div class="sublabel">両方成功し在庫がマイナスになりうる（売り越し）</div>
+      </div>
+      <div class="api-count-box">
+        <div class="label">本Story実装後（実DBで2スレッド同時実行を実証）</div>
+        <div class="count count-after">0</div>
+        <div class="sublabel">片方のみ成功・もう片方は409で拒否。在庫は0で停止</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AC breakdown -->
+  <section>
+    <h2>AC別 実装内容</h2>
+
+    <!-- AC1 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC1</div>
+        <div class="ac-text">合計・単価はサーバ再計算、usernameは認証プリンシパルから導出（SBD-2）</div>
+      </div>
+      <div class="ac-body">
+        <p>カート内容（数量）はDBカートから読み、単価は確定時点の <code>m_item.list_price</code> でBigDecimal再計算する。<code>username</code>は<code>CurrentUserProvider</code>（認証プリンシパル）から取得し、リクエストには<code>totalPrice</code>・<code>username</code>・<code>quantity</code>のフィールド自体を持たせない（構造的にAC-neg1/AC-neg3を担保）。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>backend: application/service/OrderApplicationService.java</span>
+            <span class="diff-stat">新規</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">80</span><span class="line-prefix"> </span><span>public OrderConfirmation placeOrder(PlaceOrderCommand command) {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">81</span><span class="line-prefix"> </span><span>  AuthenticatedUser user = currentUserProvider.requireCurrentUser();</span></div>
+            <div class="code-line line-ctx"><span class="line-num">82</span><span class="line-prefix"> </span><span>  Long userId = user.userId();</span></div>
+            <div class="code-line line-ctx"><span class="line-num">...</span><span class="line-prefix"> </span><span></span></div>
+            <div class="code-line line-ctx"><span class="line-num">111</span><span class="line-prefix"> </span><span>private BigDecimal calculateTotal(List&lt;CartItemCustomEntity&gt; cartItems) {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">112</span><span class="line-prefix"> </span><span>  return cartItems.stream()</span></div>
+            <div class="code-line line-ctx"><span class="line-num">113</span><span class="line-prefix"> </span><span>      .map(item -&gt; item.getListPrice().multiply(BigDecimal.valueOf(item.getQuantity())))</span></div>
+            <div class="code-line line-ctx"><span class="line-num">114</span><span class="line-prefix"> </span><span>      .reduce(BigDecimal.ZERO, BigDecimal::add);</span></div>
+            <div class="code-line line-ctx"><span class="line-num">115</span><span class="line-prefix"> </span><span>}</span></div>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>backend: presentation/rest/OrderController.java</span>
+            <span class="diff-stat">新規</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">71</span><span class="line-prefix"> </span><span>public record PlaceOrderRequest(</span></div>
+            <div class="code-line line-ctx"><span class="line-num">72</span><span class="line-prefix"> </span><span>    @NotNull @Valid OrderAddressRequest billing,</span></div>
+            <div class="code-line line-ctx"><span class="line-num">73</span><span class="line-prefix"> </span><span>    OrderAddressRequest shipping,</span></div>
+            <div class="code-line line-ctx"><span class="line-num">74</span><span class="line-prefix"> </span><span>    boolean useSeparateShipping) {</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>リクエストDTOに<code>totalPrice</code>・<code>username</code>・<code>quantity</code>のフィールドが存在しない。攻撃者がJSONにこれらを注入しても、パースの時点で無視される（AC-neg1/AC-neg3参照）。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC2 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC2</div>
+        <div class="ac-text">在庫はガード付きアトミック減算で引当（affected rows==0を在庫不足として注文失敗）</div>
+      </div>
+      <div class="ac-body">
+        <p><code>UPDATE t_inventory SET quantity = quantity - :n WHERE item_id = :id AND quantity >= :n</code>という単文UPDATEで在庫を減算する。affected rowsが0なら在庫不足（同時発注の競合負けを含む）と判定し、<code>InsufficientStockException</code>（409）を投げる。<code>SELECT ... FOR UPDATE</code>・<code>version</code>列・リトライは使わない（UPDATE文自体の行ロックで直列化）。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>backend: resources/mapper/custom/InventoryCustomMapper.xml</span>
+            <span class="diff-stat">新規</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">12</span><span class="line-prefix"> </span><span>&lt;update id="decreaseInventory" ...&gt;</span></div>
+            <div class="code-line line-ctx"><span class="line-num">14</span><span class="line-prefix"> </span><span>    UPDATE t_inventory</span></div>
+            <div class="code-line line-ctx"><span class="line-num">15</span><span class="line-prefix"> </span><span>       SET quantity = quantity - #{quantity},</span></div>
+            <div class="code-line line-ctx"><span class="line-num">16</span><span class="line-prefix"> </span><span>           update_user_id = #{updateUserId},</span></div>
+            <div class="code-line line-ctx"><span class="line-num">17</span><span class="line-prefix"> </span><span>           update_program = #{updateProgram}</span></div>
+            <div class="code-line line-ctx"><span class="line-num">18</span><span class="line-prefix"> </span><span>     WHERE item_id = #{itemId}</span></div>
+            <div class="code-line line-add"><span class="line-num">19</span><span class="line-prefix">+</span><span>       AND quantity &gt;= #{quantity}</span></div>
+            <div class="code-line line-ctx"><span class="line-num">20</span><span class="line-prefix"> </span><span>&lt;/update&gt;</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>19行目の<code>AND quantity &gt;= #{quantity}</code>がガード条件そのもの。在庫が足りない時だけUPDATE対象が0件になるため、SELECTで事前確認する必要がない（TOCTOU回避）。</span>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>backend: application/service/OrderApplicationService.java</span>
+            <span class="diff-stat">新規</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">158</span><span class="line-prefix"> </span><span>int rows = inventoryCustomMapper.decreaseInventory(decrease);</span></div>
+            <div class="code-line line-ctx"><span class="line-num">159</span><span class="line-prefix"> </span><span>AffectedRows.requireUpdated(rows, () -&gt; new InsufficientStockException(item.getItemId()));</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC3 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC3</div>
+        <div class="ac-text">在庫減算＋注文ヘッダ＋明細をall-or-nothing、item_id昇順の固定順減算、orderIdはDB原子採番</div>
+      </div>
+      <div class="ac-body">
+        <p><code>placeOrder</code>全体に<code>@Transactional</code>を付け、1品でも在庫不足なら例外で全ロールバックする。複数商品の在庫減算は<code>CartCustomMapper#selectCartItems</code>が返す<code>ORDER BY item_id</code>の順序をそのまま使い、常に昇順で減算する（デッドロック回避）。<code>orderId</code>は<code>useGeneratedKeys</code>によるAUTO_INCREMENT採番（legacyのselect→+1→update非アトミックを是正）。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>backend: application/service/OrderApplicationService.java</span>
+            <span class="diff-stat">新規</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">79</span><span class="line-prefix"> </span><span>@Transactional</span></div>
+            <div class="code-line line-ctx"><span class="line-num">80</span><span class="line-prefix"> </span><span>public OrderConfirmation placeOrder(PlaceOrderCommand command) {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">...</span><span class="line-prefix"> </span><span></span></div>
+            <div class="code-line line-ctx"><span class="line-num">150</span><span class="line-prefix"> </span><span>private void insertOrderLinesWithGuardedDecrement(</span></div>
+            <div class="code-line line-ctx"><span class="line-num">151</span><span class="line-prefix"> </span><span>    Long orderId, List&lt;CartItemCustomEntity&gt; cartItems, Long userId) {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">152</span><span class="line-prefix"> </span><span>  int lineNum = 1;</span></div>
+            <div class="code-line line-ctx"><span class="line-num">153</span><span class="line-prefix"> </span><span>  for (CartItemCustomEntity item : cartItems) { // item_id昇順で固定</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span><code>cartItems</code>は<code>CartCustomMapper.xml</code>の<code>selectCartItems</code>が<code>ORDER BY ci.item_id</code>で返すため、追加のソート処理なしで昇順固定順減算になる。</span>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>backend: resources/mapper/custom/OrderCustomMapper.xml</span>
+            <span class="diff-stat">新規</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">11</span><span class="line-prefix"> </span><span>&lt;insert id="insertOrderHeader" useGeneratedKeys="true" keyProperty="orderId"</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC4 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC4</div>
+        <div class="ac-text">確定は非冪等POST＋CSRF（GET確定リンクの廃止）</div>
+      </div>
+      <div class="ac-body">
+        <p>legacyの<code>newOrder.do?confirmed=true</code>（GET）を廃止し、<code>POST /api/orders</code>に一本化。<code>SecurityConfig</code>は無変更で、既存の<code>anyRequest().authenticated()</code>配下＝常に認証必須、非GETはCSRF必須のルールがそのまま適用される。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>backend: presentation/rest/OrderController.java</span>
+            <span class="diff-stat">新規</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">38</span><span class="line-prefix"> </span><span>@PostMapping</span></div>
+            <div class="code-line line-ctx"><span class="line-num">39</span><span class="line-prefix"> </span><span>@ResponseStatus(HttpStatus.CREATED)</span></div>
+            <div class="code-line line-ctx"><span class="line-num">40</span><span class="line-prefix"> </span><span>public OrderConfirmationResponse placeOrder(@Valid @RequestBody PlaceOrderRequest request) {</span></div>
+          </div>
+        </div>
+        <div class="test-box">
+          <div class="test-title">実DBで実証したテスト</div>
+          <p><code>OrderControllerSpec</code>「未認証は401」「CSRFトークン無しは403」を実際にMockMvc+実DBで確認済み。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC5 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC5</div>
+        <div class="ac-text">金額はBigDecimal/decimalで扱う（doubleを使わない）</div>
+      </div>
+      <div class="ac-body">
+        <p>合計・単価はすべて<code>java.math.BigDecimal</code>で扱う。<code>t_order.total_price</code>・<code>t_order_line.unit_price</code>とも<code>DECIMAL(10,2)</code>列にそのまま対応させ、浮動小数点誤差が入り込む余地を作らない。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>backend: infrastructure/mybatis/custom/entity/OrderLineWriteCustomEntity.java</span>
+            <span class="diff-stat">新規</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">15</span><span class="line-prefix"> </span><span>private BigDecimal unitPrice;</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC6 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC6</div>
+        <div class="ac-text">注文作成（状態変更）を監査ログに記録。成功・失敗の両方を記録する（SM決定で成功のみからスコープ拡張）</div>
+      </div>
+      <div class="ac-body">
+        <p>成功時は主トランザクション内で<code>recordStateChange(..., "SUCCESS", ...)</code>を呼び、注文と原子的にコミット/ロールバックされる。在庫不足・空カートによる失敗時は、主トランザクションがロールバックされても監査行が消えないよう、<code>REQUIRES_NEW</code>の別トランザクションで<code>result="FAILURE"</code>を記録する。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>backend: infrastructure/audit/AuditLogRecorder.java</span>
+            <span class="diff-stat">+14 (新規メソッド)</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">77</span><span class="line-prefix">+</span><span>@Transactional(propagation = Propagation.REQUIRES_NEW)</span></div>
+            <div class="code-line line-add"><span class="line-num">78</span><span class="line-prefix">+</span><span>public void recordStateChangeIndependently(</span></div>
+            <div class="code-line line-add"><span class="line-num">79</span><span class="line-prefix">+</span><span>    String action, String targetType, String targetId, String result, Object detail) {</span></div>
+            <div class="code-line line-add"><span class="line-num">80</span><span class="line-prefix">+</span><span>  AuthenticatedUser actor = currentUserProvider.currentUser().orElse(null);</span></div>
+            <div class="code-line line-add"><span class="line-num">81</span><span class="line-prefix">+</span><span>  insert(EVENT_STATE_CHANGE, actor, action, targetType, targetId, result, detail, null);</span></div>
+            <div class="code-line line-add"><span class="line-num">82</span><span class="line-prefix">+</span><span>}</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>呼び出し元（<code>OrderApplicationService</code>）は別bean（<code>AuditLogRecorder</code>）のメソッドを呼ぶため、Spring AOPプロキシが正しく介在し<code>@Transactional</code>が効く（自己呼び出しだと効かない罠を回避）。</span>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>backend: application/service/OrderApplicationService.java</span>
+            <span class="diff-stat">新規</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">86</span><span class="line-prefix"> </span><span>try {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">...</span><span class="line-prefix"> </span><span>  // 注文ヘッダ/明細INSERT・在庫減算・カートクリア...</span></div>
+            <div class="code-line line-ctx"><span class="line-num">96</span><span class="line-prefix"> </span><span>  auditLogRecorder.recordStateChange(</span></div>
+            <div class="code-line line-ctx"><span class="line-num">100</span><span class="line-prefix"> </span><span>      RESULT_SUCCESS, Map.of("total", totalPrice, "itemCount", cartItems.size()));</span></div>
+            <div class="code-line line-ctx"><span class="line-num">103</span><span class="line-prefix"> </span><span>  return new OrderConfirmation(orderId, totalPrice);</span></div>
+            <div class="code-line line-ctx"><span class="line-num">104</span><span class="line-prefix"> </span><span>} catch (InsufficientStockException e) {</span></div>
+            <div class="code-line line-add"><span class="line-num">105</span><span class="line-prefix">+</span><span>  auditLogRecorder.recordStateChangeIndependently(</span></div>
+            <div class="code-line line-add"><span class="line-num">106</span><span class="line-prefix">+</span><span>      ACTION_ORDER_CREATE, null, null, RESULT_FAILURE, failureDetail(e));</span></div>
+            <div class="code-line line-ctx"><span class="line-num">107</span><span class="line-prefix"> </span><span>  throw e;</span></div>
+            <div class="code-line line-ctx"><span class="line-num">108</span><span class="line-prefix"> </span><span>}</span></div>
+          </div>
+        </div>
+        <div class="test-box">
+          <div class="test-title">実DBで実証したテスト</div>
+          <p><code>OrderControllerSpec</code>「AC6(計画フェーズ確定③): 在庫不足失敗時もresult=FAILUREのORDER_CREATE監査行が残る」— 在庫不足で409になった直後にt_audit_logを実際に検索し、result=FAILURE・detail に "INSUFFICIENT_STOCK" を含む行が残っていることを確認。空カート失敗でも同様に確認。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- L2 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">[L2]</div>
+        <div class="ac-text">旧同値（特性化）: item Xを2個注文 → 在庫が2減／明細合計=単価×数量／注文合計=Σ明細</div>
+      </div>
+      <div class="ac-body">
+        <p>legacyの正常系の振る舞い（在庫減算量・明細/合計の算出方法）は変えていない。WHO・version・採番ID・日時のような非本質的な差分だけを許容し、金額計算式・在庫連動そのものはlegacyと同じ結果になることを実DBで確認した。</p>
+        <div class="test-box">
+          <div class="test-title">実DBで実証したテスト</div>
+          <p><code>OrderControllerSpec</code>「AC2/AC3(arch §4.1): 注文確定後にt_order/t_order_line/t_inventoryへ正しく永続化される」— ITEM_PLENTY（単価10.00）を3個注文 → <code>t_order.total_price=30.00</code>・<code>t_order_line.quantity=3</code>・<code>t_order_line.unit_price=10.00</code>・<code>t_inventory.quantity</code>が100→97へ正しく減算されることを確認。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC-neg1 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC-neg1</div>
+        <div class="ac-text">否定AC: totalPrice=0.01等を注入しても、永続値はサーバ再計算合計になる</div>
+      </div>
+      <div class="ac-body">
+        <p>攻撃を模したリクエスト（正規のbillingに加え<code>"totalPrice":0.01</code>を追加送信）を実際にPOSTし、レスポンスと永続化された値の両方がサーバ再計算値（10.00）のままであることを実DBで確認した。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>backend: test/.../OrderControllerSpec.groovy</span>
+            <span class="diff-stat">L219-234</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">219</span><span class="line-prefix"> </span><span>def "AC-neg1(SBD-2): totalPriceを注入しても無視されサーバ再計算値が永続化される"() {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">226</span><span class="line-prefix"> </span><span>    .content(placeOrderBody('"totalPrice":0.01')))</span></div>
+            <div class="code-line line-ctx"><span class="line-num">227</span><span class="line-prefix"> </span><span>    .andExpect(status().isCreated())</span></div>
+            <div class="code-line line-ctx"><span class="line-num">228</span><span class="line-prefix"> </span><span>    .andExpect(jsonPath('$.totalPrice').value(10.00d))</span></div>
+            <div class="code-line line-ctx"><span class="line-num">233</span><span class="line-prefix"> </span><span>jdbcTemplate.queryForObject("SELECT total_price FROM t_order WHERE order_id = ?", BigDecimal, orderId) == new BigDecimal("10.00")</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC-neg2 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC-neg2</div>
+        <div class="ac-text">否定AC: 在庫数を超える確定は失敗しquantityが負数にならない。同時/二重発注でも売り越さない</div>
+      </div>
+      <div class="ac-body">
+        <p>在庫qty=1のアイテムを2人の別ユーザーがそれぞれ自分のカートに1個ずつ入れ、<code>ExecutorService</code>+<code>CountDownLatch</code>で2スレッドから完全に同時に<code>POST /api/orders</code>を送信するテストを実DB（Testcontainers MySQL）で実行した。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>backend: test/.../OrderConcurrencyIntegrationSpec.groovy</span>
+            <span class="diff-stat">L108-141</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">108</span><span class="line-prefix"> </span><span>and: "2スレッドが同時にplaceOrderを叩けるようCountDownLatchで同期する"</span></div>
+            <div class="code-line line-ctx"><span class="line-num">129</span><span class="line-prefix"> </span><span>readyLatch.await(5, TimeUnit.SECONDS)</span></div>
+            <div class="code-line line-ctx"><span class="line-num">130</span><span class="line-prefix"> </span><span>startLatch.countDown()  // 2スレッドを同時に解放</span></div>
+            <div class="code-line line-ctx"><span class="line-num">135</span><span class="line-prefix"> </span><span>then: "片方のみ201(成功)・もう片方は409(在庫不足)"</span></div>
+            <div class="code-line line-ctx"><span class="line-num">137</span><span class="line-prefix"> </span><span>statuses.count { it == 201 } == 1</span></div>
+            <div class="code-line line-ctx"><span class="line-num">138</span><span class="line-prefix"> </span><span>statuses.count { it == 409 } == 1</span></div>
+            <div class="code-line line-ctx"><span class="line-num">140</span><span class="line-prefix"> </span><span>and: "在庫は0のまま(負数化しない・売り越し不可)"</span></div>
+            <div class="code-line line-ctx"><span class="line-num">141</span><span class="line-prefix"> </span><span>... == 0</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span><code>CountDownLatch</code>で両スレッドを完全に同期させてから同時解放するため、「たまたま順番にリクエストが来て両方成功する」という偽陰性を排除できる。MySQLの行ロックにより、後から到達した方のUPDATEが「affected rows==0」を返して失敗する。</span>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>backend: test/.../InventoryCustomMapperSpec.groovy</span>
+            <span class="diff-stat">境界値テスト</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">57</span><span class="line-prefix"> </span><span>def "在庫充足(quantity>=n)はaffected rows=1で在庫がnだけ減算される"()</span></div>
+            <div class="code-line line-ctx"><span class="line-num">67</span><span class="line-prefix"> </span><span>def "在庫不足(quantity&lt;n)はaffected rows=0で在庫が不変のままInsufficientStockExceptionになる"()</span></div>
+            <div class="code-line line-ctx"><span class="line-num">81</span><span class="line-prefix"> </span><span>def "ちょうど在庫数と同数の減算はaffected rows=1で在庫が0になる(境界値)"()</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC-neg3 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC-neg3</div>
+        <div class="ac-text">否定AC: order.username=他人を注入しても、注文は認証プリンシパル本人に紐づく</div>
+      </div>
+      <div class="ac-body">
+        <p>正規のリクエストに<code>"username":"attacker"</code>を追加送信し、永続化された<code>t_order.user_id</code>が常にJWTから解決した本人のuserIdであり、注入したusernameが一切影響しないことを実DBで確認した。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>backend: test/.../OrderControllerSpec.groovy</span>
+            <span class="diff-stat">L236-250</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">236</span><span class="line-prefix"> </span><span>def "AC-neg3(SBD-1): usernameを注入しても無視され認証プリンシパル本人に紐づく"() {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">243</span><span class="line-prefix"> </span><span>    .content(placeOrderBody('"username":"attacker"')))</span></div>
+            <div class="code-line line-ctx"><span class="line-num">249</span><span class="line-prefix"> </span><span>jdbcTemplate.queryForObject("SELECT user_id FROM t_order WHERE order_id = ?", Long, orderId) == userId</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Frontend -->
+  <section>
+    <h2>フロントエンド連携（内容確認 → 確定 → 完了画面）</h2>
+    <p style="font-size:13px; color:#4b5563; margin-bottom:12px;">#7で構築済みのチェックアウト・ウィザード（カート確認→住所入力→内容確認）の最終ステップに、実際の注文確定ボタンを配線した。</p>
+    <div class="file-change">
+      <div class="file-name">
+        <span>frontend: components/checkout/CheckoutConfirmStep.vue</span>
+        <span class="diff-stat">編集</span>
+      </div>
+      <div class="code-block">
+        <div class="code-line line-del"><span class="line-num">94</span><span class="line-prefix">-</span><span>&lt;button ... disabled&gt;{{ t('checkout.confirmStep.placeOrder') }} (Coming soon)&lt;/button&gt;</span></div>
+        <div class="code-line line-add"><span class="line-num">114</span><span class="line-prefix">+</span><span>&lt;button ... :disabled="orderStore.isPlacing" @click="handlePlaceOrder"&gt;</span></div>
+        <div class="code-line line-add"><span class="line-num">120</span><span class="line-prefix">+</span><span>  {{ orderStore.isPlacing ? t('checkout.confirmStep.placing') : t('checkout.confirmStep.placeOrder') }}</span></div>
+      </div>
+    </div>
+    <div class="file-change">
+      <div class="file-name">
+        <span>frontend: stores/order.ts</span>
+        <span class="diff-stat">新規</span>
+      </div>
+      <div class="code-block">
+        <div class="code-line line-ctx"><span class="line-num">37</span><span class="line-prefix"> </span><span>async placeOrder(): Promise&lt;boolean&gt; {</span></div>
+        <div class="code-line line-ctx"><span class="line-num">42</span><span class="line-prefix"> </span><span>  this.result = await orderApi.placeOrder({ billing, shipping, useSeparateShipping })</span></div>
+        <div class="code-line line-ctx"><span class="line-num">47</span><span class="line-prefix"> </span><span>  useCartStore().clearAfterOrder()</span></div>
+        <div class="code-line line-ctx"><span class="line-num">48</span><span class="line-prefix"> </span><span>  checkoutStore.reset()</span></div>
+        <div class="code-line line-ctx"><span class="line-num">52</span><span class="line-prefix"> </span><span>} catch { this.placeError = status === 409 ? 'INSUFFICIENT_STOCK' : 'default' }</span></div>
+      </div>
+      <div class="annotation">
+        <span class="annotation-icon">💡</span>
+        <span>チェックアウトの下書き状態（<code>checkout</code>ストア）と確定結果（<code>order</code>ストア）を分離した。成功したら住所下書きをリセットし、カート表示もサーバー側クリア済みの状態に揃える。</span>
+      </div>
+    </div>
+    <div class="file-change">
+      <div class="file-name">
+        <span>frontend: views/checkout/CheckoutCompleteView.vue</span>
+        <span class="diff-stat">新規</span>
+      </div>
+      <div class="code-block">
+        <div class="code-line line-ctx"><span class="line-num">20</span><span class="line-prefix"> </span><span>onMounted(() =&gt; { if (!orderStore.hasResult) { router.replace('/') } })</span></div>
+        <div class="code-line line-ctx"><span class="line-num">35</span><span class="line-prefix"> </span><span>&lt;dt&gt;{{ t('orderComplete.orderNumberLabel') }}&lt;/dt&gt;&lt;dd&gt;{{ orderStore.result.orderId }}&lt;/dd&gt;</span></div>
+        <div class="code-line line-ctx"><span class="line-num">39</span><span class="line-prefix"> </span><span>&lt;dt&gt;{{ t('orderComplete.totalLabel') }}&lt;/dt&gt;&lt;dd&gt;{{ formatPrice(orderStore.result.totalPrice) }}&lt;/dd&gt;</span></div>
+      </div>
+      <div class="annotation">
+        <span class="annotation-icon">💡</span>
+        <span>完了画面は最小スコープ（注文番号＋合計＋サンクスメッセージのみ）。明細・商品名の一覧表示は次のStory（#10 注文詳細閲覧）に委譲する意図的な判断。<code>orderStore</code>はPiniaメモリ保持のみ（揮発）のため、リロード等で結果が失われた場合はホームへ自動的にリダイレクトする。</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Implementation notes -->
+  <section>
+    <h2>実装メモ（仕様外の判断・変更・妥協点）</h2>
+    <div class="ac-card">
+      <div class="ac-body">
+        <p><strong>① OrderControllerのテストは計画の<code>@WebMvcTest</code>ではなく、既存パターンに合わせて<code>IntegrationTestBase</code>（Testcontainers実DB）に統一した。</strong>本プロジェクトには<code>@WebMvcTest</code>スライスの前例が無く（Cart/Account等の既存Controllerテストは全て実DB統合テスト）、CSRF/JWT認証フィルタチェーンをスライスで再現する新規インフラ整備コストが見合わないと判断した。</p>
+        <p><strong>② 在庫を実際に減算するテストは、既存カタログseed（EST-*）を使わず専用アイテム（ZZ-ORDER-*等）で隔離した。</strong>本Storyが本プロジェクトで初めて<code>t_inventory</code>を書き換えるため、他specがEST-*の在庫数を前提にしているテスト（例: カートのAC-neg1テスト）を壊さないための方針。</p>
+        <p><strong>③ <code>InsufficientStockException</code>は在庫不足・空カートの両方の失敗を1クラスで表現した</strong>（<code>itemId=null</code>が空カートを表す）。SM決定「空カートも在庫不足と同じ失敗系統（409）に寄せる」に沿った設計。</p>
+        <p><strong>④ 配送先の解決（別配送を使うかどうか）はbackend側の<code>PlaceOrderCommand#effectiveShipping()</code>に集約した。</strong><code>useSeparateShipping=false</code>のときは請求先住所をそのまま配送先として複製する。フロントは常にbilling/shipping/フラグをそのまま送るだけでよく、判定ロジックを持たない設計にした。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Verify -->
+  <section>
+    <h2>動作確認ポイント（ユーザー確認用）</h2>
+    <ul class="verify-list">
+      <li class="verify-item">
+        <div class="verify-num">1</div>
+        <div class="verify-content">
+          <strong>カートに商品を入れてチェックアウトし、「注文を確定する」ボタンを押すと注文完了画面に遷移すること</strong>
+          <span>完了画面には注文番号と合計金額、サンクスメッセージが表示され、カートは空になる</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">2</div>
+        <div class="verify-content">
+          <strong>注文確定後、カート画面に戻ると空になっていること</strong>
+          <span>サーバー側でカートが全削除され、フロントの表示もリセットされる</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">3</div>
+        <div class="verify-content">
+          <strong>在庫が無い商品を注文しようとすると、エラーメッセージが表示され注文が完了しないこと</strong>
+          <span>「ご希望の数量は在庫がありません」相当のメッセージが確認ステップに表示される（画面は内容確認のまま留まる）</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">4</div>
+        <div class="verify-content">
+          <strong>完了画面のURL（/checkout/complete）に直接アクセスしても、注文結果がない場合はトップページに戻されること</strong>
+          <span>ブラウザの戻る/進むや直接URL入力で意味不明な画面が出ないことの確認</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">5</div>
+        <div class="verify-content">
+          <strong>注文確定ボタンを押してからレスポンスが返るまでの間、ボタンが「送信中…」表示になり連打できないこと</strong>
+          <span>二重送信防止（<code>isPlacing</code>中はボタン無効化）</span>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- Scope -->
+  <section>
+    <h2>改修スコープ確認</h2>
+
+    <div class="repo-label">backend（jpetstore-backend・主・PR #10）</div>
+    <table class="scope-table">
+      <tr>
+        <th>ファイル</th>
+        <th>変更</th>
+        <th>内容</th>
+      </tr>
+      <tr>
+        <td><code>OrderController.java</code></td>
+        <td><span class="tag-new">新規</span></td>
+        <td>POST /api/orders・SBD-2アローリストDTO・201応答</td>
+      </tr>
+      <tr>
+        <td><code>OrderApplicationService.java</code></td>
+        <td><span class="tag-new">新規</span></td>
+        <td>注文確定ユースケース全体（再計算・在庫引当・監査）</td>
+      </tr>
+      <tr>
+        <td><code>domain/order/{OrderAddress,PlaceOrderCommand,OrderConfirmation}</code></td>
+        <td><span class="tag-new">新規</span></td>
+        <td>注文確定ドメインモデル</td>
+      </tr>
+      <tr>
+        <td><code>InsufficientStockException.java</code></td>
+        <td><span class="tag-new">新規</span></td>
+        <td>在庫不足・空カート例外（409マッピング）</td>
+      </tr>
+      <tr>
+        <td><code>OrderCustomMapper.java</code>/<code>.xml</code></td>
+        <td><span class="tag-new">新規</span></td>
+        <td>注文ヘッダ/明細INSERT（AUTO_INCREMENT採番）</td>
+      </tr>
+      <tr>
+        <td><code>InventoryCustomMapper.java</code>/<code>.xml</code></td>
+        <td><span class="tag-new">新規</span></td>
+        <td>在庫ガード付きアトミック減算</td>
+      </tr>
+      <tr>
+        <td><code>CartCustomMapper.java</code>/<code>.xml</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td><code>deleteCartItems</code>追加（注文成功後のカート全クリア）</td>
+      </tr>
+      <tr>
+        <td><code>AuditLogRecorder.java</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td><code>recordStateChangeIndependently</code>追加（REQUIRES_NEW失敗監査）</td>
+      </tr>
+      <tr>
+        <td><code>GlobalExceptionHandler.java</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>InsufficientStockException → 409マッピング追加</td>
+      </tr>
+      <tr>
+        <td>SecurityConfig</td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td>既存のanyRequest().authenticated()＋CSRF自動適用がそのまま効く</td>
+      </tr>
+      <tr>
+        <td>database（Flywayマイグレーション）</td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td>t_order/t_order_line/t_inventory等は全て既達スキーマを利用</td>
+      </tr>
+    </table>
+
+    <div class="repo-label">frontend（jpetstore-frontend・従・PR #6）</div>
+    <table class="scope-table">
+      <tr>
+        <th>ファイル</th>
+        <th>変更</th>
+        <th>内容</th>
+      </tr>
+      <tr>
+        <td><code>api/orderApi.ts</code></td>
+        <td><span class="tag-new">新規</span></td>
+        <td>POST /api/ordersクライアント</td>
+      </tr>
+      <tr>
+        <td><code>domain/order.ts</code></td>
+        <td><span class="tag-new">新規</span></td>
+        <td>OrderPlacementRequest/OrderConfirmation型</td>
+      </tr>
+      <tr>
+        <td><code>stores/order.ts</code></td>
+        <td><span class="tag-new">新規</span></td>
+        <td>注文確定の状態管理（isPlacing/placeError/result）</td>
+      </tr>
+      <tr>
+        <td><code>views/checkout/CheckoutCompleteView.vue</code></td>
+        <td><span class="tag-new">新規</span></td>
+        <td>最小の完了画面</td>
+      </tr>
+      <tr>
+        <td><code>components/checkout/CheckoutConfirmStep.vue</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>確定ボタンの配線（disabled/Coming soon撤去）</td>
+      </tr>
+      <tr>
+        <td><code>stores/cart.ts</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td><code>clearAfterOrder()</code>追加</td>
+      </tr>
+      <tr>
+        <td><code>router/index.ts</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td><code>/checkout/complete</code>ルート追加（requiresAuth）</td>
+      </tr>
+      <tr>
+        <td><code>i18n/locales/en.ts</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>送信中/エラー/完了画面の文言追加</td>
+      </tr>
+      <tr>
+        <td>注文詳細・履歴画面</td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td>#9/#10のスコープ（意図的に作らない）</td>
+      </tr>
+    </table>
+  </section>
+
+</div>
+</body>
+</html>
