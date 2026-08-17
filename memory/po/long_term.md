@@ -226,6 +226,16 @@ DEVからSprint13計画フェーズでユーザーに直接確認した設計論
 
 **判定**: 傾向1・傾向2はいずれも既存チェックリスト項目の再発のため新規昇格は不要。引用リストへ〔Sprint13 #30〕を追記する。
 
+### Sprint 14（2026-08-17）— E3系（#9 注文履歴一覧・#10 注文詳細閲覧）計画フェーズより
+
+DEVからSprint14計画フェーズでユーザーに直接確認した事項をSM経由で中継され、1件を質問ログに記録した（バックログ修正候補・かつ`rules/database.md`の文書ギャップ是正候補）。#9はページング用複合索引`(user_id, order_id)`を`t_order`に新設するにあたり、既存単一列索引`idx_t_order_user_id (user_id)`が左端プレフィックスで完全内包され冗長化する問題が発生した。
+
+- #9: ページング用複合索引`(user_id, order_id)`追加時、既存単一索引`idx_t_order_user_id`を「置換（ADD+DROP）」するか「両方残す」か→置換を採用（両方残すと重複索引でperfレビュー指摘対象。FKは複合索引の左端でバックされ継続するためDROPは安全）
+
+**傾向（PO長期記憶では初出だが、SM長期記憶に記録済みのSprint1トレンドと同一文書ギャップの2件目）＝「索引設計方針が`rules/database.md`に未文書化」**: 本件はPO自身の質問ログとしては初出だが、SM長期記憶（`memory/sm/long_term.md:48`）が記録するSprint1「DBスキーマStory（#22）でのFK列明示セカンダリインデックスの一貫性確認・2回目の発生でrules/database.mdへの昇格を判定」というトレンドと、切り口（Sprint1=FK列に明示索引をADDすべきか／Sprint14=複合索引導入時に既存単一索引をDROPして重複排除すべきか）は逆だが、いずれも「`rules/database.md`に索引設計方針（FK明示索引の付与基準・複合索引と単一索引の重複排除基準）が存在しない」という同一の文書ギャップに起因する。PO長期記憶で採用してきた「同一ギャップに起因する別切り口での再発は条件拡張のうえ正式昇格する」運用（Sprint5→10のcross-repo追加、Sprint9→11のHTTPステータス未定義）に照らし、本件をSprint1トレンドの実質2件目（索引ハイジーン方針の欠如という上位パターンでの再発）と判定した。
+
+**判定**: 「先例規約未定義」等の既存PO内チェックリスト項目とは異なり、本件は個別StoryのAC先回り明記では解決しない**一般的なDBエンジニアリング方針**（FK索引の付与基準・複合索引による単一索引の置換基準は、Story文脈に依存せず一度定義すれば以降のStoryに一律適用できる）と判断し、PO内チェックリストへの項目追加ではなく、`rules/database.md`に**索引ハイジーン節を新設して直接firmupする**方針を採用した。`.claude\rules\database.md`に「索引ハイジーン（FK 明示索引・複合索引導入時の重複排除）」節を追加済み（本Retroで実施）。今後のDB関連Story（#10含む今後のE3・E4）ではAC先回り明記ではなく本ルール参照で足りるため、PO先回りチェックリストへの追加は行わない。`#skills-changelog`へ[PO]で投稿する。
+
 ## バックログ起票時の先回りチェックリスト
 
 **土台Story（DB移行・backend/frontend土台・認可/認証基盤など、新規リポジトリ・新規レイヤー・新規ドメイン横断機構に着手するStory）を起票・詳細化する際は、以下をAC/備考に先回り明記できないか確認する**（Sprint1 #22・Sprint2 #23の計11件中9件がAC/備考の先回り明記で防止できたと判定され、2Sprint連続発生のため正式昇格。Sprint4 #21で「E6基盤系」に限らず認可/認証土台Storyにも適用範囲を拡張）：
@@ -307,3 +317,5 @@ DEVからSprint13計画フェーズでユーザーに直接確認した設計論
 - 2026-08-17（Sprint13計画フェーズ、#30・Q1）: Order集約はrichな集約を新設せず、#8のorchestration（原子引当・item_id固定順・all-or-nothing・監査）をOrderApplicationServiceに残す方針（案A）を採用。過剰抽象（YAGNI）回避。
 - 2026-08-17（Sprint13計画フェーズ、#30・Q2）: read/write Repositoryの命名は統一`...Repository`を採用（DEV推奨のread=`...Query`／write=`...Repository`分離をユーザーがオーバーライド）。`CatalogRepository`/`AccountRepository`等、read/write問わず`...Repository`。意味論（CQRS射影）は不変。
 - 2026-08-17（Sprint13計画フェーズ、#30・Q3）: `InventoryRepository`は新規`domain/inventory`パッケージ（`domain/cart`と並行構造）に配置する方針で確定。
+- 2026-08-17（Sprint14計画フェーズ、#9）: `t_order`へのページング用複合索引`(user_id, order_id)`追加に伴い、既存単一索引`idx_t_order_user_id`は置換（ADD+DROP）を採用。
+- 2026-08-17（Sprint14 Retro）: SM長期記憶Sprint1トレンド（FK明示索引の一貫性）とPO質問ログSprint14（複合索引導入時の単一索引重複排除）が「`rules/database.md`に索引設計方針が未文書化」という同一文書ギャップの2件目の再発と判定し、PO内チェックリストではなく`rules/database.md`に「索引ハイジーン」節を新設してfirmupした（PO判断・ユーザー確認なしで実施。#skills-changelogへ[PO]で投稿）。

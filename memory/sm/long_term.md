@@ -43,6 +43,8 @@
 
 - **tier分離13連続・初の複数 bounded context 横断（読取 CQRS 射影×書込集約 混在）でも通用**（Sprint 13）: #30（Repository 層を Catalog/Account/Order へ展開・refactor・SP8）でも計画=Opus／実装=Sonnet で手戻りゼロ完走・3観点＋SM verification 全クリーン。**計画前 Explore で3 context の drift・複雑度（Account 小＜Catalog 中＜Order 大）を把握→スコープ判断（一括 vs 子 Issue 分割）を AskUserQuestion でユーザー確定**（一括を選択）。**実装順を読取先行（Account→Catalog）→ Order にしてレビュー分散〔一括ゆえの R2〕を緩和**＝reviewer に context 別に整理して渡し観点集中。**#29 テンプレを無改造で横展開**（record→class+reconstruct／CQRS 射影 record 返し／Repository モック合成のクエリ数証明 UT）＝先例再利用（Sprint7 型）の Repository 版・C2 実効性検証成功。**teammate 成果物の stale read**（Sprint11「反映遅延の行き違い」の変種）＝read で成果物を検証する際、直近編集とのラグを考慮（今回 DEV の命名修正済みを stale 版で見て是正依頼→実害なし・初出）。
 
+- **tier分離14連続で有効・cross-repo 3-repo かつ初の #21 認可部品（`OwnershipAuthorizationService`）実ドメイン適用でも通用**（Sprint 14）: #9/#10（注文照会・履歴一覧/詳細閲覧・security・full-stack 3-repo）でも計画=Opus／実装=Sonnet で手戻りゼロ完走・3観点クリーン。**計画前 Explore 2本並列で既達 vs 未実装を切り分け**→既達土台（#8 注文ドメイン・#21 `assertOwner`・catalog ページング/JOIN 先例・frontend 土台）を無改造再利用し新規を read API＋画面＋複合索引に集約（Sprint4/9/11 型ハードニングの再現＝過剰実装回避）。**spec 委譲論点の2段階確定**（SM 計画前に Q1〔索引/repo数〕・Q2〔詳細表示範囲〕をユーザー確定＋DEV 計画報告後のエッジ論点〔索引置換 [確認事項1]〕を AskUserQuestion で確定＝Sprint11 型の再現・**SM が FK バッキング安全性を実 migration で裏取りしてから提示**）。**cross-repo closes は主=frontend（capstone＝画面）に #9/#10 集約・従=backend/database は Related**（frontend 主4回目・Sprint5#24/6#1/10#7 に続く）。
+
 ## DEVレビュー指摘の傾向
 
 - **DBスキーマ Story**（Sprint 1）: FK 列の明示セカンダリインデックスの一貫性（m_item.supplier_id）。InnoDB は FK 索引を自動生成するため機能影響は無いが、兄弟列に明示索引がある場合は揃える。2回目の発生で rules/database.md への昇格を判定。
@@ -69,6 +71,8 @@
 
 - **refactor 3観点＋SM verification が全クリーン＝教訓の横展開が効いた**（Sprint 13）: #30 は conv/sec/perf 指摘0・SM 精読も0件。**#29 で SM が発見した perf 純増（識別子解決と最終応答を同一 `findByUserId` で済ませる二重呼び）が Order（同型の Repository 新規導入）で再発しなかった**＝DEV が Sprint12 教訓（`ensureCart`/`findByCartId` 使い分け）を自発適用。**教訓を long_term/§9 に記録すると、次の同型 Story で reviewer 段階どころか実装段階で回避される**ことを実証（Sprint12 は SM が拾ったが Sprint13 は DEV が事前回避）。Spock 罠は3回目発生も §9 昇格済ルールで即解消＝**2回ルール昇格の効果が実証された初のケース**。DEV は §9 に「書込集約の適用範囲（rich 集約 vs 薄い書込 record＋orchestration 残置＝Cart 型/Order 型の判断軸）」を追記（#29 テンプレの機械的全適用を戒める・PO の「Issue 本文が rich 集約と読めた」指摘を先回り）。
 
+- **3観点クリーンが Sprint3/6/7/9/10/11 に続き7回目相当・full-stack security read Story でも通用**（Sprint 14）: #9/#10 は conv/sec/perf 指摘0。要因＝①secure-by-default 土台＋既達資産の無改造再利用（#21 `assertOwner`・`GlobalExceptionHandler` の403＋監査・catalog ページング/JOIN 先例）②否定AC 先回り指定（AC-neg1 principal スコープ・AC-neg2 同一403 で列挙不能）③意図的設計を reviewer プロンプトに明記（同一403・住所非表示・索引置換・read-only・SecurityConfig 無変更を「欠落として指摘しない」）。**同一403 の実装（不存在も `AccessDeniedException`→403）を計画で確定→ sec が実コードで列挙不能を検証**（DEV は backend-conventions §9 に「所有者限定＋列挙対策 read は不存在も同一 `AccessDeniedException`(403) に正規化」を実装パターンとして即時反映）。**reviewer 盲点の収束発見**＝`@Transactional(readOnly=true)` の read メソッド不統一（Account=有／Catalog・Order=無）を **SM 独立 verification と DEV Retro が独立に発見**したが3 reviewer は4スプリント連続（6/7/13/14）で未検出＝**規約はあっても reviewer が拾えない非機能規約（tx 属性等）は SM verification/DEV Retro で拾う**（初出・次回同種発生で reviewer チェックリスト昇格 or rules 明確化を判定。今回は Catalog 先例と整合＝#9/#10 は非違反として非指摘）。
+
 ## Sprint Reviewで発覚しやすいパターン
 
 - **Flyway 採番規約（versioned vs repeatable）**（Sprint 1）: 開発/テスト用シードを versioned で採番すると out-of-order 破綻の懸念。→ repeatable（`R__`）＋冪等を rules/database.md に明文化。**自動3reviewer は規約に無い観点は全員見逃す**（規約の明文化が再発防止の要）。
@@ -88,6 +92,8 @@
 - **refactor Story は挙動不変ゆえ Sprint Review 指摘ゼロ・非機能差分は SM verification で事前に潰す**（Sprint 12・Sprint3/6/7/8/9/10/11 のクリーンパスに続く7回目）: #29 は Sprint Review 指摘ゼロ（内部リファクタで UI 変化なし・「問題ありません」）。ただし **perf 純増（`findByUserId` 二重呼び）のような「reviewer も UT も green だが SM 精読で見つかる非機能差分」は Sprint Review 前に SM verification で発見・是正**（Sprint2「テスト green＝完成の盲点」の SM 精読版＝reviewer/テストが拾わない非機能劣化を SM が呼び出し側フローで拾う）。
 
 - **refactor は挙動不変ゆえ Sprint Review 指摘ゼロ・SM verification 段階でも問題ゼロ**（Sprint 13・Sprint3/6/7/8/9/10/11/12 に続く8回目）: #30 は Sprint Review 指摘ゼロ（内部リファクタ・「OK」）。#8 並行保証（`OrderConcurrencyIntegrationSpec`）を退行ガードにグリーン維持。**Sprint12 の perf 教訓を DEV が自発適用したため、今回は SM verification 段階でも非機能差分ゼロ**（Sprint12 は SM が拾ったが、教訓の横展開で Sprint13 は実装段階で回避）＝「テスト green の盲点」の非機能面が**教訓蓄積で自然に閉じていく**好例。
+
+- **Sprint Review クリーン（指摘ゼロ）が Sprint3/6/7/8/9/10/11 に続き継続・full-stack security read Story でも**（Sprint 14）: #9/#10 は Sprint Review「OK」。secure-by-default 土台＋既達無改造再利用＋否定AC 先回り＋意図的設計明記＋spec 委譲論点の計画確定が揃い品質が固まった。**計画前 Explore で「索引置換＝3-repo」を確定**（Q1）したため実機ギャップ（ページング遅延・索引欠如）も出ず。**local main 同期の落とし穴（新パターン・Windows/EOL 固有）**＝frontend の working-tree に EOL ノイズ（`npm run format` 由来）があると `git checkout main` が Aborting し feature ブランチのまま `pull` されて main が未同期になる→対処は `git checkout -f main`（or 事前に `git -c core.autocrlf=false diff --numstat` が空を確認）＋ URL pull は追跡 ref を更新しないため `git fetch <url> +refs/heads/main:refs/remotes/origin/main` で `origin/main` も更新（Sprint6 の CRLF-only ノイズ教訓の「main 同期版」・初出→再発で scrum-master-workflow step 12〔agent-base 同期〕へ昇格判定）。
 
 ## Skills更新履歴
 
@@ -142,3 +148,7 @@
   - SM: **`scrum-master-workflow` ⑧ Retrospective に step 12「agent-base 成果物のコミット&PR&マージ（毎スプリント標準）」を追記**（2026-08-17 ユーザー指示で標準化＝従来の都度口頭指示を恒久ルール化。2回ルールでなくユーザー直接指示のため即時反映）。#skills-changelog 投稿済。その他 SM 学びは long_term 止まり（tier分離13連続・複数 context 横断・スコープ判断のユーザー確定・#29 テンプレ無改造横展開・stale read 行き違い）。
   - DEV: `backend-conventions §9` に「書込集約の適用範囲（rich 集約 vs 薄い書込 record＋orchestration 残置・Cart 型/Order 型の判断軸）」を追記（#29 テンプレの機械的全適用を戒める・PO の「Issue 本文が rich 集約と読めた」指摘を先回り）。Spock 罠3回目は §9 昇格済で追加変更なし（棚卸し＝2回ルール昇格の効果実証）。#skills-changelog 投稿済。卒業候補なし。
   - PO: 質問傾向 Sprint13 追記（Q1=「PO 判断委譲パターン」3件目／Q2・Q3=「先例規約未定義」4/5件目・いずれも引用追記のみ再昇格なし）。意思決定ログ3件。台帳追記なし（#30 は内部リファクタ）。
+- **Sprint 14**:
+  - SM: **skill ファイル変更なし**（Sprint3/7/9/11/12 と同型・SM 学びは 2回ルールで long_term 止まり）。long_term のみ：tier分離14連続・cross-repo 3-repo・#21 認可部品初適用／計画前 Explore でスコープ最小化（Sprint4/9/11 型）／spec 委譲論点の2段階確定（Sprint11 型）／cross-repo closes 主=frontend 4回目／**`@Transactional(readOnly)` reviewer 盲点の SM/DEV 収束発見**（初出）／**local main 同期の EOL/checkout-abort 落とし穴**（初出）。#skills-changelog は SM 変更なしのため投稿なし。
+  - DEV: `backend-conventions §9` に「所有者限定＋列挙対策 read は不存在も含め同一 `AccessDeniedException`(403) に正規化」を新設（#21 実ドメイン初適用の実装パターン・2回ルール例外の即時反映・既存 §5〔存在確認→認可の順〕との使い分け基準も明記）。#skills-changelog 投稿済。long_term に3観点クリーン8回目・perf 教訓自発適用3例目（getOrder の header 単一読み＋認可後明細読み）・習得3件・`@Transactional(readOnly)` 不統一（初出・long_term 止まり）を記録。卒業判定：該当なし（backend12/database4/frontend7・15基準未達）。
+  - PO: **`rules/database.md` に「索引ハイジーン」節を新設して正式昇格**（Sprint1「FK索引一貫性」と同一文書ギャップ＝rules に索引方針未文書化の2件目・Story 文脈非依存の一般 DB 方針ゆえ AC 先回りチェックリストより文書恒久解決が適切と判断）。内容＝FK 明示索引の付与基準／複合索引が単一列索引を左端で内包する場合の置換（ADD+DROP）基準・SQL 例。#skills-changelog 投稿済。po/long_term に質問傾向・意思決定ログ2件追記。#9 AC への索引置換反映は #9 クローズ済のため次回 Refinement 継続項目。

@@ -17,7 +17,9 @@ Sprint10（#7）とも実装スプリントを終えたが、3観点レビュー
 0件・セキュリティは非ブロッキング2件、Sprint6は3観点とも0件、Sprint7はconvention/securityが0件・
 performanceのみ非ブロッキング1件で再修正不要、Sprint9は3観点とも指摘0件でクリーン、Sprint10
 （read-only住所API・既達custom mapper/entityパターンの再利用）も3観点とも指摘0件でクリーン、Sprint13
-（#30・Repository層をCatalog/Account/Orderへ全展開）も3観点とも指摘0件かつSMコア精読でも指摘0件でクリーン）。
+（#30・Repository層をCatalog/Account/Orderへ全展開）も3観点とも指摘0件かつSMコア精読でも指摘0件でクリーン、
+Sprint14（#9/#10・注文履歴一覧/詳細。`OwnershipAuthorizationService`の初の実ドメイン適用）も3観点とも
+指摘0件でクリーン）。
 以下の発見はいずれもDEV自身がTDD・実機検証中に見つけたもので初出＝1回目のため、2回ルールに従い本セクション
 ではなく「習得したこと」「技術的なハマりポイント」に記録する。ただし一部は参照知識/実装パターンとして
 初出からSkillへ即時反映した（詳細は「Skills更新履歴」）。
@@ -88,7 +90,31 @@ Sprint4のセキュリティ非ブロッキング2件（`AuthApplicationService.
   `OrderApplicationService`が既存の`ensureCart`（cartId解決のみ）と`findByCartId`（明細読取）を初めから
   使い分けて実装し、識別子解決用と最終応答用の読み取りを同一の集約全体読み込みメソッドで済ませる誤りを
   DEV自身が事前に回避した（3reviewer・SM verificationとも指摘なしでクリーン）。Skillへ即時反映済みの回避
-  パターンが後続Storyで実際に機能した実例（2回ルール対象外のまま・再昇格不要）。
+  パターンが後続Storyで実際に機能した実例（2回ルール対象外のまま・再昇格不要）。→ **Sprint14（#9/#10）でも
+  3例目として再発しなかった**。`OrderApplicationService#getOrder`が所有者解決用の`findHeaderById`（ヘッダ）
+  と最終応答用の読取を同一メソッドで済ませ（ヘッダは1回だけ読み、応答にもそのまま使い回す）、明細
+  （`findLinesByOrderId`）は認可通過後にのみ呼ぶ設計をDEVが自発的に採用した（3reviewer指摘0件）。Cart（#29）
+  ・Order書込（#30）に続き、集約の形が異なるread系（header+lines）でも同じ設計原則（識別子解決と最終応答を
+  同じ全体読み込みで済ませない）が転移することを確認できた。
+
+- [規約][DEV自己発見・reviewer指摘ではない] **CQRS射影read系メソッドの`@Transactional(readOnly = true)`
+  付与がコードベース内で不統一。** `backend-conventions`§4の既存ルール「参照系メソッドは
+  `@Transactional(readOnly = true)`」に対し、`AccountApplicationService#getMyContact`（Sprint10・#7）は
+  付与済みだが、`CatalogApplicationService`の一覧系4メソッド（Sprint6・#1／Sprint7・#2）と
+  `OrderApplicationService#listOrders`/`getOrder`（Sprint14・#9/#10、Catalogの前例をそのまま踏襲）は
+  いずれも無指定のままで、3観点reviewerもSprint6・7・13・14を通じて一度も指摘していない。Order/Catalogの
+  読取対象（注文ヘッダ・カタログseed）は書込操作でほぼ更新されないため実害は今のところ確認されていないが、
+  `listOrders`（list+count）・`getOrder`（header+lines）はいずれもRepository呼び出しが複数回にまたがる
+  read系であり、`@Transactional(readOnly = true)`が無いと各呼び出しが独立したMyBatis
+  SqlSession/コネクションになりうる（強い一貫性が必要になった場合にスナップショットがずれるリスクの芽）。
+  Skillのルール自体は既存（§4）のため新規チェックリストは不要だが、**「複数Repository呼び出しにまたがる
+  read系メソッド」への適用漏れ**という具体的な発生パターンとしては初出（reviewerが一度も検出できていない
+  点も含め、次にこの種のCQRS read系Serviceメソッドを実装/レビューする際は§4の既存ルールを能動的に
+  再確認する）。
+  発生スプリント: Sprint14（#9/#10、Retroでの自己発見。初出のため2回ルールに従い本セクション止まり。
+  reviewerの見落としが4回連続（Sprint6・7・13・14）である点は、reviewerプロンプト側でこの既存ルールの
+  チェック観点が弱い可能性を示唆するが、DEV側の実装ミス再発パターンではないためSkill昇格の対象外とし、
+  SMへの申し送り事項として記録するにとどめる）。
 
 ### jpetstore-frontend
 Sprint5（#24）が初のフロントエンド実装スプリント。3観点レビューでパフォーマンス1件・セキュリティ1件の
@@ -370,6 +396,16 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   追加適用）で階層化し、フィクスチャ依存テストとスキーマのみのテストを分離した。
 - `flyway_schema_history` は repeatable migration を `version IS NULL / type='SQL'` で記録する。
   この列を直接アサートすることでrepeatable migrationが意図通り適用されたことをテストで担保できる。
+- **既存の単一列索引を複合索引へ置き換える場合、`ADD INDEX`と`DROP INDEX`を同一の`ALTER TABLE`文にまとめる
+  ことで、重複索引が一瞬たりとも残らない置換ができる。** `t_order`の`idx_t_order_user_id (user_id)`を
+  `(user_id, order_id)`複合索引へ統合する際、複合索引の左端prefixが単一列索引と同じ検索能力を持つ
+  （かつFK`fk_t_order_user_id`のバッキングも左端prefixで引き続き成立する）ことを確認したうえで、
+  `ALTER TABLE t_order ADD INDEX idx_t_order_user_id_order_id (user_id, order_id), DROP INDEX
+  idx_t_order_user_id;`のように1文でADD+DROPを行った。2文に分けてDROP→ADDの順で実行すると
+  一時的に索引が存在しない期間が生じ、ADD→DROPの順でも一時的に重複索引が残る期間が生じるが、
+  同一ALTER文にまとめることでどちらのリスクも避けられる。索引テストは複合索引の存在と単一列索引の
+  消滅の両方をアサートして置換の完全性を担保した（`information_schema.STATISTICS`）。
+  発生スプリント: Sprint14（#9、`V00_000_011__add_t_order_user_order_index.sql`）
 
 ### jpetstore-backend
 - **Spring Boot 4.1 が自動構成する `ObjectMapper` は Jackson 3系（`tools.jackson.databind.ObjectMapper`）。**
@@ -599,6 +635,22 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   一発でクリーンな実装ができた（3reviewer・SM verificationとも指摘0件）。
   発生スプリント: Sprint13（#30。§9記載のテンプレ自体は変更不要と判断＝Skill未更新。テンプレの適用範囲の
   判断軸としてlong_term.mdに記録するにとどめた）
+- **Sprint14（#9/#10・注文履歴一覧/詳細）は、Sprint4（#21）で用意し「各ドメインへの適用は各Storyへ委譲」と
+  申し送っていた`OwnershipAuthorizationService`を、コードベース初めて実ドメイン（Order）へ適用した。**
+  `getOrder`は「orderIdからサーバー側で`findHeaderById`により真の所有者userIdを解決→`assertOwner`で
+  照合」という§9記載の設計どおりに実装でき、認可土台側の設計変更は一切不要だった（3.5スプリント越しで
+  土台の設計が実ドメインでもそのまま機能した実証）。加えて、`OwnershipAuthorizationService`単体では
+  「所有者不一致」しか判定しないため、**「不存在」も同じ`AccessDeniedException`（403）に正規化して
+  列挙オラクルを封じる判断（SBD-8）はService側の責務として実装した**（`OwnershipAuthorizationService`
+  自体は変更していない＝薄い部品のまま）。この設計判断は`backend-conventions`§9へ即時反映した
+  （詳細は「Skills更新履歴」）。
+- **カタログ（Sprint6・#1）で確立した「一覧はカスタムXMLマッパーでJOIN・LIMIT/OFFSET・COUNTを1SQLに
+  まとめる」「明細JOINは`CatalogCustomMapper.selectItemById`型（`m_item ⋈ m_product`でproduct_name補完）」
+  の2先例が、Order（#9/#10）へ無改造の設計判断で転用できた。** 一覧（`selectOrdersByUserId`）は
+  `WHERE user_id=? ORDER BY order_id DESC LIMIT/OFFSET`、明細（`selectOrderLinesByOrderId`）は
+  `t_order_line ⋈ m_item ⋈ m_product`の2段JOINで、Sprint6時点で「#2/#9が再利用する先例」と明記していた
+  設計が3スプリント越しで実際に機能した（Sprint7の#2に続く2例目の再利用実証）。
+  発生スプリント: Sprint14（#9/#10）
 
 ### jpetstore-frontend
 - **backendのSpring Security 7 CSRF設定（非XOR `CsrfTokenRequestAttributeHandler`・consume-then-
@@ -671,6 +723,12 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   `router.replace('/cart?reason=empty-checkout')`するだけにした。View自体はVitest対象外のままでも、AC
   の正しさはストア側のテストで担保できる。`frontend-conventions`§7へ反映した（詳細は「Skills更新履歴」）。
   発生スプリント: Sprint10（#7）
+- **Sprint5で確立した「一律メッセージ（HTTPステータス・エラー内容をUIへ生で渡さない）」を、ログイン以外の
+  ドメイン（注文詳細の所有者限定取得）へ初めて転用した。** `stores/order.ts#fetchDetail`は403（非所有）と
+  不存在相当のいずれも`HttpError`の種別を分岐させず、単一の`detailUnavailable`フラグに握りつぶす実装にした
+  （backendのAC-neg2＝不存在/非所有を区別不能にする要求と対で機能する）。既存ルールの新規ドメインへの
+  転用であり新しいSkillパターンではないため`frontend-conventions`は変更していない。
+  発生スプリント: Sprint14（#10）
 
 ### 横断（database＋backend＋frontend）
 - **区分値をm_codeに新規登録する際の3-repo横断フロー**を在庫ステータスで実地確認した:
@@ -684,6 +742,15 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   場合はreconcile（統合）する。
   今後の区分値追加（ユーザー方針「区分値は基本的にm_codeに登録する」）で同じ手順を辿れる。
   発生スプリント: Sprint6（#1）
+- **Sprint14（#9/#10・注文履歴一覧/詳細）は、既達土台（#8注文ドメイン・#21認可部品・#1/#2カタログの
+  ページング/JOIN先例）を最大限再利用する設計で計画され、3-repo cross-repo（database複合索引＋backend
+  read API＋frontend画面）を通じて3観点レビュー指摘0件・手戻りゼロで完走した。** Sprint6以来の
+  「secure-by-defaultな土台の上に積む」「先例を再利用する」パターンの延長線上にあるが、本Storyは
+  Sprint4（#21）で用意されたまま3.5スプリント未適用だった`OwnershipAuthorizationService`が初めて実
+  ドメインで検証された点、およびSprint12で発見されたperfパターン（識別子解決read/最終応答readの分離）が
+  Cart（#29）・Order書込（#30）に続き3例目のドメイン（Order read）でも自発的に踏襲された点で、
+  「土台・教訓が時間を跨いで複数Storyへ確実に転移する」プロセスの再現性を追加で実証した。
+  発生スプリント: Sprint14（#9/#10）
 
 ## Skills更新履歴
 
@@ -941,11 +1008,34 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   「習得したこと」（jpetstore-backend）に記録した。
 - `#skills-changelog` へ `[DEV]` で投稿済み。
 
+### Sprint 14（#9/#10・注文履歴一覧/詳細・`OwnershipAuthorizationService`の初の実ドメイン適用）
+
+- **`backend-conventions`**: `## 9. jpetstore-backend 固有の注意事項`の「本人スコープ（所有者一致）認可は
+  `OwnershipAuthorizationService`に集約する」直後に「所有者限定＋列挙対策のreadエンドポイントは、不存在も
+  含めて同一の`AccessDeniedException`（403）に正規化する」を新設した。**初出だが「知らないと書けない
+  参照知識・実装パターン」の2回ルール例外として即時反映**: 再発防止のためのチェックリスト項目ではなく、
+  `OwnershipAuthorizationService`（#21で用意・本Storyが初の実ドメイン適用）を「連番IDで推測可能なリソース」
+  と組み合わせる際の具体的な設計判断（不存在も403に含める・既存§5「認可チェックは存在確認の直後」ルールとの
+  使い分け）を明文化した実装パターンのため。POからの要望検討時に「昇格候補か」を明示的に問われ、
+  過去の`OwnershipAuthorizationService`関連追記（Sprint4）・`REQUIRES_NEW`（Sprint11）と同じ「参照知識」
+  という位置づけで即時反映が妥当と判断した。
+- **`backend-conventions`へは反映しなかったもの**: CQRS射影read系メソッドへの`@Transactional(readOnly =
+  true)`付与がコードベース内で不統一（`AccountApplicationService`=付与済み／`CatalogApplicationService`・
+  `OrderApplicationService`（#9/#10）=無指定）という、reviewerではなくDEV自身がRetroで発見した観点は、
+  既存ルール（§4）自体は既に存在し新規の実装パターンではないため、`memory/dev/long_term.md`「繰り返し
+  指摘されるパターン」（jpetstore-backend）に初出として記録するに留めた（2回ルールの通常適用。次に
+  同種のCQRS read系Serviceを実装/レビューする際に再確認する）。
+- 3reviewer指摘0件（クリーン）・Sprint12のperf教訓（識別子解決read/最終応答readの分離）が3例目のドメイン
+  でも自発的に踏襲された点・カタログのページング/JOIN先例が2例目のドメインへ転用できた点は、いずれも
+  チェックリスト項目ではなくプロセス上の教訓のため`memory/dev/long_term.md`「繰り返し指摘されるパターン」
+  「習得したこと」（jpetstore-backend・横断）に記録した。
+- `#skills-changelog` へ `[DEV]` で投稿済み。
+
 ## 卒業済みルール
 
 （該当なし。棚卸し対象となるルールが直近15スプリント基準に達していない。
-  jpetstore-backendはSprint2・3・4・6・7・8・9・10・11・12・13の11スプリントのみ、jpetstore-databaseは
-  Sprint1・3・6の3スプリントのみ、jpetstore-frontendはSprint5・6・7・8・10・11の6スプリントのみのため、
-  いずれも対象外。§9昇格済みの最古ルール（catch-all例外横取り・Sprint7昇格）でも昇格から6スプリント
-  （Sprint8〜13）しか経過しておらず15スプリントに満たない。Sprint4〜Sprint12 Retroに続きSprint13 Retroでも
+  jpetstore-backendはSprint2・3・4・6・7・8・9・10・11・12・13・14の12スプリントのみ、jpetstore-databaseは
+  Sprint1・3・6・14の4スプリントのみ、jpetstore-frontendはSprint5・6・7・8・10・11・14の7スプリントのみの
+  ため、いずれも対象外。§9昇格済みの最古ルール（catch-all例外横取り・Sprint7昇格）でも昇格から7スプリント
+  （Sprint8〜14）しか経過しておらず15スプリントに満たない。Sprint4〜Sprint13 Retroに続きSprint14 Retroでも
   棚卸しを実施したが同様の理由で卒業候補なし）

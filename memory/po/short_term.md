@@ -1,8 +1,8 @@
 # PO 短期記憶（今スプリント）
 
-## Sprint 13 Retro（2026-08-17）で棚卸し済み
+## Sprint 14 Retro（2026-08-17）で棚卸し済み
 
-Sprint 12 Retro以降の文脈（Sprint13計画フェーズ〔#30 Repository層全展開〕でのDEV確認3件〔Q1 Order集約 vs orchestration・Q2 read/write Repository命名統一・Q3 InventoryRepositoryのパッケージ配置〕）はSprint 13 Retroで棚卸し済み。要点は `memory/po/long_term.md`（質問傾向へSprint13セクション追記〔傾向1「architecture-conventionsのPO判断委譲パターン」＝Sprint6#1・Sprint8#4に続く3件目の再発〔Q1〕／傾向2「先例規約未定義」＝Sprint5#24・Sprint6#1・Sprint12#29に続く4件目・5件目の再発〔Q2・Q3〕・いずれも既存チェックリスト項目の引用リストへ追記のみで再昇格なし〕・意思決定ログ3件追記〔Q1〜Q3〕）に反映済み。Q2のユーザーオーバーライド（統一Repository命名）は独立傾向化しない方針とした。
+Sprint 13 Retro以降の文脈（Sprint14計画フェーズ〔#9 注文履歴一覧・#10 注文詳細閲覧〕でのDEV→ユーザー確認1件〔ページング用複合索引`(user_id, order_id)`追加時の既存単一索引`idx_t_order_user_id`の置換要否〕）はSprint 14 Retroで棚卸し済み。要点は `memory/po/long_term.md`（質問傾向へSprint14セクション追記〔SM長期記憶Sprint1トレンド「FK列の明示セカンダリインデックスの一貫性」と同一文書ギャップ（`rules/database.md`に索引設計方針が未文書化）の2件目の再発と判定〕・意思決定ログ2件追記）に反映済み。本件はPO内チェックリストへの項目追加ではなく、`.claude\rules\database.md`に「索引ハイジーン（FK 明示索引・複合索引導入時の重複排除）」節を新設してfirmupする形で正式昇格した（Story文脈に依存しない一般DBエンジニアリング方針のため）。`#skills-changelog`へ[PO]で投稿予定。
 
 ### 未解決の判断事項
 
@@ -17,6 +17,7 @@ Sprint 12 Retro以降の文脈（Sprint13計画フェーズ〔#30 Repository層�
 - #4のAC3備考へ、カート画面ルートが公開（`meta.requiresAuth`なし）・認証必須は`/api/cart/**` APIのみである旨を次回Refinementでユーザーに確認のうえ反映する（Sprint8計画フェーズD2で決定）。
 - #29のAC1/備考へ、Sprint12計画フェーズで確定したD1（集約の型戦略＝単一rich型・`stockQuantity`はprivate内部保持＋外向きは射影アクセサのみ公開）・D2（Repository書込メソッド粒度＝細粒度`upsertItem`/`removeItem`をドメイン語彙メソッドで残す）を反映するかは次回Refinementでユーザーに確認のうえ判断する。
 - #30のAC/方針欄へ、Sprint13計画フェーズで確定したQ1（Order集約=richな集約を新設せず#8のorchestrationをOrderApplicationServiceに残す。方針欄「#29の集約パターンに準拠」の文言を是正）・Q2（read/write Repositoryは統一`...Repository`命名。`...Query`分離は不採用）・Q3（`InventoryRepository`は新規`domain/inventory`パッケージ）を反映するかは次回Refinementでユーザーに確認のうえ判断する。
+- #9のAC/備考へ、Sprint14計画フェーズで確定した索引方針（ページング用複合索引`(user_id, order_id)`を`t_order`に追加し、既存単一索引`idx_t_order_user_id`は置換=DROPして重複索引を残さない）を反映するかは次回Refinementでユーザーに確認のうえ判断する。
 
 ### 次回PO稼働時のTODO
 

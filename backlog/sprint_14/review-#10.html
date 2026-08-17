@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint 14 Review — #10 注文詳細を所有者限定で閲覧できるようにする</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #f8f7f5; }
+
+  .page { max-width: 860px; margin: 0 auto; padding: 48px 24px; }
+
+  /* Header */
+  .sprint-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin-bottom: 8px; }
+  h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px; }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+  .badge-sprint { background: #e8f0fe; color: #1a56db; }
+  .badge-issue { background: #f0fdf4; color: #166534; }
+  .badge-feature { background: #eff6ff; color: #1d4ed8; }
+  .badge-security { background: #fef2f2; color: #b91c1c; }
+  .badge-database { background: #fefce8; color: #854d0e; }
+  .badge-backend { background: #f0f9ff; color: #0369a1; }
+  .badge-frontend { background: #fdf4ff; color: #7e22ce; }
+
+  /* Sections */
+  section { margin-bottom: 40px; }
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #888; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e5e5e5; }
+
+  /* Problem box */
+  .problem-box { background: #fff8f0; border-left: 3px solid #f59e0b; border-radius: 0 8px 8px 0; padding: 16px 20px; margin-bottom: 16px; }
+  .problem-box .label { font-size: 11px; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .problem-box p { color: #451a03; font-size: 13px; }
+
+  /* Architecture change */
+  .arch-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: center; margin-bottom: 8px; }
+  .arch-box { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; }
+  .arch-box .arch-title { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .arch-box.before { border-color: #fca5a5; }
+  .arch-box.after { border-color: #86efac; }
+  .arch-arrow { font-size: 20px; color: #888; text-align: center; }
+  .flow-item { font-size: 12px; color: #374151; padding: 3px 0; display: flex; align-items: flex-start; gap: 6px; }
+  .flow-item .dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .dot-red { background: #ef4444; }
+  .dot-green { background: #22c55e; }
+
+  /* AC cards */
+  .ac-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+  .ac-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid #f0f0f0; }
+  .ac-check { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .ac-check.done { background: #dcfce7; color: #166534; }
+  .ac-num { font-size: 11px; font-weight: 700; color: #888; }
+  .ac-text { font-size: 13px; font-weight: 600; color: #1a1a1a; flex: 1; }
+  .ac-body { padding: 16px 18px; }
+  .ac-body p { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+
+  /* File change */
+  .file-change { margin-bottom: 16px; }
+  .file-name { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; background: #f3f4f6; color: #374151; padding: 5px 10px; border-radius: 4px 4px 0 0; border: 1px solid #e5e5e5; border-bottom: none; display: flex; justify-content: space-between; }
+  .diff-stat { color: #888; }
+  .code-block { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.7; background: #1e1e2e; color: #cdd6f4; padding: 14px 16px; border-radius: 0 0 6px 6px; overflow-x: auto; white-space: pre; }
+  .code-line { display: flex; }
+  .line-num { color: #45475a; min-width: 28px; user-select: none; }
+  .line-add { background: rgba(166, 227, 161, 0.12); color: #a6e3a1; }
+  .line-del { background: rgba(243, 139, 168, 0.12); color: #f38ba8; }
+  .line-ctx { color: #cdd6f4; }
+  .line-prefix { min-width: 14px; }
+
+  /* Annotation */
+  .annotation { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-size: 12px; color: #78350f; display: flex; gap: 8px; }
+  .annotation.warn { background: #fef2f2; border-color: #fecaca; color: #7f1d1d; }
+  .annotation-icon { font-size: 14px; flex-shrink: 0; }
+
+  /* Verify section */
+  .verify-list { list-style: none; }
+  .verify-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; }
+  .verify-item:last-child { border-bottom: none; }
+  .verify-num { width: 22px; height: 22px; background: #e8f0fe; color: #1a56db; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .verify-content { flex: 1; }
+  .verify-content strong { font-size: 13px; color: #1a1a1a; display: block; margin-bottom: 3px; }
+  .verify-content span { font-size: 12px; color: #6b7280; }
+
+  /* Scope table */
+  .scope-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .scope-table th { text-align: left; padding: 8px 12px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .scope-table td { padding: 10px 12px; border: 1px solid #e5e5e5; color: #374151; vertical-align: top; }
+  .scope-table tr:hover td { background: #f9fafb; }
+  .tag-changed { font-size: 11px; font-weight: 600; background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 3px; }
+  .tag-unchanged { font-size: 11px; font-weight: 600; background: #f3f4f6; color: #6b7280; padding: 2px 6px; border-radius: 3px; }
+  .scope-group { font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; padding: 10px 12px 4px; }
+
+  /* API call count (reused as query-count box) */
+  .api-count-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .api-count-box { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; text-align: center; }
+  .api-count-box .label { font-size: 11px; color: #888; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+  .api-count-box .count { font-size: 30px; font-weight: 700; line-height: 1; }
+  .api-count-box .sublabel { font-size: 11px; color: #888; margin-top: 4px; }
+  .count-before { color: #ef4444; }
+  .count-after { color: #22c55e; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="sprint-label">Sprint 14 Review</div>
+  <h1>#10 — 注文詳細を所有者限定で閲覧できるようにする<br>（列挙対策込み）</h1>
+  <div class="meta">
+    <span class="badge badge-sprint">Sprint 14</span>
+    <span class="badge badge-issue">#10</span>
+    <span class="badge badge-feature">feature</span>
+    <span class="badge badge-security">security / E3</span>
+    <span class="badge badge-backend">backend</span>
+    <span class="badge badge-frontend">frontend</span>
+  </div>
+
+  <!-- Problem -->
+  <section>
+    <h2>なぜこの改修が必要だったか</h2>
+    <div class="problem-box">
+      <div class="label">問題（before S3・IDOR＋列挙オラクル）</div>
+      <p>legacy（Struts1 JPetStore）は注文詳細も一覧と同じ identity-rebind IDOR を抱えるうえ、存在しない orderId を指定すると <strong>NPEで500</strong> になり、実在する orderId とは異なる応答（404/200/500の分岐）を返すため、連番の orderId を総当たりして「存在する注文」を推測できる列挙オラクルになっていた。新ビルドでは所有者判定をサービス層に集約し、<strong>不存在と非所有を同一の403に正規化</strong>することで、存在推測そのものを構造的に不可能にする（SBD-1・SBD-8・SBD-10）。あわせて明細に商品名（as-isでは空だった）をJOINで補完する（ID-24・非等価改善）。</p>
+    </div>
+    <div class="arch-grid">
+      <div class="arch-box before">
+        <div class="arch-title">before（legacy）</div>
+        <div class="flow-item"><span class="dot dot-red"></span>認可根拠がリクエスト/セッションのusername（IDOR）</div>
+        <div class="flow-item"><span class="dot dot-red"></span>存在しないorderId → NPEで500（内部情報露出）</div>
+        <div class="flow-item"><span class="dot dot-red"></span>不存在/非所有/所有 で応答が分岐 → 存在推測が可能（列挙オラクル）</div>
+        <div class="flow-item"><span class="dot dot-red"></span>明細の商品名が空（履歴経由でjoinしていない）</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-box after">
+        <div class="arch-title">after（新ビルド）</div>
+        <div class="flow-item"><span class="dot dot-green"></span>所有者はDBで解決した真のuserId（サーバ側）とプリンシパルを突合</div>
+        <div class="flow-item"><span class="dot dot-green"></span>不存在・非所有ともに同一の403（AccessDeniedException）に正規化</div>
+        <div class="flow-item"><span class="dot dot-green"></span>500/trace非露出。malformed orderId（非数値）は一律400</div>
+        <div class="flow-item"><span class="dot dot-green"></span>t_order_line ⋈ m_item ⋈ m_product のJOINで商品名を補完（ID-24）</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AC breakdown -->
+  <section>
+    <h2>AC別 実装内容</h2>
+
+    <!-- AC1 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC1 (SBD-1)</div>
+        <div class="ac-text">orderId指定で自分の注文のみ詳細表示。認可はサービス層で所有者判定（認証プリンシパル基準）</div>
+      </div>
+      <div class="ac-body">
+        <p><code>OwnershipAuthorizationService</code>（#21で用意済）の<strong>初の実ドメイン適用</strong>。「orderIdから所有者を解決する」処理（ドメイン固有）と「解決済み所有者とプリンシパルを突合する」処理（再利用部品）を分離している。</p>
+
+        <div class="file-change">
+          <div class="file-name">
+            <span>jpetstore-backend / domain/security/OwnershipAuthorizationService.java（既存・#21）</span>
+            <span class="diff-stat">再利用（無改造）</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">32</span><span class="line-prefix"> </span><span>public void assertOwner(Long resourceOwnerUserId) {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">33</span><span class="line-prefix"> </span><span>  AuthenticatedUser currentUser = currentUserProvider.requireCurrentUser();</span></div>
+            <div class="code-line line-ctx"><span class="line-num">34</span><span class="line-prefix"> </span><span>  if (!currentUser.userId().equals(resourceOwnerUserId)) {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">35</span><span class="line-prefix"> </span><span>    throw new AccessDeniedException("Caller is not the owner of the target resource");</span></div>
+            <div class="code-line line-ctx"><span class="line-num">36</span><span class="line-prefix"> </span><span>  }</span></div>
+            <div class="code-line line-ctx"><span class="line-num">37</span><span class="line-prefix"> </span><span>}</span></div>
+          </div>
+        </div>
+
+        <div class="file-change">
+          <div class="file-name">
+            <span>jpetstore-backend / application/service/OrderApplicationService.java</span>
+            <span class="diff-stat">+8</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">159</span><span class="line-prefix"> </span><span>public OrderDetail getOrder(Long orderId) {</span></div>
+            <div class="code-line line-add"><span class="line-num">160</span><span class="line-prefix">+</span><span>  OrderHeader header =</span></div>
+            <div class="code-line line-add"><span class="line-num">161</span><span class="line-prefix">+</span><span>      orderRepository</span></div>
+            <div class="code-line line-add"><span class="line-num">162</span><span class="line-prefix">+</span><span>          .findHeaderById(orderId)</span></div>
+            <div class="code-line line-add"><span class="line-num">163</span><span class="line-prefix">+</span><span>          .orElseThrow(() -&gt; new AccessDeniedException("Order not found or not owned"));</span></div>
+            <div class="code-line line-add"><span class="line-num">164</span><span class="line-prefix">+</span><span>  ownershipAuthorizationService.assertOwner(header.userId());</span></div>
+            <div class="code-line line-add"><span class="line-num">165</span><span class="line-prefix">+</span><span>  List&lt;OrderDetailLine&gt; lines = orderRepository.findLinesByOrderId(orderId);</span></div>
+            <div class="code-line line-add"><span class="line-num">166</span><span class="line-prefix">+</span><span>  return new OrderDetail(header.orderId(), header.orderDate(), header.totalPrice(), lines);</span></div>
+            <div class="code-line line-ctx"><span class="line-num">167</span><span class="line-prefix"> </span><span>}</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span><code>header.userId()</code>（DB解決の真の所有者）を渡す＝クライアント入力を認可に一切使わない。<code>assertOwner</code>の呼び出し口はこの1箇所のみ。</span>
+          </div>
+        </div>
+
+        <div class="file-change">
+          <div class="file-name">
+            <span>jpetstore-backend / presentation/rest/OrderController.java</span>
+            <span class="diff-stat">+3</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">69</span><span class="line-prefix">+</span><span>/** #10 AC1〜AC4: 所有者限定の注文詳細（明細・合計・注文日のみ。住所は含めない・Sprint14 Q2）。 */</span></div>
+            <div class="code-line line-add"><span class="line-num">70</span><span class="line-prefix">+</span><span>@GetMapping("/{orderId}")</span></div>
+            <div class="code-line line-add"><span class="line-num">71</span><span class="line-prefix">+</span><span>public OrderDetailResponse getOrder(@PathVariable Long orderId) {</span></div>
+            <div class="code-line line-add"><span class="line-num">72</span><span class="line-prefix">+</span><span>  return OrderDetailResponse.from(orderApplicationService.getOrder(orderId));</span></div>
+            <div class="code-line line-add"><span class="line-num">73</span><span class="line-prefix">+</span><span>}</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span><code>orderId</code>は<code>Long</code>パス変数。数値でなければ既存の<code>handleTypeMismatch</code>が400にする（存在有無に一切触れない）。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC2 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC2</div>
+        <div class="ac-text">注文詳細に商品名を表示（明細にItemをjoin。as-isは履歴経由で商品名が空だった＝ID-24非等価改善）</div>
+      </div>
+      <div class="ac-body">
+        <p><code>CatalogCustomMapper.selectItemById</code>（<code>m_item ⋈ m_product</code>）のJOIN方式を参考に、<code>t_order_line ⋈ m_item ⋈ m_product</code>の2段JOINで<code>product_name</code>を補完する。この明細SELECTは<strong>認可通過後にのみ</strong>呼ばれる設計（下記「動作確認ポイント」参照）。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>jpetstore-backend / src/main/resources/mapper/custom/OrderCustomMapper.xml</span>
+            <span class="diff-stat">+8（明細JOIN）</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">74</span><span class="line-prefix">+</span><span>&lt;select id="selectOrderLinesByOrderId" resultType="...OrderLineViewCustomEntity"&gt;</span></div>
+            <div class="code-line line-add"><span class="line-num">75</span><span class="line-prefix">+</span><span>    SELECT ol.item_id AS item_id, p.name AS product_name,</span></div>
+            <div class="code-line line-add"><span class="line-num">76</span><span class="line-prefix">+</span><span>           ol.quantity AS quantity, ol.unit_price AS unit_price</span></div>
+            <div class="code-line line-add"><span class="line-num">77</span><span class="line-prefix">+</span><span>      FROM t_order_line ol</span></div>
+            <div class="code-line line-add"><span class="line-num">78</span><span class="line-prefix">+</span><span>      JOIN m_item i ON i.item_id = ol.item_id</span></div>
+            <div class="code-line line-add"><span class="line-num">79</span><span class="line-prefix">+</span><span>      JOIN m_product p ON p.product_id = i.product_id</span></div>
+            <div class="code-line line-add"><span class="line-num">80</span><span class="line-prefix">+</span><span>     WHERE ol.order_id = #{orderId}</span></div>
+            <div class="code-line line-add"><span class="line-num">81</span><span class="line-prefix">+</span><span>     ORDER BY ol.line_num</span></div>
+            <div class="code-line line-add"><span class="line-num">82</span><span class="line-prefix">+</span><span>&lt;/select&gt;</span></div>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>jpetstore-frontend / src/views/order/OrderDetailView.vue（新規）</span>
+            <span class="diff-stat">明細テーブル</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">55</span><span class="line-prefix"> </span><span>&lt;tr v-for="line in orderStore.detail.lines" :key="line.itemId"&gt;</span></div>
+            <div class="code-line line-ctx"><span class="line-num">56</span><span class="line-prefix"> </span><span>  &lt;td&gt;{{ line.productName }}&lt;/td&gt;</span></div>
+            <div class="code-line line-ctx"><span class="line-num">57</span><span class="line-prefix"> </span><span>  &lt;td class="jps-price"&gt;{{ formatPrice(line.unitPrice) }}&lt;/td&gt;</span></div>
+            <div class="code-line line-ctx"><span class="line-num">58</span><span class="line-prefix"> </span><span>  &lt;td&gt;{{ line.quantity }}&lt;/td&gt;</span></div>
+            <div class="code-line line-ctx"><span class="line-num">59</span><span class="line-prefix"> </span><span>  &lt;td class="jps-price"&gt;{{ formatPrice(line.lineTotal) }}&lt;/td&gt;</span></div>
+            <div class="code-line line-ctx"><span class="line-num">60</span><span class="line-prefix"> </span><span>&lt;/tr&gt;</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span><code>CheckoutConfirmStep.vue</code>の<code>&lt;table class="jps-table"&gt;</code>パターンを転用。<code>lineTotal</code>（<code>unitPrice * quantity</code>）はbackendが返さないためapi層（<code>orderApi.ts</code>）で前段算出する。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC3 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC3 (SBD-8/SBD-10)</div>
+        <div class="ac-text">not-owned と not-found を同一403に統一（連番orderIdの存在推測を封じる）。as-isの存在しないorderId→NPE 500を解消</div>
+      </div>
+      <div class="ac-body">
+        <p>不存在（<code>findHeaderById</code>が空）と非所有（<code>assertOwner</code>が不一致）の<strong>いずれも同一の<code>AccessDeniedException</code></strong>を投げ、既存<code>GlobalExceptionHandler</code>が403＋監査記録に正規化する（<code>ResourceNotFoundException</code>＝404は使わない。404を返すと列挙オラクルになるため意図的に不使用）。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>jpetstore-backend / application/service/OrderApplicationService.java（AC1と同一メソッド）</span>
+            <span class="diff-stat">L163 / L164</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">163</span><span class="line-prefix">+</span><span>.orElseThrow(() -&gt; new AccessDeniedException("Order not found or not owned"));  // 不存在</span></div>
+            <div class="code-line line-add"><span class="line-num">164</span><span class="line-prefix">+</span><span>ownershipAuthorizationService.assertOwner(header.userId());  // 非所有 → 同じ例外型</span></div>
+          </div>
+          <div class="annotation warn">
+            <span class="annotation-icon">⚠️</span>
+            <span><strong>意図的設計（reviewer起動プロンプトに明記済）</strong>: 既存<code>GlobalExceptionHandler</code>はnot-found→404／access-denied→403に分岐する作りだが、本Storyは両方を403に統一する。「不存在は404が正しいのでは」という指摘は本Storyのスコープでは誤指摘となる（SBD-8・列挙オラクル封じが優先）。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC4 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC4 (SBD-13)</div>
+        <div class="ac-text">金額表示はBigDecimal/decimal</div>
+      </div>
+      <div class="ac-body">
+        <p>明細の<code>unitPrice</code>・注文合計<code>totalPrice</code>とも<code>t_order_line.unit_price</code>/<code>t_order.total_price</code>（注文確定時点にサーバ計算・#8で確立済）をそのまま<code>BigDecimal</code>で運ぶ。浮動小数点への変換は行わない。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>jpetstore-backend / domain/order/OrderDetail.java・OrderDetailLine.java（新規）</span>
+            <span class="diff-stat">+32</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">-</span><span class="line-prefix">+</span><span>public record OrderDetail(</span></div>
+            <div class="code-line line-add"><span class="line-num">-</span><span class="line-prefix">+</span><span>    Long orderId, LocalDate orderDate, BigDecimal totalPrice, List&lt;OrderDetailLine&gt; lines) {}</span></div>
+            <div class="code-line line-add"><span class="line-num">-</span><span class="line-prefix">+</span><span>public record OrderDetailLine(</span></div>
+            <div class="code-line line-add"><span class="line-num">-</span><span class="line-prefix">+</span><span>    String itemId, String productName, int quantity, BigDecimal unitPrice) {}</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC5 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC5</div>
+        <div class="ac-text">注文詳細の画面・APIは認証必須（frontend meta.requiresAuth: true）</div>
+      </div>
+      <div class="ac-body">
+        <div class="file-change">
+          <div class="file-name">
+            <span>jpetstore-frontend / src/router/index.ts</span>
+            <span class="diff-stat">+7</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">98</span><span class="line-prefix">+</span><span>// #10 AC5: 注文詳細(所有者限定)。認証必須。</span></div>
+            <div class="code-line line-add"><span class="line-num">99</span><span class="line-prefix">+</span><span>{</span></div>
+            <div class="code-line line-add"><span class="line-num">100</span><span class="line-prefix">+</span><span>  path: '/account/orders/:orderId',</span></div>
+            <div class="code-line line-add"><span class="line-num">101</span><span class="line-prefix">+</span><span>  name: 'order-detail',</span></div>
+            <div class="code-line line-add"><span class="line-num">102</span><span class="line-prefix">+</span><span>  component: OrderDetailView,</span></div>
+            <div class="code-line line-add"><span class="line-num">103</span><span class="line-prefix">+</span><span>  meta: { title: 'JPetStore - Order Detail', requiresAuth: true },</span></div>
+            <div class="code-line line-add"><span class="line-num">104</span><span class="line-prefix">+</span><span>},</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- neg + L2 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC-neg1/2・[L2]</div>
+        <div class="ac-text">他人のorderId→403／不存在と非所有が区別不能（500・traceなし）／明細と合計は旧同値</div>
+      </div>
+      <div class="ac-body">
+        <p>frontend側は403（非所有）・404相当（不存在）を<strong>区別せず</strong> <code>detailUnavailable</code> の1フラグに統一して扱う。これによりViewが「非所有なのか不存在なのか」を判定する余地自体を無くしている。</p>
+
+        <div class="file-change">
+          <div class="file-name">
+            <span>jpetstore-frontend / src/stores/order.ts</span>
+            <span class="diff-stat">+13</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">96</span><span class="line-prefix"> </span><span>async fetchDetail(orderId: number): Promise&lt;void&gt; {</span></div>
+            <div class="code-line line-add"><span class="line-num">97</span><span class="line-prefix">+</span><span>  this.isLoadingDetail = true</span></div>
+            <div class="code-line line-add"><span class="line-num">98</span><span class="line-prefix">+</span><span>  this.detailUnavailable = false</span></div>
+            <div class="code-line line-add"><span class="line-num">99</span><span class="line-prefix">+</span><span>  this.detail = null</span></div>
+            <div class="code-line line-add"><span class="line-num">100</span><span class="line-prefix">+</span><span>  try {</span></div>
+            <div class="code-line line-add"><span class="line-num">101</span><span class="line-prefix">+</span><span>    this.detail = await orderApi.fetchOrder(orderId)</span></div>
+            <div class="code-line line-add"><span class="line-num">102</span><span class="line-prefix">+</span><span>  } catch {</span></div>
+            <div class="code-line line-add"><span class="line-num">103</span><span class="line-prefix">+</span><span>    this.detail = null</span></div>
+            <div class="code-line line-add"><span class="line-num">104</span><span class="line-prefix">+</span><span>    this.detailUnavailable = true  // 403/404相当を区別せず統一</span></div>
+            <div class="code-line line-add"><span class="line-num">105</span><span class="line-prefix">+</span><span>  } finally { this.isLoadingDetail = false }</span></div>
+            <div class="code-line line-ctx"><span class="line-num">106</span><span class="line-prefix"> </span><span>}</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>catchブロックはHTTPステータスで分岐しない（403も404相当も同じ<code>catch</code>に入り同じ<code>detailUnavailable=true</code>になる）。<code>OrderDetailView.vue</code>は「見つからないか閲覧できません」という固定メッセージのみを表示し、存在推測を与えない。</span>
+          </div>
+        </div>
+
+        <div class="file-change">
+          <div class="file-name">
+            <span>jpetstore-backend / test/.../OrderControllerSpec.groovy（自動化された否定AC回帰テスト）</span>
+            <span class="diff-stat">RED→GREEN</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num"> </span><span class="line-prefix"> </span><span>"#10 AC-neg1: 他人の注文詳細は403になる" → status().isForbidden()</span></div>
+            <div class="code-line line-ctx"><span class="line-num"> </span><span class="line-prefix"> </span><span>"#10 AC-neg2: 存在しない注文詳細も403(他人と同一・存在推測不可)"</span></div>
+            <div class="code-line line-ctx"><span class="line-num"> </span><span class="line-prefix"> </span><span>  → status().isForbidden()・jsonPath('$.message').value("Access is denied")</span></div>
+            <div class="code-line line-ctx"><span class="line-num"> </span><span class="line-prefix"> </span><span>"#10 非数値orderIdは400になる(malformedは存在を漏らさない)"</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>他人の注文（403）と存在しない注文（999999999・403）が<strong>同一のステータス・同一のメッセージ</strong>になることをテストで直接固定している。500やstacktraceが出ないことも同テストで担保。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Perf note -->
+  <section>
+    <h2>設計メモ（パフォーマンス・Sprint12/13教訓の踏襲）</h2>
+    <div class="api-count-grid">
+      <div class="api-count-box">
+        <div class="label">own（所有者一致）でのt_orderヘッダ読取</div>
+        <div class="count count-after">1回</div>
+        <div class="sublabel">findHeaderByIdを所有者解決と応答生成の両方で使い回す</div>
+      </div>
+      <div class="api-count-box">
+        <div class="label">non-owned/not-foundでのt_order_line読取</div>
+        <div class="count count-after">0回</div>
+        <div class="sublabel">assertOwnerで例外化された時点で明細クエリに到達しない（短絡）</div>
+      </div>
+    </div>
+    <p style="font-size:12px;color:#6b7280;margin-top:12px;">Sprint12（#29）でSMが発見した「識別子解決用と最終応答用の読取を同じ集約全体読み込みメソッドで済ませ、クエリ数が純増する」パターンをDEVが事前に回避（<code>OrderApplicationServiceSpec</code>の <code>perf: getOrderはfindHeaderByIdを1回だけ呼び、識別子解決用と最終応答用を分けない</code> テストで固定）。</p>
+  </section>
+
+  <!-- Verify -->
+  <section>
+    <h2>動作確認ポイント（ユーザー確認用）</h2>
+    <ul class="verify-list">
+      <li class="verify-item">
+        <div class="verify-num">1</div>
+        <div class="verify-content">
+          <strong>注文履歴一覧（#9）から自分の注文をクリックすると詳細が表示されること</strong>
+          <span>商品名・単価・数量・行合計・注文合計・注文日が正しく表示される（住所は表示されない＝Sprint14 Q2確定の意図的スコープ）</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">2</div>
+        <div class="verify-content">
+          <strong>URLを直接編集して他人の注文番号にアクセスすると「見つからない」旨のメッセージが出ること</strong>
+          <span>エラー画面や500にならず、統一されたメッセージ（存在するのかしないのか判別できない文言）が表示される</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">3</div>
+        <div class="verify-content">
+          <strong>存在しない注文番号（例: 999999999）にアクセスしても、他人の注文と同じメッセージが出ること</strong>
+          <span>手順2との見た目の違いがない（存在有無を見た目からも推測できない）</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">4</div>
+        <div class="verify-content">
+          <strong>未ログインで注文詳細URLにアクセスするとサインオン画面へ誘導され、ログイン後に戻ること</strong>
+          <span>#18/#24の元URL復帰の動作がそのまま効いている</span>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- Scope -->
+  <section>
+    <h2>改修スコープ確認</h2>
+    <table class="scope-table">
+      <tr>
+        <th>ファイル</th>
+        <th>変更</th>
+        <th>内容</th>
+      </tr>
+      <tr><td colspan="3" class="scope-group">jpetstore-backend</td></tr>
+      <tr>
+        <td><code>OrderApplicationService.java</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td><code>getOrder</code>追加（所有者判定→明細取得→OrderDetail組立）</td>
+      </tr>
+      <tr>
+        <td><code>OrderController.java</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td><code>GET /api/orders/{orderId}</code>追加・<code>OrderDetailResponse</code>/<code>OrderDetailLineResponse</code>DTO新設</td>
+      </tr>
+      <tr>
+        <td><code>OrderRepository.java</code> / <code>MyBatisOrderRepository.java</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td><code>findHeaderById</code>/<code>findLinesByOrderId</code>追加</td>
+      </tr>
+      <tr>
+        <td><code>OrderCustomMapper.java</code> / <code>.xml</code> / <code>OrderHeaderCustomEntity.java</code> / <code>OrderLineViewCustomEntity.java</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>ヘッダSELECT・明細JOIN SELECT・Entity新設</td>
+      </tr>
+      <tr>
+        <td><code>OrderDetail.java</code> / <code>OrderHeader.java</code> / <code>OrderDetailLine.java</code>（domain）</td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>新規。読取専用ドメインモデル（住所・userIdを応答に含めない設計）</td>
+      </tr>
+      <tr>
+        <td><code>OwnershipAuthorizationService.java</code></td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td>#21で用意済の部品を無改造で初適用</td>
+      </tr>
+      <tr>
+        <td><code>GlobalExceptionHandler.java</code></td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td>既存のAccessDeniedException→403＋監査正規化をそのまま利用</td>
+      </tr>
+      <tr>
+        <td><code>OrderApplicationServiceSpec</code> / <code>OrderControllerSpec</code> / <code>MyBatisOrderRepositorySpec</code> / <code>OrderCustomMapperSpec</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>own/not-owned/not-found・非数値400・perf（findHeaderById1回のみ）のテスト追加</td>
+      </tr>
+      <tr><td colspan="3" class="scope-group">jpetstore-frontend</td></tr>
+      <tr>
+        <td><code>domain/order.ts</code> / <code>api/orderApi.ts</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td><code>OrderDetail</code>/<code>OrderDetailLine</code>型・<code>fetchOrder</code>・<code>lineTotal</code>前段算出</td>
+      </tr>
+      <tr>
+        <td><code>stores/order.ts</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td><code>detail</code>/<code>detailUnavailable</code> state・<code>fetchDetail</code>追加</td>
+      </tr>
+      <tr>
+        <td><code>router/index.ts</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td><code>/account/orders/:orderId</code>（<code>requiresAuth: true</code>）追加</td>
+      </tr>
+      <tr>
+        <td><code>views/order/OrderDetailView.vue</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>新規。明細テーブル・合計・統一エラーメッセージ表示（住所は表示しない）</td>
+      </tr>
+      <tr>
+        <td><code>i18n/locales/en.ts</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td><code>order.detail.*</code>キー追加（<code>unavailable.*</code>を含む）</td>
+      </tr>
+      <tr>
+        <td>配送先/請求先住所の表示・注文編集/キャンセルAPI</td>
+        <td><span class="tag-unchanged">対象外</span></td>
+        <td>Sprint14 Q2で意図的にスコープ外と確定（AC外・過剰実装回避）</td>
+      </tr>
+    </table>
+  </section>
+
+</div>
+</body>
+</html>
