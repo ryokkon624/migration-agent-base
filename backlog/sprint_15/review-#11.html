@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint 15 Review — #11 無認証remoting/WSのgetOrderを廃止し認証必須RESTに置換する</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #f8f7f5; }
+
+  .page { max-width: 860px; margin: 0 auto; padding: 48px 24px; }
+
+  /* Header */
+  .sprint-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin-bottom: 8px; }
+  h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px; }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+  .badge-sprint { background: #e8f0fe; color: #1a56db; }
+  .badge-issue { background: #f0fdf4; color: #166534; }
+  .badge-security { background: #fef2f2; color: #b91c1c; }
+  .badge-repo { background: #fff7ed; color: #c2410c; }
+
+  /* Sections */
+  section { margin-bottom: 40px; }
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #888; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e5e5e5; }
+
+  /* Problem box */
+  .problem-box { background: #fff8f0; border-left: 3px solid #f59e0b; border-radius: 0 8px 8px 0; padding: 16px 20px; margin-bottom: 16px; }
+  .problem-box .label { font-size: 11px; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .problem-box p { color: #451a03; font-size: 13px; }
+
+  /* Architecture change */
+  .arch-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: center; margin-bottom: 8px; }
+  .arch-box { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; }
+  .arch-box .arch-title { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .arch-box.before { border-color: #fca5a5; }
+  .arch-box.after { border-color: #86efac; }
+  .arch-arrow { font-size: 20px; color: #888; text-align: center; }
+  .flow-item { font-size: 12px; color: #374151; padding: 3px 0; display: flex; align-items: flex-start; gap: 6px; }
+  .flow-item .dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .dot-red { background: #ef4444; }
+  .dot-green { background: #22c55e; }
+
+  /* AC cards */
+  .ac-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+  .ac-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid #f0f0f0; }
+  .ac-check { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .ac-check.done { background: #dcfce7; color: #166534; }
+  .ac-num { font-size: 11px; font-weight: 700; color: #888; }
+  .ac-text { font-size: 13px; font-weight: 600; color: #1a1a1a; flex: 1; }
+  .ac-body { padding: 16px 18px; }
+  .ac-body p { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+
+  /* File change */
+  .file-change { margin-bottom: 16px; }
+  .file-name { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; background: #f3f4f6; color: #374151; padding: 5px 10px; border-radius: 4px 4px 0 0; border: 1px solid #e5e5e5; border-bottom: none; display: flex; justify-content: space-between; }
+  .diff-stat { color: #888; }
+  .code-block { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.7; background: #1e1e2e; color: #cdd6f4; padding: 14px 16px; border-radius: 0 0 6px 6px; overflow-x: auto; }
+  .code-line { display: flex; }
+  .line-num { color: #45475a; min-width: 28px; user-select: none; }
+  .line-add { background: rgba(166, 227, 161, 0.12); color: #a6e3a1; }
+  .line-del { background: rgba(243, 139, 168, 0.12); color: #f38ba8; }
+  .line-ctx { color: #cdd6f4; }
+  .line-prefix { min-width: 14px; }
+
+  /* Annotation */
+  .annotation { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-size: 12px; color: #78350f; display: flex; gap: 8px; }
+  .annotation-icon { font-size: 14px; flex-shrink: 0; }
+
+  /* Verify section */
+  .verify-list { list-style: none; }
+  .verify-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; }
+  .verify-item:last-child { border-bottom: none; }
+  .verify-num { width: 22px; height: 22px; background: #e8f0fe; color: #1a56db; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .verify-content { flex: 1; }
+  .verify-content strong { font-size: 13px; color: #1a1a1a; display: block; margin-bottom: 3px; }
+  .verify-content span { font-size: 12px; color: #6b7280; }
+
+  /* Scope table */
+  .scope-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .scope-table th { text-align: left; padding: 8px 12px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .scope-table td { padding: 10px 12px; border: 1px solid #e5e5e5; color: #374151; vertical-align: top; }
+  .scope-table tr:hover td { background: #f9fafb; }
+  .tag-changed { font-size: 11px; font-weight: 600; background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 3px; }
+  .tag-unchanged { font-size: 11px; font-weight: 600; background: #f3f4f6; color: #6b7280; padding: 2px 6px; border-radius: 3px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="sprint-label">Sprint 15 Review</div>
+  <h1>#11 — 無認証 remoting/WS の getOrder を廃止し<br>認証必須REST に置換する</h1>
+  <div class="meta">
+    <span class="badge badge-sprint">Sprint 15</span>
+    <span class="badge badge-issue">#11</span>
+    <span class="badge badge-security">security / E3</span>
+    <span class="badge badge-repo">backend</span>
+  </div>
+
+  <!-- Problem -->
+  <section>
+    <h2>なぜこの改修が必要だったか</h2>
+    <div class="problem-box">
+      <div class="label">問題（before の脆弱性棚卸しより）</div>
+      <p>Struts1レガシー（before）には Hessian/Burlap/HttpInvoker/Axis 等の remoting/WS エクスポータ経由で <code>OrderService.getOrder</code> を<strong>無認証のまま呼び出せる経路</strong>があった。モダン backend の実装コードには既にこの面が構造的に存在しない（<code>build.gradle</code> に該当依存なし・ソース全体を grep しても remoting/WS 系クラスは0件）ことは Refinement 時点で確認済みだったが、その「存在しないこと」自体を検証する自動テストや明文化が無く、将来的に依存を追加した際に気づかず再混入するリスクを封じられていなかった。</p>
+    </div>
+    <div class="arch-grid">
+      <div class="arch-box before">
+        <div class="arch-title">改修前</div>
+        <div class="flow-item"><span class="dot dot-red"></span>remoting/WS面の不在は目視grep確認のみ</div>
+        <div class="flow-item"><span class="dot dot-red"></span>退行を検知する自動テストが無い</div>
+        <div class="flow-item"><span class="dot dot-red"></span>「露出面はRESTのみ」の明文化も無い</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-box after">
+        <div class="arch-title">改修後</div>
+        <div class="flow-item"><span class="dot dot-green"></span><code>RemotingSurfaceAbsenceSpec</code>が7クラスの<br>classpath不在を継続的に検証</div>
+        <div class="flow-item"><span class="dot dot-green"></span><code>package-info.java</code>でREST限定・<br>チャネル非依存認可を明文化</div>
+        <div class="flow-item"><span class="dot dot-green"></span>将来の依存追加等での再混入を<br>テスト赤化で即検知できる</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AC breakdown -->
+  <section>
+    <h2>AC別 実装内容</h2>
+
+    <!-- AC1 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC1 (SBD-7)</div>
+        <div class="ac-text">無認証remoting/WS（Hessian/Burlap/HttpInvoker/Axis等）のOrderService.getOrder面を残さない。外部APIはREST・認証必須のみ</div>
+      </div>
+      <div class="ac-body">
+        <p>モダン backend は元々remoting/WS面を持たないため削除対象コードは無い（構造的解消）。<code>presentation.rest</code> パッケージに露出面をRESTのみに限定する旨を明文化する <code>package-info.java</code> を新規追加した。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../presentation/rest/package-info.java（新規）</span>
+            <span class="diff-stat">+13 / -0</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">1</span><span class="line-prefix">+</span><span>/**</span></div>
+            <div class="code-line line-add"><span class="line-num">2</span><span class="line-prefix">+</span><span> * REST API の Presentation 層（{@code @RestController}）。</span></div>
+            <div class="code-line line-add"><span class="line-num">4</span><span class="line-prefix">+</span><span> * &lt;p&gt;外部への露出面はこのパッケージ（HTTP/JSON REST・SecurityConfigにより既定で認証必須）に限定する。</span></div>
+            <div class="code-line line-add"><span class="line-num">5</span><span class="line-prefix">+</span><span> * remoting/WS 系のエクスポータ・エンドポイントは構造的に持たず、新規に追加もしない（#11 AC1/AC-neg1・SBD-7）。</span></div>
+            <div class="code-line line-add"><span class="line-num">6</span><span class="line-prefix">+</span><span> * この不在は RemotingSurfaceAbsenceSpec（同パッケージのテスト）で回帰テスト固定している。</span></div>
+            <div class="code-line line-add"><span class="line-num">13</span><span class="line-prefix">+</span><span>package com.example.jpetstore.backend.presentation.rest;</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC2 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC2 (SBD-1)</div>
+        <div class="ac-text">注文取得の認可はサービス/ドメイン層で呼び出しチャネル非依存に強制（Web層チェックに依存しない）</div>
+      </div>
+      <div class="ac-body">
+        <p>これは #9/#10 のスプリントで既に実装済み（<code>OrderApplicationService.getOrder</code> → <code>OwnershipAuthorizationService.assertOwner</code> → <code>CurrentUserProvider</code>）。<code>OrderController</code> は認可分岐を一切持たず Application Service への委譲のみを行う。本 Story ではロジックの追加変更は行わず、この既存設計を <code>package-info.java</code> で明文化するに留めた。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../presentation/rest/package-info.java（同上ファイルの続き）</span>
+            <span class="diff-stat">（AC1と同一ファイル）</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">8</span><span class="line-prefix">+</span><span> * &lt;p&gt;認可は Web 層（Controller）ではなく Service/Domain 層（OwnershipAuthorizationService・</span></div>
+            <div class="code-line line-add"><span class="line-num">9</span><span class="line-prefix">+</span><span> * CurrentUserProvider）で呼び出しチャネル非依存に強制する（#11 AC2/SBD-1）。Controller は</span></div>
+            <div class="code-line line-add"><span class="line-num">10</span><span class="line-prefix">+</span><span> * Application Service への委譲のみを行い、認可分岐そのものは持たない。</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span><code>OrderController.java</code>・<code>OrderApplicationService.java</code> 自体は本 Story で変更していない（既に AC2 を満たしているため）。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC-neg1 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC-neg1 (SBD-7)</div>
+        <div class="ac-text">旧 remoting/axis エンドポイントが404（deser経路が存在しない）</div>
+      </div>
+      <div class="ac-body">
+        <p>Spring 6+ で <code>org.springframework.remoting.*</code> のエクスポータ階層自体が撤去済みのため「Springコンテキストに該当Beanが登録されていないこと」を assert する方式は使えない（型参照ができない）。代わりに <code>Class.forName(fqcn)</code> が <code>ClassNotFoundException</code> になることを直接 assert する plain Spock（Spring context 不要）を新設した。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/test/groovy/.../presentation/rest/RemotingSurfaceAbsenceSpec.groovy（新規）</span>
+            <span class="diff-stat">+36 / -0</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">18</span><span class="line-prefix">+</span><span>def "remoting/WSエクスポータ/エンドポイントクラス(#className)はclasspathに存在しない(SBD-7)"() {</span></div>
+            <div class="code-line line-add"><span class="line-num">19</span><span class="line-prefix">+</span><span>    when:</span></div>
+            <div class="code-line line-add"><span class="line-num">20</span><span class="line-prefix">+</span><span>    Class.forName(className)</span></div>
+            <div class="code-line line-add"><span class="line-num">22</span><span class="line-prefix">+</span><span>    then:</span></div>
+            <div class="code-line line-add"><span class="line-num">23</span><span class="line-prefix">+</span><span>    thrown(ClassNotFoundException)</span></div>
+            <div class="code-line line-add"><span class="line-num">25</span><span class="line-prefix">+</span><span>    where:</span></div>
+            <div class="code-line line-add"><span class="line-num">27</span><span class="line-prefix">+</span><span>        'org.springframework.remoting.caucho.HessianServiceExporter',</span></div>
+            <div class="code-line line-add"><span class="line-num">28</span><span class="line-prefix">+</span><span>        'org.springframework.remoting.caucho.BurlapServiceExporter',</span></div>
+            <div class="code-line line-add"><span class="line-num">29</span><span class="line-prefix">+</span><span>        'org.springframework.remoting.httpinvoker.HttpInvokerServiceExporter',</span></div>
+            <div class="code-line line-add"><span class="line-num">30</span><span class="line-prefix">+</span><span>        'org.springframework.remoting.rmi.RmiServiceExporter',</span></div>
+            <div class="code-line line-add"><span class="line-num">31</span><span class="line-prefix">+</span><span>        'org.springframework.remoting.support.RemoteExporter',</span></div>
+            <div class="code-line line-add"><span class="line-num">32</span><span class="line-prefix">+</span><span>        'org.apache.axis.transport.http.AxisServlet',</span></div>
+            <div class="code-line line-add"><span class="line-num">33</span><span class="line-prefix">+</span><span>        'jakarta.jws.WebService',</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>Sprint4 の SBD-9（オープンリダイレクトsink不在を回帰テストで固定）と同型のパターン。7クラス全てが赤化しない限り本specはグリーンのまま、いずれかの依存追加で混入した場合は即座に赤化する。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC-neg2 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC-neg2 (SBD-1)</div>
+        <div class="ac-text">いかなる無認証チャネルからも他人の注文PIIを総当りできない（before S13-S15 消滅）</div>
+      </div>
+      <div class="ac-body">
+        <p>こちらも #9/#10 で既に実証済み（<code>OrderControllerSpec</code>：未認証アクセス→401、不存在/非所有のいずれも同一の403へ正規化＝存在推測を与えない）。remoting/WS面自体が構造的に不在（AC-neg1）であるため、無認証チャネルの選択肢がREST以外に存在せず、REST側の認証必須化と組み合わせて総当り不可を担保する。本Storyでの追加実装は無い。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Implementation notes -->
+  <section>
+    <h2>実装メモ（仕様外の判断・変更・妥協点）</h2>
+    <div class="ac-body" style="background:white;border:1px solid #e5e5e5;border-radius:10px;padding:16px 18px;">
+      <p><strong>明文化の置き場所</strong>: ADR形式ではなく Javadoc パッケージコメント（<code>package-info.java</code>）を採用した。既存コードベースに ADR ディレクトリの慣習が無く、パッケージ境界の説明としては package-info が最も自然な置き場所と判断した。</p>
+      <p style="margin-top:10px;"><strong>スコープ外にしたもの</strong>: remoting面の新規実装（フィルタ・エクスポータ等）は一切行っていない。撤去対象コードも存在しない（構造的にゼロ）。<code>SecurityConfig</code> は無変更。</p>
+    </div>
+  </section>
+
+  <!-- Verify -->
+  <section>
+    <h2>動作確認ポイント（ユーザー確認用）</h2>
+    <ul class="verify-list">
+      <li class="verify-item">
+        <div class="verify-num">1</div>
+        <div class="verify-content">
+          <strong>注文照会・注文履歴画面がこれまで通り動作すること</strong>
+          <span>本Storyは画面変更を伴わない。カート→注文確定→注文履歴・詳細のフローに変化がないことを確認</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">2</div>
+        <div class="verify-content">
+          <strong>未認証でAPIに直接アクセスすると401になること（既存動作の再確認）</strong>
+          <span><code>/api/orders</code>・<code>/api/orders/{id}</code> をCookie無しで叩くと401が返ること</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">3</div>
+        <div class="verify-content">
+          <strong>（開発者向け）<code>./gradlew test</code> 実行時に RemotingSurfaceAbsenceSpec がグリーンであること</strong>
+          <span>今回新設した安全網。7件のテストケース全てが成功することを確認</span>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- Scope -->
+  <section>
+    <h2>改修スコープ確認</h2>
+    <table class="scope-table">
+      <tr>
+        <th>ファイル</th>
+        <th>変更</th>
+        <th>内容</th>
+      </tr>
+      <tr>
+        <td><code>package-info.java</code></td>
+        <td><span class="tag-changed">変更あり（新規）</span></td>
+        <td>REST限定の露出面・チャネル非依存認可の明文化</td>
+      </tr>
+      <tr>
+        <td><code>RemotingSurfaceAbsenceSpec.groovy</code></td>
+        <td><span class="tag-changed">変更あり（新規）</span></td>
+        <td>7クラスのclasspath不在を回帰テストで固定</td>
+      </tr>
+      <tr>
+        <td><code>OrderController.java</code></td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td>既存のREST実装（#9/#10）をそのまま利用</td>
+      </tr>
+      <tr>
+        <td><code>OrderApplicationService.java</code></td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td>既存のchannel-independent認可実装（#9/#10）をそのまま利用</td>
+      </tr>
+      <tr>
+        <td><code>SecurityConfig.java</code></td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td>計画フェーズで変更禁止を確定済み</td>
+      </tr>
+      <tr>
+        <td><code>build.gradle</code></td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td>remoting/WS系の依存を新規追加していないことのみ確認</td>
+      </tr>
+    </table>
+  </section>
+
+</div>
+</body>
+</html>

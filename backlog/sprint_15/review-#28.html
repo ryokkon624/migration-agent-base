@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint 15 Review — #28 カートマージのN+1クエリをバッチ取得に改善する</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #f8f7f5; }
+
+  .page { max-width: 860px; margin: 0 auto; padding: 48px 24px; }
+
+  /* Header */
+  .sprint-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin-bottom: 8px; }
+  h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px; }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+  .badge-sprint { background: #e8f0fe; color: #1a56db; }
+  .badge-issue { background: #f0fdf4; color: #166534; }
+  .badge-refactor { background: #fdf4ff; color: #7e22ce; }
+  .badge-repo { background: #fff7ed; color: #c2410c; }
+
+  /* Sections */
+  section { margin-bottom: 40px; }
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #888; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e5e5e5; }
+
+  /* Problem box */
+  .problem-box { background: #fff8f0; border-left: 3px solid #f59e0b; border-radius: 0 8px 8px 0; padding: 16px 20px; margin-bottom: 16px; }
+  .problem-box .label { font-size: 11px; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .problem-box p { color: #451a03; font-size: 13px; }
+
+  /* Architecture change */
+  .arch-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: center; margin-bottom: 8px; }
+  .arch-box { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; }
+  .arch-box .arch-title { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .arch-box.before { border-color: #fca5a5; }
+  .arch-box.after { border-color: #86efac; }
+  .arch-arrow { font-size: 20px; color: #888; text-align: center; }
+  .flow-item { font-size: 12px; color: #374151; padding: 3px 0; display: flex; align-items: flex-start; gap: 6px; }
+  .flow-item .dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .dot-red { background: #ef4444; }
+  .dot-green { background: #22c55e; }
+
+  /* AC cards */
+  .ac-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+  .ac-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid #f0f0f0; }
+  .ac-check { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .ac-check.done { background: #dcfce7; color: #166534; }
+  .ac-num { font-size: 11px; font-weight: 700; color: #888; }
+  .ac-text { font-size: 13px; font-weight: 600; color: #1a1a1a; flex: 1; }
+  .ac-body { padding: 16px 18px; }
+  .ac-body p { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+
+  /* File change */
+  .file-change { margin-bottom: 16px; }
+  .file-name { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; background: #f3f4f6; color: #374151; padding: 5px 10px; border-radius: 4px 4px 0 0; border: 1px solid #e5e5e5; border-bottom: none; display: flex; justify-content: space-between; }
+  .diff-stat { color: #888; }
+  .code-block { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.7; background: #1e1e2e; color: #cdd6f4; padding: 14px 16px; border-radius: 0 0 6px 6px; overflow-x: auto; }
+  .code-line { display: flex; }
+  .line-num { color: #45475a; min-width: 28px; user-select: none; }
+  .line-add { background: rgba(166, 227, 161, 0.12); color: #a6e3a1; }
+  .line-del { background: rgba(243, 139, 168, 0.12); color: #f38ba8; }
+  .line-ctx { color: #cdd6f4; }
+  .line-prefix { min-width: 14px; }
+
+  /* Annotation */
+  .annotation { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-size: 12px; color: #78350f; display: flex; gap: 8px; }
+  .annotation-icon { font-size: 14px; flex-shrink: 0; }
+
+  /* Verify section */
+  .verify-list { list-style: none; }
+  .verify-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; }
+  .verify-item:last-child { border-bottom: none; }
+  .verify-num { width: 22px; height: 22px; background: #e8f0fe; color: #1a56db; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .verify-content { flex: 1; }
+  .verify-content strong { font-size: 13px; color: #1a1a1a; display: block; margin-bottom: 3px; }
+  .verify-content span { font-size: 12px; color: #6b7280; }
+
+  /* Scope table */
+  .scope-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .scope-table th { text-align: left; padding: 8px 12px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .scope-table td { padding: 10px 12px; border: 1px solid #e5e5e5; color: #374151; vertical-align: top; }
+  .scope-table tr:hover td { background: #f9fafb; }
+  .tag-changed { font-size: 11px; font-weight: 600; background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 3px; }
+  .tag-unchanged { font-size: 11px; font-weight: 600; background: #f3f4f6; color: #6b7280; padding: 2px 6px; border-radius: 3px; }
+
+  /* API call count */
+  .api-count-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .api-count-box { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; text-align: center; }
+  .api-count-box .label { font-size: 11px; color: #888; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+  .api-count-box .count { font-size: 36px; font-weight: 700; line-height: 1; }
+  .api-count-box .sublabel { font-size: 11px; color: #888; margin-top: 4px; }
+  .count-before { color: #ef4444; }
+  .count-after { color: #22c55e; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="sprint-label">Sprint 15 Review</div>
+  <h1>#28 — カートマージの N+1 クエリを<br>バッチ取得に改善する</h1>
+  <div class="meta">
+    <span class="badge badge-sprint">Sprint 15</span>
+    <span class="badge badge-issue">#28</span>
+    <span class="badge badge-refactor">refactor</span>
+    <span class="badge badge-repo">backend</span>
+  </div>
+
+  <!-- Problem -->
+  <section>
+    <h2>なぜこの改修が必要だったか</h2>
+    <div class="problem-box">
+      <div class="label">問題</div>
+      <p>Sprint 9 のパフォーマンスレビューで、ログイン時にクライアント（localStorage）のカート内容をサーバーカートへ合流させる <code>CartApplicationService.merge(List&lt;CartLine&gt;)</code> が、クライアント側カートの行ごとにループ内で <code>selectItemForCart(itemId, cartId)</code> を1件ずつ呼び出す <strong>N+1クエリ</strong>であることが指摘されていた（Sprint 8 由来の既存問題）。影響が限定的（マージはログイン時1回・item数は有界）だったため非ブロッキングでbacklogへ繰り越し、Cart Repository層のPoC（#29）で書き換えられた新コードに対する retrofit として本 Story で解消した。</p>
+    </div>
+    <div class="arch-grid">
+      <div class="arch-box before">
+        <div class="arch-title">改修前</div>
+        <div class="flow-item"><span class="dot dot-red"></span>merge() がclientLinesを1行ずつループ</div>
+        <div class="flow-item"><span class="dot dot-red"></span>行ごとに <code>findStock(cartId, itemId)</code> → 1 SELECT</div>
+        <div class="flow-item"><span class="dot dot-red"></span>カートがN行ならN回のSELECTが発生</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-box after">
+        <div class="arch-title">改修後</div>
+        <div class="flow-item"><span class="dot dot-green"></span>全行のquantity&lt;=0を先にfail-fast検証</div>
+        <div class="flow-item"><span class="dot dot-green"></span>clientLinesをitemId単位でcoalesce（合算）</div>
+        <div class="flow-item"><span class="dot dot-green"></span><code>findStocks(cartId, itemIds)</code>で1回のバッチSELECT</div>
+      </div>
+    </div>
+    <div class="api-count-grid" style="margin-top:16px;">
+      <div class="api-count-box">
+        <div class="label">マージ時の在庫取得クエリ数（改修前）</div>
+        <div class="count count-before">N</div>
+        <div class="sublabel">カート行数に比例して増加</div>
+      </div>
+      <div class="api-count-box">
+        <div class="label">マージ時の在庫取得クエリ数（改修後）</div>
+        <div class="count count-after">1</div>
+        <div class="sublabel">行数によらず常に1回</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AC breakdown -->
+  <section>
+    <h2>AC別 実装内容</h2>
+
+    <!-- AC1 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC1</div>
+        <div class="ac-text">マージ処理のクエリ回数がカート行数に比例しない（バッチ1回に集約）</div>
+      </div>
+      <div class="ac-body">
+        <p><code>CartCustomMapper</code> にバッチ版 <code>selectItemsForCart(itemIds, cartId)</code> を新設し、<code>CatalogCustomMapper</code> の <code>&lt;foreach&gt;</code> 先例（IN句）に倣ってitemIds分をまとめて1クエリで取得する。<code>CartRepository</code>/<code>MyBatisCartRepository</code> にはその橋渡し役 <code>findStocks(cartId, itemIds)</code> を追加した。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../mybatis/custom/mapper/CartCustomMapper.java</span>
+            <span class="diff-stat">+9 / -0</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">36</span><span class="line-prefix"> </span><span>      @Param("itemId") String itemId, @Param("cartId") Long cartId);</span></div>
+            <div class="code-line line-add"><span class="line-num">38</span><span class="line-prefix">+</span><span>  /**</span></div>
+            <div class="code-line line-add"><span class="line-num">39</span><span class="line-prefix">+</span><span>   * 複数アイテムの在庫qty・既存数量を1クエリでまとめて取得する（#28・merge のN+1解消用）。</span></div>
+            <div class="code-line line-add"><span class="line-num">44</span><span class="line-prefix">+</span><span>  List&lt;ItemForCartCustomEntity&gt; selectItemsForCart(</span></div>
+            <div class="code-line line-add"><span class="line-num">45</span><span class="line-prefix">+</span><span>      @Param("itemIds") List&lt;String&gt; itemIds, @Param("cartId") Long cartId);</span></div>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/resources/mapper/custom/CartCustomMapper.xml</span>
+            <span class="diff-stat">+19 / -0</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">58</span><span class="line-prefix">+</span><span>&lt;select id="selectItemsForCart" resultType="...ItemForCartCustomEntity"&gt;</span></div>
+            <div class="code-line line-add"><span class="line-num">59</span><span class="line-prefix">+</span><span>    SELECT i.item_id AS item_id,</span></div>
+            <div class="code-line line-add"><span class="line-num">60</span><span class="line-prefix">+</span><span>           COALESCE(inv.quantity, 0) AS stock_quantity,</span></div>
+            <div class="code-line line-add"><span class="line-num">61</span><span class="line-prefix">+</span><span>           COALESCE(ci.quantity, 0) AS current_quantity</span></div>
+            <div class="code-line line-add"><span class="line-num">62</span><span class="line-prefix">+</span><span>      FROM m_item i</span></div>
+            <div class="code-line line-add"><span class="line-num">63</span><span class="line-prefix">+</span><span>      LEFT JOIN t_inventory inv ON inv.item_id = i.item_id</span></div>
+            <div class="code-line line-add"><span class="line-num">64</span><span class="line-prefix">+</span><span>      LEFT JOIN t_cart_item ci ON ci.cart_id = #{cartId} AND ci.item_id = i.item_id</span></div>
+            <div class="code-line line-add"><span class="line-num">65</span><span class="line-prefix">+</span><span>     WHERE i.item_id IN</span></div>
+            <div class="code-line line-add"><span class="line-num">66</span><span class="line-prefix">+</span><span>        &lt;foreach collection="itemIds" item="itemId" open="(" separator="," close=")"&gt;</span></div>
+            <div class="code-line line-add"><span class="line-num">67</span><span class="line-prefix">+</span><span>            #{itemId}</span></div>
+            <div class="code-line line-add"><span class="line-num">68</span><span class="line-prefix">+</span><span>        &lt;/foreach&gt;</span></div>
+            <div class="code-line line-add"><span class="line-num">69</span><span class="line-prefix">+</span><span>&lt;/select&gt;</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span><code>selectItemForCart</code>（単数）と同じLEFT JOIN構造をそのまま踏襲し、WHERE句だけをIN句へ置き換えた。<code>CatalogCustomMapper</code> の <code>searchProductsWhere</code> と同じforeachパターン。</span>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../domain/cart/CartRepository.java</span>
+            <span class="diff-stat">+13 / -3</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">43</span><span class="line-prefix"> </span><span>   * @return {@code m_item} に該当行が無ければ {@code Optional.empty()}（アイテム不存在＝呼び出し元で404）。add/update</span></div>
+            <div class="code-line line-add"><span class="line-num">44</span><span class="line-prefix">+</span><span>   *     ユースケース（単一itemId）向けに残す。マージのようにN件をまとめて解決する場合は findStocks を使う（#28）。</span></div>
+            <div class="code-line line-ctx"><span class="line-num">46</span><span class="line-prefix"> </span><span>  Optional&lt;StockAvailability&gt; findStock(Long cartId, String itemId);</span></div>
+            <div class="code-line line-add"><span class="line-num">48</span><span class="line-prefix">+</span><span>  /**</span></div>
+            <div class="code-line line-add"><span class="line-num">49</span><span class="line-prefix">+</span><span>   * 複数アイテムの在庫コンテキストを1回のバッチ取得でまとめて解決する（#28・merge のN+1解消）。</span></div>
+            <div class="code-line line-add"><span class="line-num">52</span><span class="line-prefix">+</span><span>   * @param itemIds 空リストの場合は永続化アクセスを行わず Map.of() を返す（IN () の不正SQLを避ける短絡）。</span></div>
+            <div class="code-line line-add"><span class="line-num">56</span><span class="line-prefix">+</span><span>  Map&lt;String, StockAvailability&gt; findStocks(Long cartId, List&lt;String&gt; itemIds);</span></div>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../mybatis/cart/MyBatisCartRepository.java</span>
+            <span class="diff-stat">+14 / -0</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">68</span><span class="line-prefix">+</span><span>  @Override</span></div>
+            <div class="code-line line-add"><span class="line-num">69</span><span class="line-prefix">+</span><span>  public Map&lt;String, StockAvailability&gt; findStocks(Long cartId, List&lt;String&gt; itemIds) {</span></div>
+            <div class="code-line line-add"><span class="line-num">70</span><span class="line-prefix">+</span><span>    if (itemIds.isEmpty()) {</span></div>
+            <div class="code-line line-add"><span class="line-num">71</span><span class="line-prefix">+</span><span>      return Map.of();</span></div>
+            <div class="code-line line-add"><span class="line-num">72</span><span class="line-prefix">+</span><span>    }</span></div>
+            <div class="code-line line-add"><span class="line-num">73</span><span class="line-prefix">+</span><span>    return cartCustomMapper.selectItemsForCart(itemIds, cartId).stream()</span></div>
+            <div class="code-line line-add"><span class="line-num">74</span><span class="line-prefix">+</span><span>        .map(CartConverter::toStockAvailability)</span></div>
+            <div class="code-line line-add"><span class="line-num">75</span><span class="line-prefix">+</span><span>        .collect(Collectors.toMap(StockAvailability::itemId, Function.identity()));</span></div>
+            <div class="code-line line-add"><span class="line-num">76</span><span class="line-prefix">+</span><span>  }</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>itemIdsが空リストの場合はmapperを一切呼ばず <code>Map.of()</code> を返す。<code>IN ()</code> という不正SQLになることを避けるための短絡で、マージ対象が0件のときは余分なクエリも発行しない。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC2 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC2</div>
+        <div class="ac-text">既存のマージ挙動（数量加算・在庫数クランプ・quantity&lt;=0→400・オーバーフロー処理）が回帰しない</div>
+      </div>
+      <div class="ac-body">
+        <p><code>CartApplicationService.merge</code> を「①全行のquantity&lt;=0をfail-fastで検証 → ②clientLinesをitemId単位で合算（coalesce） → ③findStocksで1回のバッチ取得 → ④取得済みmapを参照しながらループ適用」の順に書き換えた。不変条件（在庫クランプ・加算・オーバーフロー処理）を担う <code>Cart.mergeLine</code> 自体は無改修。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../application/service/CartApplicationService.java</span>
+            <span class="diff-stat">+49 / -13</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">114</span><span class="line-prefix"> </span><span>  @Transactional</span></div>
+            <div class="code-line line-ctx"><span class="line-num">115</span><span class="line-prefix"> </span><span>  public Cart merge(List&lt;CartLine&gt; clientLines) {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">116</span><span class="line-prefix"> </span><span>    Long cartId = cartRepository.ensureCart(currentUserId());</span></div>
+            <div class="code-line line-del"><span class="line-num">108</span><span class="line-prefix">-</span><span>    Cart cart = Cart.identity(cartId);</span></div>
+            <div class="code-line line-del"><span class="line-num">110</span><span class="line-prefix">-</span><span>    for (CartLine clientLine : clientLines) {</span></div>
+            <div class="code-line line-del"><span class="line-num">111</span><span class="line-prefix">-</span><span>      if (clientLine.quantity() &lt;= 0) { throw new IllegalArgumentException(...); }</span></div>
+            <div class="code-line line-del"><span class="line-num">114</span><span class="line-prefix">-</span><span>      Optional&lt;StockAvailability&gt; stock = cartRepository.findStock(cartId, clientLine.itemId());</span></div>
+            <div class="code-line line-del"><span class="line-num">118</span><span class="line-prefix">-</span><span>      Optional&lt;CartItem&gt; line = cart.mergeLine(stock.get(), clientLine.quantity());</span></div>
+            <div class="code-line line-ctx"><span class="line-num">118</span><span class="line-prefix"> </span><span>    for (CartLine clientLine : clientLines) {</span></div>
+            <div class="code-line line-add"><span class="line-num">119</span><span class="line-prefix">+</span><span>      if (clientLine.quantity() &lt;= 0) { throw new IllegalArgumentException(...); }</span></div>
+            <div class="code-line line-add"><span class="line-num">122</span><span class="line-prefix">+</span><span>    }</span></div>
+            <div class="code-line line-add"><span class="line-num">124</span><span class="line-prefix">+</span><span>    Map&lt;String, Integer&gt; coalescedLines = coalesce(clientLines);</span></div>
+            <div class="code-line line-add"><span class="line-num">125</span><span class="line-prefix">+</span><span>    Map&lt;String, StockAvailability&gt; stocks =</span></div>
+            <div class="code-line line-add"><span class="line-num">126</span><span class="line-prefix">+</span><span>        cartRepository.findStocks(cartId, List.copyOf(coalescedLines.keySet()));</span></div>
+            <div class="code-line line-add"><span class="line-num">128</span><span class="line-prefix">+</span><span>    Cart cart = Cart.identity(cartId);</span></div>
+            <div class="code-line line-add"><span class="line-num">129</span><span class="line-prefix">+</span><span>    for (Map.Entry&lt;String, Integer&gt; coalescedLine : coalescedLines.entrySet()) {</span></div>
+            <div class="code-line line-add"><span class="line-num">130</span><span class="line-prefix">+</span><span>      StockAvailability stock = stocks.get(coalescedLine.getKey());</span></div>
+            <div class="code-line line-add"><span class="line-num">131</span><span class="line-prefix">+</span><span>      if (stock == null) { continue; }</span></div>
+            <div class="code-line line-add"><span class="line-num">134</span><span class="line-prefix">+</span><span>      Optional&lt;CartItem&gt; line = cart.mergeLine(stock, coalescedLine.getValue());</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>quantity&lt;=0の検証は「合算後の値」ではなく「クライアントが送ってきた個々の行」に対して行う（合算すると正の値になり得る不正入力も個別行の時点で拒否する。既存挙動を維持）。</span>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../application/service/CartApplicationService.java（coalesce新設）</span>
+            <span class="diff-stat">+16 / -0</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">150</span><span class="line-prefix">+</span><span>  private static Map&lt;String, Integer&gt; coalesce(List&lt;CartLine&gt; clientLines) {</span></div>
+            <div class="code-line line-add"><span class="line-num">151</span><span class="line-prefix">+</span><span>    Map&lt;String, Integer&gt; coalesced = new LinkedHashMap&lt;&gt;();</span></div>
+            <div class="code-line line-add"><span class="line-num">152</span><span class="line-prefix">+</span><span>    for (CartLine clientLine : clientLines) {</span></div>
+            <div class="code-line line-add"><span class="line-num">154</span><span class="line-prefix">+</span><span>      coalesced.merge(clientLine.itemId(), clientLine.quantity(), CartApplicationService::addSaturating);</span></div>
+            <div class="code-line line-add"><span class="line-num">156</span><span class="line-prefix">+</span><span>    return coalesced;</span></div>
+            <div class="code-line line-add"><span class="line-num">157</span><span class="line-prefix">+</span><span>  }</span></div>
+            <div class="code-line line-add"><span class="line-num">159</span><span class="line-prefix">+</span><span>  private static int addSaturating(int a, int b) {</span></div>
+            <div class="code-line line-add"><span class="line-num">160</span><span class="line-prefix">+</span><span>    try { return Math.addExact(a, b); }</span></div>
+            <div class="code-line line-add"><span class="line-num">162</span><span class="line-prefix">+</span><span>    catch (ArithmeticException overflow) { return Integer.MAX_VALUE; }</span></div>
+            <div class="code-line line-add"><span class="line-num">165</span><span class="line-prefix">+</span><span>  }</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span><strong>coalesce の挙動パリティ根拠</strong>: 在庫クランプは <code>min(合算値, 在庫数)</code> という単調な関数のため、1行ずつ加算→都度クランプする逐次処理と、先に合算してから1回だけクランプする処理は最終値が一致する（クランプが一度発動すると以降どれだけ加算しても結果は在庫数に張り付くため）。合算自体も <code>Math.addExact</code> でオーバーフロー検出し、オーバーフロー時は「事実上無制限の需要」として <code>Integer.MAX_VALUE</code> へ飽和させることで、単純な <code>+</code> によるサイレントなマイナス化（wraparound）を防ぎ、逐次処理との厳密パリティを担保している。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC3 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC3</div>
+        <div class="ac-text">統合テストでN+1が解消されたことを確認（クエリ回数 or バッチ経路の検証）</div>
+      </div>
+      <div class="ac-body">
+        <p>Mapperをmockした純UTで「Repository各メソッド＝1 SQL文」×「Serviceが各メソッドを正確に1回だけ呼ぶ」ことを検証し、実DBに依存せずクエリ数をDB非依存かつ決定的に証明する（本コードベース既定の手法）。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/test/groovy/.../application/service/CartApplicationServiceSpec.groovy</span>
+            <span class="diff-stat">+63 / -18</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">234</span><span class="line-prefix">+</span><span>def "#28: N行のmergeでもfindStocksは1回だけ呼ばれ、findStock(単数)は呼ばれない(N+1解消)"() {</span></div>
+            <div class="code-line line-add"><span class="line-num">247</span><span class="line-prefix">+</span><span>    then:</span></div>
+            <div class="code-line line-add"><span class="line-num">248</span><span class="line-prefix">+</span><span>    1 * cartRepository.findStocks(_, _) &gt;&gt; [...]</span></div>
+            <div class="code-line line-add"><span class="line-num">255</span><span class="line-prefix">+</span><span>    0 * cartRepository.findStock(_, _)</span></div>
+            <div class="code-line line-add"><span class="line-num">256</span><span class="line-prefix">+</span><span>}</span></div>
+            <div class="code-line line-add"><span class="line-num">258</span><span class="line-prefix">+</span><span>def "#28: 重複itemIdのclient行はitemId単位で合算してから1回でマージする(coalesce・逐次accumulateと同じ最終値)"() { ... }</span></div>
+            <div class="code-line line-add"><span class="line-num">272</span><span class="line-prefix">+</span><span>def "#28: 重複itemIdの合算が在庫を超える場合は在庫数にクランプする(逐次クランプと同値)"() { ... }</span></div>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/test/groovy/.../mybatis/cart/MyBatisCartRepositorySpec.groovy</span>
+            <span class="diff-stat">+33 / -0</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">28</span><span class="line-prefix">+</span><span>def "#28: findStocksは複数itemIdをまとめてcartCustomMapper#selectItemsForCartへ1回で渡す(N+1解消)"() { ... }</span></div>
+            <div class="code-line line-add"><span class="line-num">50</span><span class="line-prefix">+</span><span>def "#28: findStocksは空リストならcartCustomMapper#selectItemsForCartを呼ばずMap.of()を返す(IN()不正SQL回避)"() { ... }</span></div>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/test/groovy/.../mybatis/custom/mapper/CartCustomMapperSpec.groovy（実DB・Testcontainers）</span>
+            <span class="diff-stat">+31 / -0</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">173</span><span class="line-prefix">+</span><span>def "#28: selectItemsForCartは複数itemIdの在庫qty・既存数量を1クエリでまとめて取得する"() { ... }</span></div>
+            <div class="code-line line-add"><span class="line-num">193</span><span class="line-prefix">+</span><span>def "#28: selectItemsForCartは存在しないitemIdを結果から除外する(404判定はApplication層のfindStock単数に残る)"() { ... }</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Implementation notes -->
+  <section>
+    <h2>実装メモ（仕様外の判断・変更・妥協点）</h2>
+    <div class="ac-body" style="background:white;border:1px solid #e5e5e5;border-radius:10px;padding:16px 18px;">
+      <p><strong>coalesce方式を選んだ理由</strong>: バックログ策定時の前提（localStorageはitemIdキーのmap）は誤りで、実体は配列（<code>StoredCartLine[]</code>）であり、正規UIでは重複itemIdは生じないがlocalStorage改竄で重複を仕込むことは可能。単純にバッチ化しただけ（合算せず最後の行だけ処理する等）だと、改竄重複入力に対して逐次accumulateと異なる結果（last-write-win化）になりうるため、merge冒頭でitemId単位に合算してから1回だけクランプする設計にし、挙動不変を数学的に担保した（上記AC2の解説注釈参照）。</p>
+      <p style="margin-top:10px;"><strong>バッチ化の対象範囲</strong>: 単一版 <code>findStock</code> は add/update ユースケースで引き続き使用するため残置した（バッチ化対象外）。書込（upsert/remove）はアイテム単位で本質的に必要な処理のため、こちらもバッチ化していない。<code>Cart.mergeLine</code>（加算・クランプ・overflow・quantity&lt;=0→400）は無改修。</p>
+    </div>
+  </section>
+
+  <!-- Verify -->
+  <section>
+    <h2>動作確認ポイント（ユーザー確認用）</h2>
+    <ul class="verify-list">
+      <li class="verify-item">
+        <div class="verify-num">1</div>
+        <div class="verify-content">
+          <strong>未ログイン中に複数商品をカートに入れてからログインすると、サーバー側カートに正しい数量（加算後）で反映されること</strong>
+          <span>これまで通り、未ログイン中のカート内容がログイン後に正しくマージされることを確認</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">2</div>
+        <div class="verify-content">
+          <strong>在庫数を超える数量をマージしようとしても、エラーにならず在庫数に自動的に調整（クランプ）されること</strong>
+          <span>拒否ではなく在庫数への丸め込みという既存挙動が維持されているか確認</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">3</div>
+        <div class="verify-content">
+          <strong>カート画面の表示・追加・更新・削除の見た目・動作にこれまでと変化がないこと</strong>
+          <span>本改修は内部の永続化アクセスの効率化のみで、画面・API仕様は無変更</span>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- Scope -->
+  <section>
+    <h2>改修スコープ確認</h2>
+    <table class="scope-table">
+      <tr>
+        <th>ファイル</th>
+        <th>変更</th>
+        <th>内容</th>
+      </tr>
+      <tr>
+        <td><code>CartCustomMapper.java</code> / <code>.xml</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td><code>selectItemsForCart</code>（IN句バッチ取得）を新規追加</td>
+      </tr>
+      <tr>
+        <td><code>CartRepository.java</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td><code>findStocks</code>インターフェイスメソッドを追加</td>
+      </tr>
+      <tr>
+        <td><code>MyBatisCartRepository.java</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td><code>findStocks</code>実装（空リスト短絡）を追加</td>
+      </tr>
+      <tr>
+        <td><code>CartApplicationService.java</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td><code>merge()</code>をfail-fast検証→coalesce→バッチ取得→ループの順へ書き換え</td>
+      </tr>
+      <tr>
+        <td><code>Cart.java</code>（<code>mergeLine</code>）</td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td>加算・在庫クランプ・overflow・quantity&lt;=0→400のロジックは無改修</td>
+      </tr>
+      <tr>
+        <td><code>CartRepository#findStock</code>（単数）</td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td>add/updateユースケース向けにそのまま残置（バッチ化対象外）</td>
+      </tr>
+      <tr>
+        <td><code>CartController.java</code> / <code>CartControllerSpec.groovy</code></td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td>既存のE2Eテストは無改修のままグリーン。API仕様も無変更</td>
+      </tr>
+    </table>
+  </section>
+
+</div>
+</body>
+</html>

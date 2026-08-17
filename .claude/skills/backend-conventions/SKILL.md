@@ -771,3 +771,39 @@ def "ensureCartはcartIdを返す"() {
 > 不変条件が薄い」と分析し、ユーザー承認のうえ薄い書込record＋orchestration残置（案A）を採用した。POから
 > 「Issue本文の『#29集約パターンに準拠』という文言がrich集約と読めた」との指摘があり、本節でこの判断軸を
 > 明文化した。詳細は`memory/dev/long_term.md`「習得したこと」（jpetstore-backend）参照。
+
+### 型自体が撤去/非依存のフレームワーク機能の構造的不在は、Bean不在ではなくクラス不在（`Class.forName`）で回帰テスト固定する
+
+Spring 6+ で `org.springframework.remoting.*` のエクスポータ階層（`HessianServiceExporter`/`BurlapServiceExporter`/
+`HttpInvokerServiceExporter`/`RmiServiceExporter`/`RemoteExporter`等）自体が撤去されているため、「Springコンテキ
+ストに該当Beanが登録されていないこと」をassertする通常の方式は使えない（型そのものがクラスパスに存在せずimport
+すらできない）。このように**型自体が撤去/非依存のフレームワーク機能の構造的不在**を回帰テストで固定したい場合は、
+`Class.forName(fqcn)` が `ClassNotFoundException` になることを直接assertするplain Spock（Spring context不要・
+DBも不要）を書く。
+
+```groovy
+def "remoting/WSエクスポータ/エンドポイントクラス(#className)はclasspathに存在しない(SBD-7)"() {
+    when:
+    Class.forName(className)
+
+    then:
+    thrown(ClassNotFoundException)
+
+    where:
+    className << [
+            'org.springframework.remoting.caucho.HessianServiceExporter',
+            'org.springframework.remoting.httpinvoker.HttpInvokerServiceExporter',
+            'org.springframework.remoting.rmi.RmiServiceExporter',
+            'org.springframework.remoting.support.RemoteExporter',
+            // ...
+    ]
+}
+```
+
+将来これらの依存が誤って追加された場合、本specが即座に赤化して退行を検知する。Sprint4のSBD-9（オープンリダイレクト
+sink不在の回帰固定）と同じ「不在の実証」哲学を、「削除対象コードが元から存在しない既達判定Story」に適用する際の
+具体的な実装技法として使い分ける。あわせて、露出面をREST（`presentation.rest`）のみに限定する旨は`package-info.java`
+（Javadocパッケージコメント）で明文化する（ADRディレクトリの慣習が本コードベースに無いため、パッケージ境界の説明は
+package-infoに置く）。
+
+> 発生スプリント: Sprint15（#11・`RemotingSurfaceAbsenceSpec`＋`presentation/rest/package-info.java`）
