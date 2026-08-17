@@ -807,3 +807,56 @@ sink不在の回帰固定）と同じ「不在の実証」哲学を、「削除�
 package-infoに置く）。
 
 > 発生スプリント: Sprint15（#11・`RemotingSurfaceAbsenceSpec`＋`presentation/rest/package-info.java`）
+
+### セキュリティ関連の試行カウンタ/レート制限はDB-backedテーブルで永続化する（in-memoryにしない）
+
+ログイン試行制限・登録レート制限のような「セキュリティ上意味のある回数カウンタ」は、原則としてin-memory
+（アプリケーションプロセス内のMap/キャッシュ）ではなく専用のDBテーブル（`t_xxx_attempt`）へ永続化する。
+理由は2つ: ①アプリケーションの再起動でカウンタが消失すると制限が無かったことになる、②将来的にマルチ
+インスタンス構成になった場合インスタンスごとに別カウンタとなりバイパスの温床になる（本プロジェクトは
+現状シングルインスタンスだが、in-memory実装は将来スケールした際に静かに無効化される）。新規に試行
+カウンタ/レート制限を設計する際は、まずDB-backedを第一候補として検討し、in-memoryを選ぶ場合は明示的な
+理由（例: 業務上重要でない・秒単位の粒度が必要等）をユーザーに確認してから採用する。
+
+- 単文アトミック更新（`INSERT ... ON DUPLICATE KEY UPDATE`）でread-then-writeの競合を避ける
+  （`LoginAttemptCustomMapper`/`RegisterAttemptCustomMapper`）。
+- 時刻比較（ロック期限・ウィンドウ判定）はJava側ではなくDB側（`NOW(6)`）で行う（Sprint4の教訓・環境間
+  クロックスキュー回避。上記「技術的なハマりポイント」参照）。
+- キーは用途に応じて選ぶ（認証済みログイン失敗＝`username`／未認証な登録＝`client_ip`。いずれもFK制約・
+  version列は不要）。`client_ip`は`X-Forwarded-For`を無条件信頼せず`request.getRemoteAddr()`を既定にする
+  （既出）。
+- 超過判定はService層のゲート（`assertNotLocked`/`assertNotRateLimited`）に閉じ、既存の失敗系統
+  （401/429等）へ合流させる（新しい失敗系統を作らない）。
+
+> **背景（Sprint4 #20 `t_login_attempt`で初出→Sprint16 #13 `t_register_attempt`で2回目発生・2回ルール
+> 昇格）**: 登録レート制限の計画フェーズでは当初in-memory案が候補に挙がったが、ユーザーが「in-memoryでは
+> なくDB-backedを選択」と明示的に確定した（`backlog/sprint_16/sprint_backlog.md` E1。3-repo化の要因にも
+> なった）。2スプリントにまたがり同じ設計判断（DB永続化を選ぶ）が繰り返されたため、以後デフォルトで
+> in-memory案を出さずDB-backedを第一候補とする一般ルールとして明文化した。
+
+### version楽観ロックUPDATEの実装パターン（コードベース初のUPDATE実装・#14）
+
+Sprint4（#20/#21）で用意した足場（`AffectedRows.requireUpdated(rows)` → `OptimisticLockConflictException` →
+`GlobalExceptionHandler.handleConflict`（409）・DDLのversion列）は、Sprint12/13/14（Repository層展開・
+`OwnershipAuthorizationService`実適用）を経てもUPDATE自体の実利用例がゼロのまま維持されていた。#14
+（アカウント編集）が初めてのversion楽観ロックUPDATE実装であり、以下4点を今後の同種UPDATE実装（プロフィール
+以外の編集系全般）が踏襲できる型として確立した。
+
+1. **GET側でversionをレスポンスに含め、PUT/PATCHでそのまま往復させる**。クライアントは編集前に取得した
+   versionをそのまま送り返すだけでよく、更新対象の識別（pk）とは別に楽観ロックトークンとして扱う。
+2. **UPDATE文は`SET ..., version = version + 1 WHERE pk = :id AND version = :readVersion`の1文にまとめ、
+   `AffectedRows.requireUpdated(rows)`でaffected==0を`OptimisticLockConflictException`へ変換する**
+   （Sprint4で用意した`Supplier<RuntimeException>`オーバーロードは使わず既定の楽観ロック用例外のまま
+   でよい＝当初の設計意図どおり無改造で機能した）。
+3. **同一集約内の複数テーブルにまたがる更新（例: m_account + m_profile）は、単一のversionトークン
+   （集約ルート＝m_accountのversion）でガードし、依存テーブル側のUPDATEはガード対象のUPDATEがaffected>0
+   だった場合にのみ発行する**（Repository内で早期return）。依存テーブル側に別途version列を持たせて
+   二重にガードする必要はない。
+4. **UPDATE成功後、確認のための再SELECTは行わない**。永続化された値は送信したコマンド入力そのものである
+   ため、レスポンスは`command`の入力値＋`expectedVersion + 1`から直接組み立てる（Sprint12/13の「識別子
+   解決用readと最終応答用readを同じ集約全体読み込みで済ませない」教訓をさらに進め、書込操作の最終応答では
+   再読取り自体が不要なケースがあることを示す）。
+
+> **背景（Sprint16 #14）**: 並行安全性（AC-neg3・同一readVersionへの2並行PUT）はSprint11（#8）の2段ラッチ
+> テスト手法（`CountDownLatch`×2）を応用し初回でgreen化できた（C1チャレンジ実証）。詳細な設計判断は
+> `memory/dev/long_term.md`「習得したこと」（jpetstore-backend）参照。

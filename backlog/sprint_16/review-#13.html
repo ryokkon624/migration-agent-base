@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint 16 Review — #13 ユーザー登録（自動ログイン・DB-backedレート制限）</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #f8f7f5; }
+
+  .page { max-width: 860px; margin: 0 auto; padding: 48px 24px; }
+
+  /* Header */
+  .sprint-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin-bottom: 8px; }
+  h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px; }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+  .badge-sprint { background: #e8f0fe; color: #1a56db; }
+  .badge-issue { background: #f0fdf4; color: #166534; }
+  .badge-feature { background: #fdf4ff; color: #7e22ce; }
+  .badge-scope { background: #fff7ed; color: #c2410c; }
+
+  /* Sections */
+  section { margin-bottom: 40px; }
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #888; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e5e5e5; }
+
+  /* Problem box */
+  .problem-box { background: #fff8f0; border-left: 3px solid #f59e0b; border-radius: 0 8px 8px 0; padding: 16px 20px; margin-bottom: 16px; }
+  .problem-box .label { font-size: 11px; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .problem-box p { color: #451a03; font-size: 13px; }
+
+  /* Architecture change */
+  .arch-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: center; margin-bottom: 8px; }
+  .arch-box { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; }
+  .arch-box .arch-title { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .arch-box.before { border-color: #fca5a5; }
+  .arch-box.after { border-color: #86efac; }
+  .arch-arrow { font-size: 20px; color: #888; text-align: center; }
+  .flow-item { font-size: 12px; color: #374151; padding: 3px 0; display: flex; align-items: flex-start; gap: 6px; }
+  .flow-item .dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .dot-red { background: #ef4444; }
+  .dot-green { background: #22c55e; }
+
+  /* AC cards */
+  .ac-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+  .ac-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid #f0f0f0; }
+  .ac-check { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .ac-check.done { background: #dcfce7; color: #166534; }
+  .ac-num { font-size: 11px; font-weight: 700; color: #888; }
+  .ac-text { font-size: 13px; font-weight: 600; color: #1a1a1a; flex: 1; }
+  .ac-body { padding: 16px 18px; }
+  .ac-body p { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+
+  /* File change */
+  .file-change { margin-bottom: 16px; }
+  .file-name { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; background: #f3f4f6; color: #374151; padding: 5px 10px; border-radius: 4px 4px 0 0; border: 1px solid #e5e5e5; border-bottom: none; display: flex; justify-content: space-between; }
+  .diff-stat { color: #888; }
+  .code-block { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.7; background: #1e1e2e; color: #cdd6f4; padding: 14px 16px; border-radius: 0 0 6px 6px; overflow-x: auto; }
+  .code-line { display: flex; }
+  .line-num { color: #45475a; min-width: 28px; user-select: none; }
+  .line-add { background: rgba(166, 227, 161, 0.12); color: #a6e3a1; }
+  .line-del { background: rgba(243, 139, 168, 0.12); color: #f38ba8; }
+  .line-ctx { color: #cdd6f4; }
+  .line-prefix { min-width: 14px; }
+
+  /* Annotation */
+  .annotation { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-size: 12px; color: #78350f; display: flex; gap: 8px; }
+  .annotation-icon { font-size: 14px; flex-shrink: 0; }
+
+  /* Note list (implementation notes) */
+  .note-list { list-style: none; }
+  .note-item { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; font-size: 13px; color: #374151; }
+  .note-item strong { color: #1a1a1a; }
+
+  /* Verify section */
+  .verify-list { list-style: none; }
+  .verify-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; }
+  .verify-item:last-child { border-bottom: none; }
+  .verify-num { width: 22px; height: 22px; background: #e8f0fe; color: #1a56db; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .verify-content { flex: 1; }
+  .verify-content strong { font-size: 13px; color: #1a1a1a; display: block; margin-bottom: 3px; }
+  .verify-content span { font-size: 12px; color: #6b7280; }
+
+  /* Scope table */
+  .scope-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .scope-table th { text-align: left; padding: 8px 12px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .scope-table td { padding: 10px 12px; border: 1px solid #e5e5e5; color: #374151; vertical-align: top; }
+  .scope-table tr:hover td { background: #f9fafb; }
+  .tag-new { font-size: 11px; font-weight: 600; background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 3px; }
+  .tag-changed { font-size: 11px; font-weight: 600; background: #e8f0fe; color: #1a56db; padding: 2px 6px; border-radius: 3px; }
+  .tag-unchanged { font-size: 11px; font-weight: 600; background: #f3f4f6; color: #6b7280; padding: 2px 6px; border-radius: 3px; }
+  .scope-group { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.05em; margin: 16px 0 6px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="sprint-label">Sprint 16 Review</div>
+  <h1>#13 — ユーザー登録（自動ログイン・DB-backedレート制限）を提供する</h1>
+  <div class="meta">
+    <span class="badge badge-sprint">Sprint 16</span>
+    <span class="badge badge-issue">#13</span>
+    <span class="badge badge-feature">feature / E4</span>
+    <span class="badge badge-scope">3-repo（backend + frontend + database）</span>
+  </div>
+
+  <!-- Problem -->
+  <section>
+    <h2>なぜこの改修が必要だったか</h2>
+    <div class="problem-box">
+      <div class="label">問題</div>
+      <p>これまでSPA上には新規アカウントを作る手段が存在しなかった（トップページの「New Here?」は <code>href="#"</code> のダミーリンク）。JSP廃止方針のもと、レガシー版にあった登録機能をREST＋SPAで作り直し、登録した瞬間にそのまま買い物を始められる（自動ログイン）状態にする必要があった。あわせて、未認証で叩ける新規エンドポイントは総当り・アカウント大量作成の的になりやすいため、DB-backedのレート制限を新設する。</p>
+    </div>
+    <div class="arch-grid">
+      <div class="arch-box before">
+        <div class="arch-title">改修前</div>
+        <div class="flow-item"><span class="dot dot-red"></span>「New Here?」ボタンは <code>href="#"</code> のダミー（遷移先なし）</div>
+        <div class="flow-item"><span class="dot dot-red"></span>アカウントを新規作成するAPI/画面が存在しない</div>
+        <div class="flow-item"><span class="dot dot-red"></span>未認証ユーザーはSignonのみ利用可能</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-box after">
+        <div class="arch-title">改修後</div>
+        <div class="flow-item"><span class="dot dot-green"></span>「New Here?」→ <code>/register</code>（<code>RegisterView.vue</code>）</div>
+        <div class="flow-item"><span class="dot dot-green"></span><code>POST /api/register</code> → m_account/m_signon/m_profile を同一トランザクションでINSERT</div>
+        <div class="flow-item"><span class="dot dot-green"></span>成功時は照合スキップの fresh JWT を発行し即ログイン状態に（<code>issueTokensFor</code>）</div>
+        <div class="flow-item"><span class="dot dot-green"></span>同一IPからの連続試行は <code>t_register_attempt</code> でカウントし429で抑止</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AC breakdown -->
+  <section>
+    <h2>AC別 実装内容</h2>
+
+    <!-- AC1 / L2 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC1 / [L2]</div>
+        <div class="ac-text">account/signon/profile 3表相当への登録をREST＋SPAで提供し、登録後は自動ログインする</div>
+      </div>
+      <div class="ac-body">
+        <p>独立パス <code>POST /api/register</code>（E8）を新設。allowlist DTOで受理した値をコマンドへ変換し、登録ユースケースへ渡す。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../presentation/rest/RegistrationController.java</span>
+            <span class="diff-stat">新規 93行</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">39</span><span class="line-prefix">+</span><span>  @PostMapping</span></div>
+            <div class="code-line line-add"><span class="line-num">40</span><span class="line-prefix">+</span><span>  @ResponseStatus(HttpStatus.CREATED)</span></div>
+            <div class="code-line line-add"><span class="line-num">41</span><span class="line-prefix">+</span><span>  public RegistrationResponse register(</span></div>
+            <div class="code-line line-add"><span class="line-num">42</span><span class="line-prefix">+</span><span>      @Valid @RequestBody RegisterRequest request,</span></div>
+            <div class="code-line line-add"><span class="line-num">43</span><span class="line-prefix">+</span><span>      HttpServletRequest servletRequest,</span></div>
+            <div class="code-line line-add"><span class="line-num">44</span><span class="line-prefix">+</span><span>      HttpServletResponse response) {</span></div>
+            <div class="code-line line-add"><span class="line-num">45</span><span class="line-prefix">+</span><span>    AuthenticatedUser user =</span></div>
+            <div class="code-line line-add"><span class="line-num">46</span><span class="line-prefix">+</span><span>        registrationApplicationService.register(request.toCommand(), servletRequest, response);</span></div>
+            <div class="code-line line-add"><span class="line-num">47</span><span class="line-prefix">+</span><span>    return new RegistrationResponse(user.username(), user.roles());</span></div>
+            <div class="code-line line-add"><span class="line-num">48</span><span class="line-prefix">+</span><span>  }</span></div>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../application/service/RegistrationApplicationService.java</span>
+            <span class="diff-stat">新規 118行</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">67</span><span class="line-prefix">+</span><span>  @Transactional</span></div>
+            <div class="code-line line-add"><span class="line-num">68</span><span class="line-prefix">+</span><span>  public AuthenticatedUser register(</span></div>
+            <div class="code-line line-add"><span class="line-num">69</span><span class="line-prefix">+</span><span>      RegisterAccountCommand command, HttpServletRequest request, HttpServletResponse response) {</span></div>
+            <div class="code-line line-add"><span class="line-num">70</span><span class="line-prefix">+</span><span>    String clientIp = request.getRemoteAddr();</span></div>
+            <div class="code-line line-add"><span class="line-num">71</span><span class="line-prefix">+</span><span>    registerAttemptService.assertNotRateLimited(clientIp);</span></div>
+            <div class="code-line line-add"><span class="line-num">78</span><span class="line-prefix">+</span><span>      String passwordHash = passwordEncoder.encode(command.password());</span></div>
+            <div class="code-line line-add"><span class="line-num">79</span><span class="line-prefix">+</span><span>      NewAccountRegistration registration = toRegistration(command, passwordHash);</span></div>
+            <div class="code-line line-add"><span class="line-num">83</span><span class="line-prefix">+</span><span>        userId = accountRepository.register(registration);</span></div>
+            <div class="code-line line-add"><span class="line-num">88</span><span class="line-prefix">+</span><span>      AuthenticatedUser user = new AuthenticatedUser(userId, command.username(), DEFAULT_ROLES);</span></div>
+            <div class="code-line line-add"><span class="line-num">89</span><span class="line-prefix">+</span><span>      authApplicationService.issueTokensFor(user, response);</span></div>
+            <div class="code-line line-add"><span class="line-num">90</span><span class="line-prefix">+</span><span>      return user;</span></div>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../infrastructure/mybatis/account/MyBatisAccountRepository.java</span>
+            <span class="diff-stat">register() 追加</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">59</span><span class="line-prefix">+</span><span>  @Override</span></div>
+            <div class="code-line line-add"><span class="line-num">60</span><span class="line-prefix">+</span><span>  public Long register(NewAccountRegistration registration) {</span></div>
+            <div class="code-line line-add"><span class="line-num">61</span><span class="line-prefix">+</span><span>    AccountRegistrationCustomEntity account = toAccountEntity(registration);</span></div>
+            <div class="code-line line-add"><span class="line-num">62</span><span class="line-prefix">+</span><span>    accountRegistrationCustomMapper.insertAccount(account);</span></div>
+            <div class="code-line line-add"><span class="line-num">63</span><span class="line-prefix">+</span><span>    Long userId = account.getUserId();</span></div>
+            <div class="code-line line-add"><span class="line-num">65</span><span class="line-prefix">+</span><span>    accountRegistrationCustomMapper.insertSignon(toSignonEntity(userId, registration));</span></div>
+            <div class="code-line line-add"><span class="line-num">66</span><span class="line-prefix">+</span><span>    accountRegistrationCustomMapper.insertProfile(toProfileEntity(userId, registration));</span></div>
+            <div class="code-line line-add"><span class="line-num">67</span><span class="line-prefix">+</span><span>    return userId;</span></div>
+            <div class="code-line line-add"><span class="line-num">68</span><span class="line-prefix">+</span><span>  }</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>m_account → m_signon → m_profile の3件INSERTを <code>@Transactional</code> 配下の1メソッドに集約。username重複（UNIQUE制約違反）は <code>DuplicateKeyException</code> として呼び出し元で捕捉し、<code>UsernameAlreadyExistsException</code>（409）に変換する（E4）。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC2 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC2 (SBD-4)</div>
+        <div class="ac-text">登録直後の自動ログインで認証状態を再生成する（固定化防止）</div>
+      </div>
+      <div class="ac-body">
+        <p>本プロジェクトはHttpSessionを持たないJWT statelessアーキテクチャ。既存 <code>login()</code> 末尾の「fresh JWT発行＋httpOnly Cookie書き込み」を <code>issueTokensFor</code> として抽出し、登録処理から（パスワード照合を経ずに）再利用する。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../application/service/AuthApplicationService.java</span>
+            <span class="diff-stat">+15 / -2</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">79</span><span class="line-prefix"> </span><span>    AuthenticatedUserDetails principal = (AuthenticatedUserDetails) authResult.getPrincipal();</span></div>
+            <div class="code-line line-ctx"><span class="line-num">80</span><span class="line-prefix"> </span><span>    AuthenticatedUser user = principal.authenticatedUser();</span></div>
+            <div class="code-line line-add"><span class="line-num">82</span><span class="line-prefix">+</span><span>    issueTokensFor(user, response);</span></div>
+            <div class="code-line line-ctx"><span class="line-num">83</span><span class="line-prefix"> </span><span>    return user;</span></div>
+            <div class="code-line line-ctx"><span class="line-num">84</span><span class="line-prefix"> </span><span>  }</span></div>
+            <div class="code-line line-add"><span class="line-num">95</span><span class="line-prefix">+</span><span>  public void issueTokensFor(AuthenticatedUser user, HttpServletResponse response) {</span></div>
+            <div class="code-line line-add"><span class="line-num">96</span><span class="line-prefix">+</span><span>    String accessToken = jwtService.generateAccessToken(user);</span></div>
+            <div class="code-line line-add"><span class="line-num">97</span><span class="line-prefix">+</span><span>    String refreshToken = jwtService.generateRefreshToken(user);</span></div>
+            <div class="code-line line-add"><span class="line-num">98</span><span class="line-prefix">+</span><span>    cookieSupport.writeAccessTokenCookie(response, accessToken, jwtProperties.accessTokenTtl());</span></div>
+            <div class="code-line line-add"><span class="line-num">99</span><span class="line-prefix">+</span><span>    cookieSupport.writeRefreshTokenCookie(response, refreshToken, jwtProperties.refreshTokenTtl());</span></div>
+            <div class="code-line line-add"><span class="line-num">100</span><span class="line-prefix">+</span><span>  }</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span><b>意図的設計（計画フェーズで確定済み）</b>: HttpSessionは導入しない。常に新規署名のトークンを発行する（供給された既存トークンをそのまま再利用・エコーしない）ため、新規ユーザーであっても固定化防止の要件（AC2/SBD-4）はfresh JWT発行で満たされる。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC3 / AC-neg1 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC3 / AC-neg1 (SBD-5)</div>
+        <div class="ac-text">パスワードはbcryptハッシュ＋ソルトで保存し、DBに平文パスワードが存在しない</div>
+      </div>
+      <div class="ac-body">
+        <p>既存の <code>PasswordEncoderConfig</code>（<code>{bcrypt}</code>プレフィックス付きDelegatingPasswordEncoder）をそのまま利用。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../application/service/RegistrationApplicationService.java</span>
+            <span class="diff-stat">L78</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">78</span><span class="line-prefix">+</span><span>      String passwordHash = passwordEncoder.encode(command.password());</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>統合テスト（<code>RegistrationControllerSpec</code>）で登録後の <code>m_signon.password_hash</code> が <code>{bcrypt}</code> で始まり、かつ生パスワードと不一致であることをDBまで確認済み（AC-neg1実証）。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC4 / AC-neg2 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC4 / AC-neg2 (SBD-6)</div>
+        <div class="ac-text">登録エンドポイントの総当り/列挙をレート制限で抑止する</div>
+      </div>
+      <div class="ac-body">
+        <p>既存のログインロックアウト（<code>LoginAttemptService</code>・username単位）は登録には転用できない（登録時点ではusernameがまだ存在しない）ため、IPアドレスをキーとするDB-backedの登録試行テーブル・サービスを新設した。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>database: flyway/sql/V00_000_012__create_register_attempt.sql</span>
+            <span class="diff-stat">新規 36行</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">22</span><span class="line-prefix">+</span><span>CREATE TABLE t_register_attempt (</span></div>
+            <div class="code-line line-add"><span class="line-num">23</span><span class="line-prefix">+</span><span>      client_ip VARCHAR(45) NOT NULL COMMENT '登録試行元IPアドレス(PK・FK制約なし)'</span></div>
+            <div class="code-line line-add"><span class="line-num">24</span><span class="line-prefix">+</span><span>    , attempt_count INT NOT NULL DEFAULT 0 COMMENT '直近窓内の試行回数'</span></div>
+            <div class="code-line line-add"><span class="line-num">26</span><span class="line-prefix">+</span><span>    , lock_until DATETIME(6) NULL COMMENT 'レート制限解除予定日時(NULL=制限なし)'</span></div>
+            <div class="code-line line-add"><span class="line-num">35</span><span class="line-prefix">+</span><span>    , PRIMARY KEY (client_ip)</span></div>
+            <div class="code-line line-add"><span class="line-num">36</span><span class="line-prefix">+</span><span>) ENGINE = InnoDB ...;</span></div>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../infrastructure/security/RegisterAttemptService.java</span>
+            <span class="diff-stat">新規 72行</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">44</span><span class="line-prefix">+</span><span>  public void assertNotRateLimited(String clientIp) {</span></div>
+            <div class="code-line line-add"><span class="line-num">45</span><span class="line-prefix">+</span><span>    if (mapper.countActiveLock(clientIp) > 0) {</span></div>
+            <div class="code-line line-add"><span class="line-num">46</span><span class="line-prefix">+</span><span>      throw new RegistrationRateLimitExceededException();</span></div>
+            <div class="code-line line-add"><span class="line-num">47</span><span class="line-prefix">+</span><span>    }</span></div>
+            <div class="code-line line-add"><span class="line-num">48</span><span class="line-prefix">+</span><span>  }</span></div>
+            <div class="code-line line-add"><span class="line-num">59</span><span class="line-prefix">+</span><span>  @Transactional(propagation = Propagation.REQUIRES_NEW)</span></div>
+            <div class="code-line line-add"><span class="line-num">60</span><span class="line-prefix">+</span><span>  public void recordAttempt(String clientIp) {</span></div>
+            <div class="code-line line-add"><span class="line-num">61</span><span class="line-prefix">+</span><span>    mapper.recordAttempt(</span></div>
+            <div class="code-line line-add"><span class="line-num">62</span><span class="line-prefix">+</span><span>        clientIp, properties.maxAttempts(), properties.lockDuration().toSeconds(), currentProgram());</span></div>
+            <div class="code-line line-add"><span class="line-num">66</span><span class="line-prefix">+</span><span>  }</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>client_ipは <code>request.getRemoteAddr()</code> のみ使用（X-Forwarded-Forは信頼しない・Sprint2教訓）。<code>recordAttempt</code>は成功/失敗を問わず必ず1回呼ばれ（レート制限ゲート自体で短絡した場合を除く）、<code>REQUIRES_NEW</code>でメイン処理のロールバックとは独立してコミットされる。判定はDB側の<code>NOW(6)</code>基準（アプリ/DB間のクロックスキューに対して安全・Sprint4教訓）。</span>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../config/SecurityConfig.java</span>
+            <span class="diff-stat">+3</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">67</span><span class="line-prefix"> </span><span>                        "/api/auth/login",</span></div>
+            <div class="code-line line-ctx"><span class="line-num">68</span><span class="line-prefix"> </span><span>                        "/api/auth/logout",</span></div>
+            <div class="code-line line-add"><span class="line-num">69</span><span class="line-prefix">+</span><span>                        // #13 E8: 独立パス。/api/account/** は authenticated() のまま維持</span></div>
+            <div class="code-line line-add"><span class="line-num">70</span><span class="line-prefix">+</span><span>                        "/api/register")</span></div>
+          </div>
+        </div>
+        <div class="annotation" style="margin-top:-4px;">
+          <span class="annotation-icon">ℹ️</span>
+          <span><b>意図的スコープ（計画フェーズで確定済み・欠落ではない）</b>: AC4は「レート制限＋メール検証」と書かれているが、実SMTP基盤・検証トークン表が現状ゼロのため、メール検証は別バックログへ持ち越すプレースホルダとし、本Sprintではレート制限のみで列挙対策を担保する（Q1確定事項）。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC5 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC5</div>
+        <div class="ac-text">profile.langpref は任意項目として保持する（i18nは英語のみ）</div>
+      </div>
+      <div class="ac-body">
+        <p>登録フォームには言語設定・お気に入りカテゴリの入力欄を出さない（E5）。DTOはoptionalで受理し、未入力時はサーバ側で既定値を補完する。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../application/service/RegistrationApplicationService.java</span>
+            <span class="diff-stat">L96-101</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">98</span><span class="line-prefix">+</span><span>    String languagePreference =</span></div>
+            <div class="code-line line-add"><span class="line-num">99</span><span class="line-prefix">+</span><span>        command.languagePreference() == null || command.languagePreference().isBlank()</span></div>
+            <div class="code-line line-add"><span class="line-num">100</span><span class="line-prefix">+</span><span>            ? DEFAULT_LANGUAGE_PREFERENCE</span></div>
+            <div class="code-line line-add"><span class="line-num">101</span><span class="line-prefix">+</span><span>            : command.languagePreference();</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>favoriteCategoryId は未入力ならNULLのまま保存。両方とも#14の編集画面で後から設定できる。bannerdata/MyListは既にPO決定で廃止済みのため本Storyでは対象外。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC6 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC6 (SBD-18)</div>
+        <div class="ac-text">入力表示はエスケープする（bannerName等のHTML内包列は継承しない）</div>
+      </div>
+      <div class="ac-body">
+        <p><code>RegisterView.vue</code>はVueの既定テキスト補間（<code>&#123;&#123; &#125;&#125;</code>）のみを使用し、<code>v-html</code>は一切使用しない（Sprint5で確立した既定方針をそのまま踏襲）。bannerdata等のHTML内包列は登録DTO・画面のいずれにも存在しない。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Implementation notes -->
+  <section>
+    <h2>実装メモ（仕様外の判断・変更・妥協点）</h2>
+    <ul class="note-list">
+      <li class="note-item"><strong>登録試行は成功/失敗を問わず必ず1回記録する</strong>: 既存<code>LoginAttemptService</code>は「失敗のみ記録・成功でリセット」だが、登録は1回の試行自体がIP由来の資源消費（アカウント大量作成の温床）であるため、結果によらずカウントする方が抑止として妥当と判断した。レート制限ゲート自体で短絡した場合は記録しない。</li>
+      <li class="note-item"><strong><code>recordAttempt</code>に<code>REQUIRES_NEW</code>を付与</strong>: メインの登録処理がusername重複等でロールバックしても、レート制限カウンタは業務データの成否と独立して必ずコミットされる必要があるため。</li>
+      <li class="note-item"><strong>レート制限の閾値既定値（5回/15分）は既存<code>LoginAttemptProperties</code>と同じ値を流用</strong>: バックログでは「閾値既定はDEV調整」とされていたため、実証済みデフォルトをそのまま採用した。運用時に<code>auth.register-rate-limit.*</code>で個別調整可能。</li>
+      <li class="note-item"><strong><code>AccountRepository.register()</code>は1メソッドでm_account/m_signon/m_profileの3件INSERTを行う設計</strong>: 「1回の業務アクションで3表へ常に一緒に書く」性質のため、Order（insertHeader/insertLineを分離）とは異なりRepositoryインタフェースを1メソッドに集約した。</li>
+      <li class="note-item"><strong>frontend: <code>RegisterPayload</code>型は<code>Address</code>を継承</strong>: backendの登録リクエストが氏名/連絡先/住所でチェックアウトの<code>Address</code>と完全に同じ形だったため継承する形にし、既存<code>AddressForm.vue</code>を無改造で<code>RegisterView.vue</code>に再利用した。</li>
+      <li class="note-item"><strong>frontend: パスワード一致検証をクライアント側でも先取りして実施</strong>: サーバ側検証（400）が権威だが、送信前に即座にフィードバックする方がUXが良いと判断した。</li>
+    </ul>
+  </section>
+
+  <!-- Verify -->
+  <section>
+    <h2>動作確認ポイント（ユーザー確認用）</h2>
+    <ul class="verify-list">
+      <li class="verify-item">
+        <div class="verify-num">1</div>
+        <div class="verify-content">
+          <strong>トップページの「New Here?」ボタンから登録画面に遷移できること</strong>
+          <span>これまでダミーリンク（href="#"）だったが、/register へ実際に遷移する</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">2</div>
+        <div class="verify-content">
+          <strong>必須項目を入力して登録すると、そのままログイン状態になること</strong>
+          <span>登録完了後に再度サインオンする必要がなく、そのままカタログ等を利用できる</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">3</div>
+        <div class="verify-content">
+          <strong>既に使われているユーザー名で登録しようとするとエラーになること</strong>
+          <span>「使用済み」の明示的なメッセージが表示される（409）</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">4</div>
+        <div class="verify-content">
+          <strong>パスワードと確認用パスワードが一致しないと、送信前にエラー表示されること</strong>
+          <span>クライアント側で即座にフィードバックされる</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">5</div>
+        <div class="verify-content">
+          <strong>同じ端末から登録を連続で何度も試みると、一定回数を超えた時点でエラーになること</strong>
+          <span>「しばらくしてから再度お試しください」等のメッセージ（429・レート制限）</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">6</div>
+        <div class="verify-content">
+          <strong>登録画面に言語設定・お気に入りカテゴリの入力欄が出ないこと</strong>
+          <span>意図的な仕様（E5）。これらは登録後に#14の編集画面から設定する</span>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- Scope -->
+  <section>
+    <h2>改修スコープ確認</h2>
+    <div class="scope-group">database</div>
+    <table class="scope-table">
+      <tr><th>ファイル</th><th>変更</th><th>内容</th></tr>
+      <tr><td><code>flyway/sql/V00_000_012__create_register_attempt.sql</code></td><td><span class="tag-new">新規</span></td><td>t_register_attempt（登録レート制限カウンタ・client_ip PK）</td></tr>
+    </table>
+    <div class="scope-group">backend</div>
+    <table class="scope-table">
+      <tr><th>ファイル</th><th>変更</th><th>内容</th></tr>
+      <tr><td><code>presentation/rest/RegistrationController.java</code></td><td><span class="tag-new">新規</span></td><td>POST /api/register・allowlist DTO</td></tr>
+      <tr><td><code>application/service/RegistrationApplicationService.java</code></td><td><span class="tag-new">新規</span></td><td>登録ユースケース（レート制限→検証→bcrypt→3表INSERT→自動ログイン）</td></tr>
+      <tr><td><code>infrastructure/security/RegisterAttemptService.java</code> / <code>RegisterAttemptCustomMapper.java</code> / <code>RegisterAttemptProperties.java</code></td><td><span class="tag-new">新規</span></td><td>DB-backedレート制限（IPキー・単文アトミックUPDATE）</td></tr>
+      <tr><td><code>domain/account/*</code>（NewAccountRegistration / RegisterAccountCommand）・<code>domain/exception/*</code>（UsernameAlreadyExistsException / RegistrationRateLimitExceededException）</td><td><span class="tag-new">新規</span></td><td>登録コマンド・専用例外</td></tr>
+      <tr><td><code>infrastructure/mybatis/custom/entity,mapper/*Registration*</code></td><td><span class="tag-new">新規</span></td><td>m_account/m_signon/m_profile書込みEntity/Mapper（XML含む）</td></tr>
+      <tr><td><code>domain/account/AccountRepository.java</code> / <code>infrastructure/mybatis/account/MyBatisAccountRepository.java</code></td><td><span class="tag-changed">変更あり</span></td><td>register()メソッド追加</td></tr>
+      <tr><td><code>application/service/AuthApplicationService.java</code></td><td><span class="tag-changed">変更あり</span></td><td>login()末尾を issueTokensFor() として抽出（E9・login本体ロジックは無変更）</td></tr>
+      <tr><td><code>config/SecurityConfig.java</code></td><td><span class="tag-changed">変更あり</span></td><td>permitAllに /api/register を追加（/api/account/** は無変更）</td></tr>
+      <tr><td><code>presentation/rest/exception/GlobalExceptionHandler.java</code></td><td><span class="tag-changed">変更あり</span></td><td>UsernameAlreadyExists→409・RateLimitExceeded→429 の正規化を追加</td></tr>
+    </table>
+    <div class="scope-group">frontend</div>
+    <table class="scope-table">
+      <tr><th>ファイル</th><th>変更</th><th>内容</th></tr>
+      <tr><td><code>views/RegisterView.vue</code></td><td><span class="tag-new">新規</span></td><td>登録画面（SignonView/AddressForm下敷き）</td></tr>
+      <tr><td><code>api/accountApi.ts</code></td><td><span class="tag-changed">変更あり</span></td><td>registerAccount() 追加</td></tr>
+      <tr><td><code>stores/auth.ts</code></td><td><span class="tag-changed">変更あり</span></td><td>register action・RegisterErrorReason分類 追加</td></tr>
+      <tr><td><code>domain/account.ts</code></td><td><span class="tag-changed">変更あり</span></td><td>RegisterPayload型 追加</td></tr>
+      <tr><td><code>router/index.ts</code></td><td><span class="tag-changed">変更あり</span></td><td>/register ルート追加（guest可）</td></tr>
+      <tr><td><code>views/HomeView.vue</code></td><td><span class="tag-changed">変更あり</span></td><td>「New Here?」を href="#" → RouterLink to="/register" に配線</td></tr>
+      <tr><td><code>assets/main.css</code></td><td><span class="tag-changed">変更あり</span></td><td>.jps-required::after を「必須」→「Required」に英語化（E6・既存チェックアウトにも波及）</td></tr>
+      <tr><td><code>i18n/locales/en.ts</code></td><td><span class="tag-changed">変更あり</span></td><td>account.register.* 文言追加</td></tr>
+    </table>
+  </section>
+
+</div>
+</body>
+</html>

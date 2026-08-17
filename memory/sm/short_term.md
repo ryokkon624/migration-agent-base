@@ -1,21 +1,21 @@
 # SM 短期記憶（今スプリント）
 
-Sprint 15（#11 remoting/WS getOrder 廃止の実証・#12 支払プレースホルダ確定・#28 カートマージ N+1 バッチ化＝E3 残セキュリティ/支払＋E2 perf・cross-repo 2-repo）完了。Retro 済み。次スプリント開始時にリセット済み。
+Sprint 16（#13 [E4]ユーザー登録＋自動ログイン・#14 [E4]アカウント/プロフィール編集の本人固定・allowlist・version 楽観ロック初実装＝E4 アカウント・3-repo・10SP）完了。Retro 済み。次スプリント開始時にリセット済み。
 
-- 実装: `feature/12-e3-hardening-cart-perf`（backend/frontend 同名）。backend 3コミット（#28 e34f6f8・#11 980413a・#12 92a6576）・frontend 1コミット（#12 cfb72eb）。全テスト green。
-- 品質: **3観点＋SM verification 全クリーン（8回目相当）・Sprint Review 指摘ゼロ・tier分離15連続**。3件とも「既達判定」から出発し計画前 Explore で残スコープ最小化＝過剰実装回避。
-- PR/マージ: backend #14（closes #11/#28・Related #12）・frontend #8（closes #12）→ **マージはユーザー確認済 Sprint Review 後の通常フロー**（本セッションでは PR 作成まで。マージ状態は次回要確認）。
-- 委譲論点2ラウンド確定（SM 先回り Q1-Q3＋DEV 実コード精読後 Q2'/Q3'）→ churn ゼロ。DEV がバックログ2前提（localStorage=map・型残骸=孤立）の誤りを撤去前確認で訂正→**#12 型残骸は両 repo とも codegen 生成物ゆえ温存＝実削除ゼロ**。
-- Retro: SM=skill 変更なし（学びは long_term）／DEV=`backend-conventions §9` に「型撤去済 FW 機能の構造的不在は `Class.forName` でクラス不在固定」新設／PO=先回りチェックリスト昇格（「リファクタ/是正 Story は前提〔データ構造・生成物か〕も実コード裏取り」＝Sprint12傾向2 の2件目昇格）＋`intended-diff-ledger.md` ID-8 記述強化。long_term 反映済。
+- 実装: `feature/13-e4-account`（backend/frontend/database 同名）。3観点＋SM verification 全クリーン（9回目相当）・Sprint Review 指摘ゼロ・tier分離16連続。PR: frontend #9（closes #13/#14）・backend #15・database #7（Related）→ **全マージ済**（#13/#14 closed(completed) 確認済）。local main 3 repo 同期済（database は transient DNS fetch 失敗を検知して再同期＝e7b068d・backend 6d05d41・frontend 6dc5fa0）。
+- 委譲論点2ラウンド確定（SM 先回り Q1メール検証プレースホルダ/Q2入力検証#17委譲＋DEV 実コード精読後 E1-E9）→ churn ゼロ。E1 でユーザーが in-memory→DB-backed にオーバーライド→3-repo 化。
+- SM verification: version lock 初実装の正当性（affected==0 で profile UPDATE 発行せず→409→rollback）・login 非破壊・新規 read の readOnly 整合・クエリ純増ゼロを精読確認。
+- Retro: SM=`scrum-master-workflow` に「teammate 完了は idle 通知で判断しない」昇格（3回目）／DEV=`backend-conventions §9` に DB-backed レート制限一般ルール（2回ルール昇格）＋version 楽観ロック UPDATE 実装パターン／PO=`architecture-conventions` D7 新設＋`intended-diff-ledger` ID-11 拡張＋Issue #32（メール検証 deferred）起票。long_term 反映済。
 
 ## 要フォロー（次回）
-- (1) **「撤去/リファクタ対象が生成物か・実データ構造を実コードで裏取り」**＝PO は先回りチェックリスト昇格済。SM 側は次回再発で scrum-master-workflow ①（計画前 Explore）へ「前提の実コード裏取り」を昇格判定。
-- (2) `@Transactional(readOnly)` reviewer 盲点（Sprint14 継続・今 Sprint は read API 新設なしで非該当）。次の read Story 発生時に reviewer チェックリスト昇格 or rules 明確化を判定。
-- (3) #9 AC への索引置換反映（PO 継続・#9 クローズ済のため次回 Refinement）／#12 ID-8 記述強化は反映済。
-- (4) local main 同期の EOL/checkout-abort 落とし穴（frontend）。今回は push のみで非該当だが、次スプリント開始時の main 同期で再確認。
+- (1) **teammate 完了確認（idle ≠ 完了）**＝scrum-master-workflow 昇格済。次回も verify→未反映なら nudge→反映後前進を徹底。
+- (2) **`@Transactional(readOnly)` reviewer 盲点**（Sprint14 継続）: Sprint16 は DEV が新規 read `getAccountForEdit` に readOnly を先回り適用し非該当化。次の read Story でも reviewer が拾えなければ rules 明確化 or reviewer チェックリスト昇格を判定。
+- (3) **メール検証本実装（Issue #32・NotReady）**: SMTP 基盤が要る。着手時に intended-diff-ledger 再判定（PO）。
+- (4) **local main 同期の transient DNS/fetch 失敗**: 今回 database で発生→再確認で検知。次回も `reset --hard origin/main` 後に HEAD を確認する。
+- (5) E4 残: #15 パスワード変更（現在PW 再認証 SBD-16/ID-13）・#17 入力検証強化（ID-16）。次スプリント候補。
 
 ## 次スプリント候補
-- E3 は #11/#12 で残セキュリティ/支払を消化。次は E4 プロフィール（#13/#14/#15 系）等。バックログの Sprint 16 対象は Planning 時に GitHub Projects の Sprint フィールドで特定する。
+- E4 残（#15 PW変更・#17 入力検証）や E5 等。Sprint 17 対象は Planning 時に GitHub Projects の Sprint フィールドで特定する。
 
 ## agent-base 成果物（step 12・実施中）
-- 対象: backlog/sprint_15/（sprint_backlog.md・implementation-notes.md・review-#11/#12/#28.html）／memory/{sm,dev,po}/{short,long}.md／.claude/skills/backend-conventions/SKILL.md／spec/intended-diff-ledger.md。ブランチ `docs/sprint-15-e3-hardening-cart-perf`・`Related: #11,#12,#28`（closes にしない）。
+- 対象: backlog/sprint_16/（sprint_backlog.md・implementation-notes.md・review-#13/#14.html）／memory/{sm,dev,po}/{short,long}.md／.claude/skills/scrum-master-workflow・backend-conventions／spec/architecture-conventions.md（D7）・intended-diff-ledger.md（ID-11）。ブランチ `docs/sprint-16-e4-account-register-edit`・`Related: #13,#14`（closes にしない）。

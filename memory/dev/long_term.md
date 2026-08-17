@@ -117,6 +117,16 @@ Sprint4のセキュリティ非ブロッキング2件（`AuthApplicationService.
   チェック観点が弱い可能性を示唆するが、DEV側の実装ミス再発パターンではないためSkill昇格の対象外とし、
   SMへの申し送り事項として記録するにとどめる）。
 
+- [設計判断][DEV/ユーザー訂正・reviewer指摘ではない] **セキュリティ関連の試行カウンタ/レート制限を新設する
+  際、計画フェーズの初期案がin-memoryに寄りがちで、ユーザーがDB-backedへ訂正する場面が2回連続した。**
+  Sprint4（#20・ログインロックアウト`t_login_attempt`）に続き、Sprint16（#13・登録レート制限）でも計画
+  フェーズの当初案はin-memoryだったが、ユーザーが「in-memoryではなくDB-backed登録試行テーブル」を明示的に
+  確定した（`backlog/sprint_16/sprint_backlog.md` E1。3-repo化の要因にもなった）。再起動でのカウンタ消失・
+  将来のマルチインスタンス構成でのバイパスという実害がin-memory案では見過ごされやすいため、2回ルールに
+  従い`backend-conventions`§9へ「セキュリティ関連の試行カウンタ/レート制限はDB-backedを第一候補とする」
+  一般ルールとして昇格した（詳細は「Skills更新履歴」）。
+  発生スプリント: Sprint4（#20）→ **Sprint16（#13）で2回目発生・2回ルール昇格**
+
 ### jpetstore-frontend
 Sprint5（#24）が初のフロントエンド実装スプリント。3観点レビューでパフォーマンス1件・セキュリティ1件の
 指摘があった（規約は指摘なし）。いずれも初出（1回目）のため、2回ルールに従いSkillのチェックリストへは
@@ -686,6 +696,18 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   まとめる場面全般）で再利用できる証明の型として記録する。
   発生スプリント: Sprint15（#28。初出のため2回ルールに従い本セクション止まり。coalesce技法自体は
   `CartApplicationService.merge`のJavadocにも根拠を明記済み）
+- **Sprint4（#20/#21）で用意したversion楽観ロックUPDATE足場（`AffectedRows.requireUpdated`→
+  `OptimisticLockConflictException`→409）が、Sprint12/13/14（Repository層展開・
+  `OwnershipAuthorizationService`実適用）を経てもUPDATE自体の実利用例ゼロのまま3スプリント放置されて
+  いたが、Sprint16（#14・アカウント編集）で初めて実UPDATEに使われ、無改造のまま機能した。** 確立した
+  実装パターン（GET/PUTでのversion往復・単一集約ルートversionトークンでの複数テーブル横断ガード・
+  依存UPDATEのaffected>0条件付き発行・UPDATE成功後の再SELECT省略）は`backend-conventions`§9へ即時
+  反映した（詳細は「Skills更新履歴」）。並行安全性（AC-neg3・同一readVersionへの2並行PUT）はSprint11
+  （#8）の2段ラッチテスト手法（`CountDownLatch`×2）をそのまま応用し、初回実装で一発green化できた
+  （C1チャレンジ実証成功。Sprint11確立から5スプリント越しでの初再利用）。「足場を先回りして用意し、
+  実際のドメインでの検証は後続Storyに委ねる」設計（`OwnershipAuthorizationService`のSprint4→Sprint14と
+  同型のパターン）が、version楽観ロックでも同様に機能したことを確認できた。
+  発生スプリント: Sprint16（#14）
 
 ### jpetstore-frontend
 - **backendのSpring Security 7 CSRF設定（非XOR `CsrfTokenRequestAttributeHandler`・consume-then-
@@ -764,6 +786,13 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   （backendのAC-neg2＝不存在/非所有を区別不能にする要求と対で機能する）。既存ルールの新規ドメインへの
   転用であり新しいSkillパターンではないため`frontend-conventions`は変更していない。
   発生スプリント: Sprint14（#10）
+- **Sprint10で確立した「View非テスト方針下の否定AC判定はPiniaストアのtestableなgetterへ切り出す」パターンを、
+  #14（アカウント編集の409競合UX）で再利用しつつ、Sprint14の`order.ts`（403/不存在を単一フラグへ握りつぶす）
+  とは意図的に異なる設計（`hasConflict`/`hasSaveError`を別フラグに分離し`shouldPromptReload`ゲッターで
+  「再読込を促す」新UXを表現）を採用した。** 既存ルールの機械的な再適用ではなく、Story固有の要件（409だけ
+  再読込を促す・その他エラーとは文言も遷移も異なる）に応じてパターンの中身（フラグの分割粒度）を調整した
+  判断であり、新しいSkillパターンではないため`frontend-conventions`は変更していない。
+  発生スプリント: Sprint16（#14）
 
 ### 横断（database＋backend＋frontend）
 - **区分値をm_codeに新規登録する際の3-repo横断フロー**を在庫ステータスで実地確認した:
@@ -1085,11 +1114,38 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   に記録した。
 - `#skills-changelog` へ `[DEV]` で投稿済み。
 
+### Sprint 16（#13/#14・E4 ユーザー登録＋アカウント編集・version楽観ロック初実装）
+
+- **`backend-conventions`**: `## 9. jpetstore-backend 固有の注意事項` に以下2点を追記した:
+  1. **2回ルールによる昇格**: セキュリティ関連の試行カウンタ/レート制限をDB-backedテーブルで永続化する
+     一般ルール。Sprint4（#20・`t_login_attempt`）が初出、Sprint16（#13・登録レート制限で計画フェーズの
+     当初案がin-memoryだったところをユーザーが`t_register_attempt`のDB-backed方式へ明示的に訂正）で
+     2回目の発生と判断し、「新規に試行カウンタを設計する際はDB-backedを第一候補とする」ルールとして
+     §9へ新設した（実装レシピ＝単文アトミックupsert・DB側`NOW(6)`比較・キー選定方針も併記）。
+  2. **初出だが「知らないと書けない参照知識・実装パターン」の2回ルール例外として即時反映**: #14で確立した
+     version楽観ロックUPDATEの実装パターン（GET/PUT間のversion往復・単一集約ルートversionトークンでの
+     複数テーブル横断ガード・依存UPDATEのaffected>0条件付き発行・UPDATE成功後の再SELECT省略）。Sprint4で
+     用意した足場が3スプリント（Sprint12-14）実利用ゼロのまま維持された後の**コードベース初のUPDATE実装**
+     であり、#29 Cart PoCテンプレ（Sprint12）・書込集約の適用範囲（Sprint13）と同じ「今後の同種Storyが
+     踏襲すべき先例テンプレ」という位置づけのため即時反映が妥当と判断した。
+- **`backend-conventions`/`frontend-conventions`へ反映しなかったもの**: 以下はいずれも既存ルールの
+  Story固有の適用・再利用であり新規パターンではないため、`memory/dev/long_term.md`への記録に留めた:
+  - frontend: #14の409競合UXを`hasConflict`/`hasSaveError`/`shouldPromptReload`に分離した設計判断
+    （Sprint10のstore getter切出しパターンの再利用＋Sprint14 `order.ts`とは異なる粒度の意図的選択）
+    → 「習得したこと」（jpetstore-frontend）に記録。
+  - `RegisterPayload`が`Address`型を継承する設計・`AccountEditDetail`が`Address`を継承しない設計
+    （nullable差異による非互換の判断）は`backlog/sprint_16/implementation-notes.md`に仕様外判断として
+    記録済みのためlong_term.mdへの重複記録はしない。
+- 3reviewer/SM verificationの結果は本Retro時点（PRマージ前）では未確定のため、「繰り返し指摘される
+  パターン」（reviewer起因分）の更新は次回Retro以降に持ち越す。本Retroの更新はDEV自身のTDD・実装中の
+  自己発見（設計判断の訂正・初実装パターンの確立）のみを対象にした。
+- `#skills-changelog` へ `[DEV]` で投稿済み。
+
 ## 卒業済みルール
 
 （該当なし。棚卸し対象となるルールが直近15スプリント基準に達していない。
-  jpetstore-backendはSprint2・3・4・6・7・8・9・10・11・12・13・14・15の13スプリントのみ、jpetstore-databaseは
-  Sprint1・3・6・14の4スプリントのみ、jpetstore-frontendはSprint5・6・7・8・10・11・14・15の8スプリントのみの
-  ため、いずれも対象外。§9昇格済みの最古ルール（catch-all例外横取り・Sprint7昇格）でも昇格から8スプリント
-  （Sprint8〜15）しか経過しておらず15スプリントに満たない。Sprint4〜Sprint14 Retroに続きSprint15 Retroでも
-  棚卸しを実施したが同様の理由で卒業候補なし）
+  jpetstore-backendはSprint2・3・4・6・7・8・9・10・11・12・13・14・15・16の14スプリントのみ、
+  jpetstore-databaseはSprint1・3・6・14・16の5スプリントのみ、jpetstore-frontendはSprint5・6・7・8・10・
+  11・14・15・16の9スプリントのみのため、いずれも対象外。§9昇格済みの最古ルール（catch-all例外横取り・
+  Sprint7昇格）でも昇格から9スプリント（Sprint8〜16）しか経過しておらず15スプリントに満たない。
+  Sprint4〜Sprint15 Retroに続きSprint16 Retroでも棚卸しを実施したが同様の理由で卒業候補なし）

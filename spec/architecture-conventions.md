@@ -14,6 +14,7 @@
 | **D4** | 区分値 `m_code` は**残す**。多言語は**日英のみ**（`display_name_es` 列を廃止） | es 列を削除 |
 | **D5** | enum 生成は **TS（database）・Java（backend）とも既存ジェネレータを流用**、entity/mapper は MyBatis Generator を流用。**Dart 生成は廃止**、`0012`(ProgramType) は生成対象外 | Dart 出力・0012 生成を廃止 |
 | **D6** | 並行制御：**在庫引き当て＝ガード付きアトミック減算**、**編集系エンティティ＝`version` 列で楽観ロック**（`updated_at` はロックに使わず監査専用） | 新規（legacy はガード無し減算で売り越し可能） |
+| **D7** | secure-by-default 系の試行カウンタ・レート制限状態は **DB-backed で永続化**（in-memory/HTTPセッション保持は不可） | 新規（legacy はレート制限自体が無い。backend の stateless/JWT 前提を優先） |
 
 ---
 
@@ -152,6 +153,16 @@ polyrepo。GitHub 作成はりょこさん、ローカル雛形は別途用意�
 
 > 通常の業務表（生成CRUD一式が必要）は引き続き §3.2 のとおり MyBatis Generator を使う。この節は
 > **純追記表に限った例外規約**であることに注意。
+
+---
+
+## 5. secure-by-default 系カウンタの永続化方針（D7）
+
+認証・登録などの secure-by-default 機構（レート制限・ロックアウト等、SBD-6 系）が保持する試行回数・ロック状態は、**DB-backed で永続化する**（in-memory/HTTP セッションでの保持は不可）。
+
+- **理由**: backend は stateless/JWT 前提（§1 の polyrepo 構成・水平スケール想定）。in-memory カウンタはインスタンス再起動や複数インスタンス間で共有されず、レート制限がバイパスされうる。DB-backed であれば決定論的なテスト・水平スケール・再起動耐性を一律に担保できる。
+- **判例**: `t_login_attempt`（Sprint4 #20・ログインロックアウト）／`t_register_attempt`（Sprint16 #13・登録レート制限）。12 スプリントを隔てて同一の設計軸（cross-repo・`jpetstore-database` に Flyway 追加）で独立に確定しており、以後は本節を根拠に PO/DEV が個別確認なしに DB-backed 採用を判断できる。
+- **本節が扱わない範囲**（DEV裁量・backend-conventions 側）: テーブルの列設計・キー戦略（per-IP/per-username）・閾値のデフォルト値・IP アドレスの正規化/ハッシュ化方式など、実装レベルの詳細は各 Story の計画フェーズ、または backend-conventions で定める。
 
 ---
 

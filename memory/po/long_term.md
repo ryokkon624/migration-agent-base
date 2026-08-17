@@ -256,6 +256,40 @@ SM経由でSprint15計画フェーズの確認・確定事項5件（SMのspec委
 
 **判定**: 傾向1は4件目の再発のため引用リストへ追記のみ（新規昇格不要）。傾向2は2回以上（実質3件）の発生条件を満たすため、既存チェックリスト項目の説明を拡張して正式昇格する。傾向3は初出のため、正式昇格は見送り傾向記録に留める（ledger側の強化のみ実施済み）。
 
+### Sprint 16（2026-08-17）— E4系（#13 登録・#14 アカウント編集）計画フェーズより
+
+DEVからSprint16計画フェーズでユーザーに直接確認した事項9件（E1〜E9）と、SMが先回りでユーザー承認取得した3件（メール検証プレースホルダ／入力検証委譲／PW変更委譲）、計12件をSM経由で中継され、質問ログに記録した（9件がバックログ修正候補・3件は既存台帳/チェックリストの適用確認でバックログ修正不要）。E4（アカウント）はSprint16でE4初のwriteドメインとして着手（#13登録・#14編集）。
+
+- E1: 登録レート制限（AC-neg2/SBD-6）の保持先はin-memoryかDB-backedか→DB-backed採用（`t_register_attempt`、既存`t_login_attempt`と同方式）
+- E2: account/profile両表のversion扱いは単一トークンか二重トークンか→`m_account.version`単一トークン採用
+- E3: 編集用readは既存`GET /api/account/me`拡張か新設か→新規`GET /api/account`（version込み）
+- E4: username重複時のレスポンス（409+明示メッセージ）は列挙対策(AC4)と整合するか→整合（列挙対策はレート制限が担保）
+- E5: 登録フォームにlangpref/favcategory入力欄を出すか→出さない（DTO optional受理のみ）
+- E6: `.jps-required`日本語ラベルの扱い→英語化（既存不整合の是正・Sprint16バックログR4で想定済み）
+- E7: 登録WHOのcreate_user_id（未認証guestアクター）の値→NULL（architecture-conventions §2.1準拠）
+- E8: 登録エンドポイントのパス・permitAll設計→`POST /api/register`独立パス
+- E9: 自動ログインのJWT発行処理の抽出配置→`issueTokensFor`共通化（実装アーキテクチャ判断・DEV裁量）
+- SM先回り確定3件: メール検証プレースホルダ（ID-8型）／入力検証はas-is同等のみ実装しID-16どおり#17/#15へ委譲／PW変更は#15へ委譲。いずれも既存台帳（ID-8型・ID-16・ID-13）またはスコープ境界チェックリストの適用確認で、DEVへの再質問なしにSM単独で計画フェーズ解決できた成功例。
+
+**傾向1（既存チェックリスト項目のどれにも完全一致しない中間的性質・個別分析の結果アーキ規約側でfirmup）＝「secure-by-defaultカウンタの永続化方式（DB vs in-memory）」**: E1は、Sprint4 #20（ログインロックアウトのDB表保持）と同一設計軸の、12スプリントを隔てた再発。POチェックリストのどの既存項目にも完全一致しないため、Sprint16質問中継時点では「次回Retroで判定」として保留していた。**本Retroで判定：PO内チェックリストへの新規昇格ではなく、Sprint14の「DB索引ハイジーン」節新設（`rules/database.md`直接firmup）と同型の対応として、`spec/architecture-conventions.md`にD7（secure-by-default系カウンタの永続化＝DB-backed）を新設・直接firmupした**（本Retroで実施。テーブル設計・キー戦略・閾値等の実装詳細はbackend-conventions/DEV裁量に委ね、spec側は原則のみを明文化）。
+
+**傾向2（既存チェックリスト項目「architecture-conventionsのPO判断委譲パターン」の4件目の再発）**: E2（version単一/二重トークン）は、§3.1〔Sprint6〕→§4.3〔Sprint8〕→§9〔Sprint13〕に続く§4.2の4件目の再発。既存チェックリスト項目に該当するため新規昇格は不要（引用リストへ追記）。
+
+**傾向3（既存チェックリスト項目「先例規約未定義」の再発）**: E3（編集用readエンドポイント新設/既存拡張の判断）・E8（登録エンドポイントのパス設計）は、Sprint5 #24／Sprint6 #1／Sprint7 #2／Sprint12 #29／Sprint13 #30に続く事例。E7（WHO create_user_idのguestアクター値）はarchitecture-conventions §2.1が答えを持っていたが備考未引用だった点で同型の一種。いずれも新規昇格不要。
+
+**傾向4（既存チェックリスト項目「secure-by-default機構の既存充足確認」の5件目の再発）**: E4（username重複409と列挙対策の整合）は、Sprint4 #20/#21・Sprint9 #6・Sprint15 #11に続く5件目の再発。新規昇格不要。
+
+**傾向5（新規パターン・初出。観察継続）＝「DTO optionalフィールドの登録画面UI表示要否が未定義」**: E5は初出のため正式昇格は見送り、次回以降の同種発生時に判断する。
+
+**（参考）E6・E9・SM先回り確定3件の位置づけ**: E6はSprint16バックログ自身が「留意（既存不整合）」R4として既知リスク記録済みのため確認完了として扱う。E9は実装アーキテクチャ判断（DEV裁量）。SM先回り確定3件は既存チェックリスト運用が機能している証跡として記録する。
+
+**判定**: 傾向1は本Retroでarchitecture-conventions D7として直接firmup（PO内チェックリストへの昇格ではない）。傾向2〜4は既存チェックリスト項目の再発のため引用リストへ追記のみ（新規昇格不要）。傾向5は初出のため観察継続。
+
+**（本Retro追加判定・team-lead依頼分）**:
+
+- **メール検証プレースホルダ（#13 Q1）の別バックログ化**: `mcp__github__list_issues`（state:open）で重複が無いことを確認したうえで、新規Issue **#32**「[E4] 登録時のメールアドレス所有権を検証する（メール確認リンク）」をReady=NotReady（deferred）で起票した（Sprint15 #12支払プレースホルダの持ち越し運用と同型）。
+- **intended-diff-ledgerへの反映**: #13のsecure-by-default差分のうち、**登録レート制限**はSBD-6の同一設計軸としてID-11を拡張した（登録試行=`t_register_attempt`・関連Storyへ#13を追加、legacyには登録試行への列挙対策自体が存在しなかった旨を明記）。一方、**メール検証プレースホルダ**は、legacy側も元々メール検証を持たず（`spec/behavior/account.md` S12/R14はspecが新規に提案した対策であり、legacy実装ではない）、実装を見送った現時点では観測可能な旧新差分が生じていないため、**新規IDは不要**と判定した（ID-8〔支払プレースホルダ〕は実際にカード列/入力欄を撤去する実装差分が生じたが、本件は実装自体を行っていない点が異なる）。#32着手時に改めてID追記要否を判定する。ID-2（ハッシュ）／ID-7（bannerdata）／ID-10（セッション再生成）は、いずれも既に関連Storyへ#13が登録済みで対応済みと確認した。
+
 ## バックログ起票時の先回りチェックリスト
 
 **土台Story（DB移行・backend/frontend土台・認可/認証基盤など、新規リポジトリ・新規レイヤー・新規ドメイン横断機構に着手するStory）を起票・詳細化する際は、以下をAC/備考に先回り明記できないか確認する**（Sprint1 #22・Sprint2 #23の計11件中9件がAC/備考の先回り明記で防止できたと判定され、2Sprint連続発生のため正式昇格。Sprint4 #21で「E6基盤系」に限らず認可/認証土台Storyにも適用範囲を拡張）：
@@ -268,12 +302,12 @@ SM経由でSprint15計画フェーズの確認・確定事項5件（SMのspec委
 - [ ] 未実装の依存機能がある場合の実証手段（例：ログインEP不在下でのトークン発行実証方法、保護ルート実証を純関数テストで代替可能か等）〔Sprint2 #23／Sprint5 #24〕
 - [ ] 秘密情報・設定値の管理方針（デフォルト値許容かfail-fastか）〔Sprint2 #23〕
 - [ ] 外部システム・他リポジトリ資産との連携方式（統合テストでの他repoスキーマ適用方法等）〔Sprint2 #23〕
-- [ ] セキュリティ対策（secure-by-default機構）の新規追加要否を判断する前に、既存実装で要件を満たしている可能性を確認し、「既存機構Xで達成済み・新規実装不要」または「新規実装が必要な理由」をAC/備考に明記する〔Sprint4 #20（SBD-9）・#21（AC2）／Sprint9 #6（Origin/SameSite）／Sprint15 #11（remoting/WS getOrder廃止＝構造的既達・回帰テスト＋明文化で固定）〕
+- [ ] セキュリティ対策（secure-by-default機構）の新規追加要否を判断する前に、既存実装で要件を満たしている可能性を確認し、「既存機構Xで達成済み・新規実装不要」または「新規実装が必要な理由」をAC/備考に明記する〔Sprint4 #20（SBD-9）・#21（AC2）／Sprint9 #6（Origin/SameSite）／Sprint15 #11（remoting/WS getOrder廃止＝構造的既達・回帰テスト＋明文化で固定）／Sprint16 #13（E4・username重複409と列挙対策の整合）〕
 - [ ] Vue3 SPA化に伴うfeature/security Storyでフロント側に波及する要素（画面文言・プリフィル値・遷移UX等）がある場合は、対象内/対象外を明示し、対象外なら持ち越し先Issue番号をAC/備考に明記する〔Sprint3 #18・Sprint4 #20〕
 - [ ] AC等に定量パラメータ（閾値・回数・期間・上限など）が定性的表現のみで書かれていないか。既存踏襲値がある場合は先回り明記し、新規UX値で具体値を決め切れない場合も「計画フェーズで確定が必要」である旨と決定候補を備考に明記する〔Sprint4 #20（レート制限閾値）・Sprint6 #1（残少バッジ閾値N）〕
-- [ ] 初のドメイン機能/土台Storyが、後続Story群が再利用する先例規約（採番方式・命名規則・DTO形・横断ライブラリの技術選定等）を確立する場合、その規約の確定値をAC/備考に先回り明記できないか確認する。Issueの論点として存在は認識されていても、具体的な確定値が書かれていなければ計画フェーズで確認が発生しうる〔Sprint5 #24（i18nライブラリ/キー構造）・Sprint6 #1（ページ採番）・Sprint12 #29（集約の型戦略・save粒度）・Sprint13 #30（Repository命名統一・Inventoryパッケージ配置）〕
+- [ ] 初のドメイン機能/土台Storyが、後続Story群が再利用する先例規約（採番方式・命名規則・DTO形・横断ライブラリの技術選定等）を確立する場合、その規約の確定値をAC/備考に先回り明記できないか確認する。Issueの論点として存在は認識されていても、具体的な確定値が書かれていなければ計画フェーズで確認が発生しうる〔Sprint5 #24（i18nライブラリ/キー構造）・Sprint6 #1（ページ採番）・Sprint12 #29（集約の型戦略・save粒度）・Sprint13 #30（Repository命名統一・Inventoryパッケージ配置）・Sprint16 #14（編集用readエンドポイント新設）・#13（登録エンドポイントのパス設計）〕
 - [ ] 新ドメインfeature Story（検索/フィルタ系に限らず、カート・チェックアウト等の状態変更を伴うfeatureを含む）の画面は、UI配置・ルーティング保護境界（`meta.requiresAuth`の要否・未ログイン利用可否）に加え、前提状態が満たされない場合の異常系UI遷移（例：空カートで注文フォームへ進入した際の誘導先・エラー表示）までAC/備考に先回り明記できないか確認する〔Sprint7 #2（UI配置・検索対象範囲・異常系レスポンス）／Sprint8 #4（カート画面のルート保護境界）／Sprint10 #7（空カート誘導UX）〕
-- [ ] architecture-conventionsが一般規約を示しつつ個別確定をPO判断に委ねている項目（例: §3.1区分値のm_code採用、§4.3更新系エンティティのversion列）に該当するStoryを起票/Refinementする際は、その規約の確定値・適用可否をAC/備考に先回り明記できないか確認する〔Sprint6 #1（§3.1）／Sprint8 #4（§4.3）／Sprint13 #30（§9・Order集約深度）〕
+- [ ] architecture-conventionsが一般規約を示しつつ個別確定をPO判断に委ねている項目（例: §3.1区分値のm_code採用、§4.3更新系エンティティのversion列）に該当するStoryを起票/Refinementする際は、その規約の確定値・適用可否をAC/備考に先回り明記できないか確認する〔Sprint6 #1（§3.1）／Sprint8 #4（§4.3）／Sprint13 #30（§9・Order集約深度）／Sprint16 #14（§4.2・account/profileのversion単一/二重トークン）〕
 - [ ] 機能Story（土台Story限定ではない）のACが未着手の上流Feature/Epicのデータ・APIに依存する場合（例：他ドメインからのプリフィル・参照系データ取得）、必要な取得手段（cross-repoでのAPI新設要否を含む）をAC/備考に先回り明記できないか確認する〔Sprint5 #24（認証状態再水和・`GET /api/auth/me`新設）／Sprint10 #7（配送先プリフィル・`GET /api/account/me`新設）〕
 - [ ] 異常系/否定AC（在庫不足・不正入力・競合等による失敗）を含むStoryは、対応するHTTPステータスコードを既存の先例パターン（例：楽観ロック競合=409、不正入力=400）に揃えるか新規定義するかをAC/備考に先回り明記できないか確認する〔Sprint9 #6（非数値quantity→400ハンドラ）／Sprint11 #8（在庫競合・空カート→409）〕
 - [ ] Storyの起票/Refinement時に、対象ドメイン・データに関連する`spec/intended-diff-ledger.md`の既存エントリを確認し、新機能の設計・データ項目がその制約範囲内か（新規実装が必要か、既存決定で充足済みか）をAC/備考に先回り明記できないか確認する〔Sprint8 #4（D1・ID-28がAC-neg1に及ぼす制約）／Sprint11 #8（ID-8/ID-21で支払・email・phone扱いが充足済みと確認）〕
@@ -346,3 +380,11 @@ SM経由でSprint15計画フェーズの確認・確定事項5件（SMのspec委
 - 2026-08-17（Sprint15計画フェーズ、#12）: backend `CardType.java`は削除しない（温存）。m_code 0002からのcodegen生成物と判明し、削除してもgenerateEnums手動実行で再生成されるため実質的に削除不可能。frontend定数のみ撤去する。
 - 2026-08-17（Sprint15計画フェーズ、#28）: カートマージのバッチ化後も重複itemId入力時の挙動を厳密に不変とする（coalesceで対応）。バックログ前提「localStorageはitemIdキーmap」は誤りで実体は配列、dedupは書込ロジック側が担保する仕様と確定（refactor ACの「挙動不変」を厳守）。
 - 2026-08-17（Sprint15 Retro）: Sprint12傾向2（リファクタ/是正Story起票時のスコープが実コード未裏取りでずれる）を、Sprint15 #12（CardType.javaのcodegen生成物由来未確認）・#28（localStorageのデータ構造前提の誤り）の2件の再発を受け、対象を「スコープ」から「前提（データ構造・削除対象の生成物由来等）」まで含む形に拡張してチェックリストへ正式昇格した。
+- 2026-08-17（Sprint16計画フェーズ、#13・E1）: 登録レート制限（AC-neg2/SBD-6）はDB-backed登録試行テーブル`t_register_attempt`（既存`t_login_attempt`と同方式・IPキー・XFF非信頼）を採用。
+- 2026-08-17（Sprint16計画フェーズ、#14・E2）: `m_account.version`を単一楽観ロックトークンとし、account版ガード→409／profileは同一tx内無ガード更新（account失敗時のtxロールバックでlost update防止）。二重version非採用。
+- 2026-08-17（Sprint16計画フェーズ、#14・E3）: 編集用readは新規`GET /api/account`（version込み）を追加。チェックアウト用の既存`GET /api/account/me`は無変更。
+- 2026-08-17（Sprint16計画フェーズ、#13・E7）: 登録WHOのcreate_user_id（未認証guestアクター）はNULL（architecture-conventions §2.1準拠）。
+- 2026-08-17（Sprint16計画フェーズ、#13・E8）: 登録エンドポイントは`POST /api/register`独立パスを採用。`/api/account/**`は一律authenticatedに保つ。
+- 2026-08-17（Sprint16 Retro）: `spec/architecture-conventions.md`にD7（secure-by-default系の試行カウンタ・レート制限状態はDB-backedで永続化）を新設・firmupした。Sprint4 #20（`t_login_attempt`）とSprint16 #13（`t_register_attempt`）の12スプリントを隔てた再発を受け、Sprint14の「DB索引ハイジーン」節新設と同型の対応としてspec側に一般原則を明文化（実装詳細はbackend-conventions/DEV裁量に委譲）。
+- 2026-08-17（Sprint16 Retro）: メール検証（#13 AC4/SBD-6のプレースホルダ部分）を別バックログIssue **#32**「[E4] 登録時のメールアドレス所有権を検証する（メール確認リンク）」として起票（Ready=NotReady・deferred）。Sprint15 #12支払プレースホルダと同型の持ち越し運用。
+- 2026-08-17（Sprint16 Retro）: `spec/intended-diff-ledger.md`のID-11を拡張し、登録試行への列挙対策（レート制限）を関連Story#13として追加（`t_register_attempt`・D7参照）。一方、メール検証プレースホルダ自体はlegacyも元々持たない機能であり実装差分が生じていないため、新規IDは起票せず#32着手時に再判定することとした。

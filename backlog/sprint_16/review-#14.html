@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint 16 Review — #14 アカウント/プロフィール編集（本人固定・allowlist・version楽観ロック）</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #f8f7f5; }
+
+  .page { max-width: 860px; margin: 0 auto; padding: 48px 24px; }
+
+  /* Header */
+  .sprint-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin-bottom: 8px; }
+  h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px; }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+  .badge-sprint { background: #e8f0fe; color: #1a56db; }
+  .badge-issue { background: #f0fdf4; color: #166534; }
+  .badge-security { background: #fef2f2; color: #b91c1c; }
+  .badge-scope { background: #fff7ed; color: #c2410c; }
+
+  /* Sections */
+  section { margin-bottom: 40px; }
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #888; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e5e5e5; }
+
+  /* Problem box */
+  .problem-box { background: #fff8f0; border-left: 3px solid #f59e0b; border-radius: 0 8px 8px 0; padding: 16px 20px; margin-bottom: 16px; }
+  .problem-box .label { font-size: 11px; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .problem-box p { color: #451a03; font-size: 13px; }
+
+  /* Architecture change */
+  .arch-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: center; margin-bottom: 8px; }
+  .arch-box { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; }
+  .arch-box .arch-title { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .arch-box.before { border-color: #fca5a5; }
+  .arch-box.after { border-color: #86efac; }
+  .arch-arrow { font-size: 20px; color: #888; text-align: center; }
+  .flow-item { font-size: 12px; color: #374151; padding: 3px 0; display: flex; align-items: flex-start; gap: 6px; }
+  .flow-item .dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .dot-red { background: #ef4444; }
+  .dot-green { background: #22c55e; }
+
+  /* AC cards */
+  .ac-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+  .ac-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid #f0f0f0; }
+  .ac-check { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .ac-check.done { background: #dcfce7; color: #166534; }
+  .ac-num { font-size: 11px; font-weight: 700; color: #888; }
+  .ac-text { font-size: 13px; font-weight: 600; color: #1a1a1a; flex: 1; }
+  .ac-body { padding: 16px 18px; }
+  .ac-body p { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+
+  /* File change */
+  .file-change { margin-bottom: 16px; }
+  .file-name { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; background: #f3f4f6; color: #374151; padding: 5px 10px; border-radius: 4px 4px 0 0; border: 1px solid #e5e5e5; border-bottom: none; display: flex; justify-content: space-between; }
+  .diff-stat { color: #888; }
+  .code-block { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.7; background: #1e1e2e; color: #cdd6f4; padding: 14px 16px; border-radius: 0 0 6px 6px; overflow-x: auto; }
+  .code-line { display: flex; }
+  .line-num { color: #45475a; min-width: 28px; user-select: none; }
+  .line-add { background: rgba(166, 227, 161, 0.12); color: #a6e3a1; }
+  .line-del { background: rgba(243, 139, 168, 0.12); color: #f38ba8; }
+  .line-ctx { color: #cdd6f4; }
+  .line-prefix { min-width: 14px; }
+
+  /* Annotation */
+  .annotation { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-size: 12px; color: #78350f; display: flex; gap: 8px; }
+  .annotation-icon { font-size: 14px; flex-shrink: 0; }
+
+  /* Note list (implementation notes) */
+  .note-list { list-style: none; }
+  .note-item { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; font-size: 13px; color: #374151; }
+  .note-item strong { color: #1a1a1a; }
+
+  /* Verify section */
+  .verify-list { list-style: none; }
+  .verify-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; }
+  .verify-item:last-child { border-bottom: none; }
+  .verify-num { width: 22px; height: 22px; background: #e8f0fe; color: #1a56db; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .verify-content { flex: 1; }
+  .verify-content strong { font-size: 13px; color: #1a1a1a; display: block; margin-bottom: 3px; }
+  .verify-content span { font-size: 12px; color: #6b7280; }
+
+  /* Scope table */
+  .scope-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .scope-table th { text-align: left; padding: 8px 12px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .scope-table td { padding: 10px 12px; border: 1px solid #e5e5e5; color: #374151; vertical-align: top; }
+  .scope-table tr:hover td { background: #f9fafb; }
+  .tag-new { font-size: 11px; font-weight: 600; background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 3px; }
+  .tag-changed { font-size: 11px; font-weight: 600; background: #e8f0fe; color: #1a56db; padding: 2px 6px; border-radius: 3px; }
+  .tag-unchanged { font-size: 11px; font-weight: 600; background: #f3f4f6; color: #6b7280; padding: 2px 6px; border-radius: 3px; }
+  .scope-group { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.05em; margin: 16px 0 6px; }
+
+  /* Concurrency proof box */
+  .proof-box { background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 14px 16px; font-size: 12px; color: #166534; }
+  .proof-box .proof-title { font-weight: 700; margin-bottom: 6px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="sprint-label">Sprint 16 Review</div>
+  <h1>#14 — アカウント/プロフィール編集を本人固定・allowlistバインドにする</h1>
+  <div class="meta">
+    <span class="badge badge-sprint">Sprint 16</span>
+    <span class="badge badge-issue">#14</span>
+    <span class="badge badge-security">security / E4</span>
+    <span class="badge badge-scope">backend + frontend</span>
+  </div>
+
+  <!-- Problem -->
+  <section>
+    <h2>なぜこの改修が必要だったか</h2>
+    <div class="problem-box">
+      <div class="label">問題</div>
+      <p>レガシー版（before）の <code>editAccount</code> は、クライアントから受け取った <code>username</code> を信頼してそのユーザーの行を更新していたため、他人のusernameを注入すれば他人のアカウントを書き換えられる「乗っ取り」構造だった（S2/S3）。また、複数タブ・多重送信等で同時に編集要求が来た場合に後勝ちで上書きされ、片方の変更が消える（lost update）問題もあった。本Storyでは、更新対象を認証プリンシパル本人に構造的に固定し、権威フィールドはサーバが決定し、<code>version</code>楽観ロックで後勝ち上書きを防ぐ。</p>
+    </div>
+    <div class="arch-grid">
+      <div class="arch-box before">
+        <div class="arch-title">改修前（レガシー相当）</div>
+        <div class="flow-item"><span class="dot dot-red"></span>editAccountはリクエストの username で対象行を特定（他人のusernameを注入可能）</div>
+        <div class="flow-item"><span class="dot dot-red"></span>userid/status等の権威フィールドもリクエストからそのまま受理</div>
+        <div class="flow-item"><span class="dot dot-red"></span>楽観ロックなし＝後勝ちの更新がそのまま反映される（lost update）</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-box after">
+        <div class="arch-title">改修後</div>
+        <div class="flow-item"><span class="dot dot-green"></span>対象は常に <code>CurrentUserProvider</code> が解決した認証プリンシパル自身（URLにもBodyにもuserId/usernameを取らない）</div>
+        <div class="flow-item"><span class="dot dot-green"></span>userid/status/version/WHO列はDTOに存在せず、サーバが決定（型で構造的に注入不能）</div>
+        <div class="flow-item"><span class="dot dot-green"></span><code>version</code>楽観ロック（<code>WHERE user_id=:id AND version=:readVersion</code>）→競合は409、古い画面には再読込を促す</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AC breakdown -->
+  <section>
+    <h2>AC別 実装内容</h2>
+
+    <!-- AC1 / AC-neg1 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC1 / AC-neg1 (SBD-1)</div>
+        <div class="ac-text">更新対象を認証プリンシパル本人に固定する（他人のusernameを注入しても自分のみ更新される）</div>
+      </div>
+      <div class="ac-body">
+        <p><code>GET/PUT /api/account</code> はいずれもリクエストから userId/username を一切受け取らず、<code>CurrentUserProvider</code> が解決した本人のIDのみを使う。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../application/service/AccountApplicationService.java</span>
+            <span class="diff-stat">L83-101</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">83</span><span class="line-prefix">+</span><span>  @Transactional</span></div>
+            <div class="code-line line-add"><span class="line-num">84</span><span class="line-prefix">+</span><span>  public AccountEditDetail updateAccount(AccountEditCommand command) {</span></div>
+            <div class="code-line line-add"><span class="line-num">85</span><span class="line-prefix">+</span><span>    Long userId = currentUserProvider.requireCurrentUser().userId();</span></div>
+            <div class="code-line line-add"><span class="line-num">86</span><span class="line-prefix">+</span><span>    AccountUpdate update =</span></div>
+            <div class="code-line line-add"><span class="line-num">87</span><span class="line-prefix">+</span><span>        new AccountUpdate(</span></div>
+            <div class="code-line line-add"><span class="line-num">88</span><span class="line-prefix">+</span><span>            userId,</span></div>
+            <div class="code-line line-add"><span class="line-num">89</span><span class="line-prefix">+</span><span>            command.expectedVersion(),</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span><code>AccountEditCommand</code>（Controller入力用）はそもそも <code>userId</code>/<code>username</code> フィールドを持たない。<code>OwnershipAuthorizationService</code>による所有者照合は不要（本人行のみ触るため所有者照合が構造的に自明・CartApplicationServiceと同じ思想）。</span>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>backend統合テスト: AccountEditControllerSpec.groovy</span>
+            <span class="diff-stat">AC-neg1テスト</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">-</span><span class="line-prefix"> </span><span>def "AC-neg1(SBD-1): 他人のuserIdを注入してもリクエストは常に自分自身のみを更新する"() {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">-</span><span class="line-prefix"> </span><span>then: "自分の行のみ更新され、他人の行は変更されない"</span></div>
+            <div class="code-line line-ctx"><span class="line-num">-</span><span class="line-prefix"> </span><span>...first_name == "Jiro" (自分) / ...first_name == otherFirstNameBefore (他人・無変更)</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>そもそもリクエストDTOに<code>username</code>フィールド自体が存在しないため「注入不能」（型レベルで担保）。この観点をend-to-end（MockMvc＋実DB）で固定した。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC2 / AC-neg2 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC2 / AC-neg2 (SBD-2)</div>
+        <div class="ac-text">マスアサインメントallowlist（編集可フィールドのみ受理、権威フィールドは無視される）</div>
+      </div>
+      <div class="ac-body">
+        <p>リクエストDTOは編集可フィールドのみを宣言。<code>userid</code>/<code>status</code>等を注入しても、そもそもDTOにマッピング先が存在しないため無視される。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../presentation/rest/AccountController.java</span>
+            <span class="diff-stat">L86-99</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">86</span><span class="line-prefix">+</span><span>  public record AccountEditRequest(</span></div>
+            <div class="code-line line-add"><span class="line-num">87</span><span class="line-prefix">+</span><span>      long version,</span></div>
+            <div class="code-line line-add"><span class="line-num">88</span><span class="line-prefix">+</span><span>      @NotBlank String firstName,</span></div>
+            <div class="code-line line-add"><span class="line-num">89</span><span class="line-prefix">+</span><span>      @NotBlank String lastName,</span></div>
+            <div class="code-line line-add"><span class="line-num">90</span><span class="line-prefix">+</span><span>      @NotBlank String email,</span></div>
+            <div class="code-line line-add"><span class="line-num">97</span><span class="line-prefix">+</span><span>      @NotBlank String country,</span></div>
+            <div class="code-line line-add"><span class="line-num">98</span><span class="line-prefix">+</span><span>      @NotBlank String languagePreference,</span></div>
+            <div class="code-line line-add"><span class="line-num">99</span><span class="line-prefix">+</span><span>      String favoriteCategoryId) {</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span><code>userid</code>/<code>username</code>/<code>status</code>/WHO列はレコードに宣言されていない。テストでは<code>"userId": 999999, "username": "hijacked", "status": "CLOSED"</code>を注入したJSONを送っても、本人のusername/statusは無変更・存在しないuserId=999999には何も起きないことをDBで確認済み。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC3 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC3 (arch §4.2)</div>
+        <div class="ac-text">version楽観ロック。古いversionの更新要求はHTTP 409で拒否し、後勝ちの上書き（lost update）を起こさない</div>
+      </div>
+      <div class="ac-body">
+        <p>コードベース初の実UPDATE（version付き）。<code>m_account.version</code>を編集アグリゲート単一の楽観ロックトークンとし（E2）、同一トランザクション内で<code>m_profile</code>を更新する。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/resources/mapper/custom/AccountEditCustomMapper.xml</span>
+            <span class="diff-stat">L24-41</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">24</span><span class="line-prefix">+</span><span>    &lt;update id="updateAccount" ...&gt;</span></div>
+            <div class="code-line line-add"><span class="line-num">26</span><span class="line-prefix">+</span><span>        UPDATE m_account</span></div>
+            <div class="code-line line-add"><span class="line-num">30</span><span class="line-prefix">+</span><span>               version = version + 1,</span></div>
+            <div class="code-line line-add"><span class="line-num">32</span><span class="line-prefix">+</span><span>         WHERE user_id = #{userId} AND version = #{expectedVersion}</span></div>
+            <div class="code-line line-add"><span class="line-num">33</span><span class="line-prefix">+</span><span>    &lt;/update&gt;</span></div>
+            <div class="code-line line-add"><span class="line-num">36</span><span class="line-prefix">+</span><span>    &lt;update id="updateProfile" ...&gt;</span></div>
+            <div class="code-line line-add"><span class="line-num">37</span><span class="line-prefix">+</span><span>        UPDATE m_profile</span></div>
+            <div class="code-line line-add"><span class="line-num">40</span><span class="line-prefix">+</span><span>         WHERE user_id = #{userId}</span></div>
+            <div class="code-line line-add"><span class="line-num">41</span><span class="line-prefix">+</span><span>    &lt;/update&gt;</span></div>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../infrastructure/mybatis/account/MyBatisAccountRepository.java</span>
+            <span class="diff-stat">L76-84</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">76</span><span class="line-prefix">+</span><span>  @Override</span></div>
+            <div class="code-line line-add"><span class="line-num">77</span><span class="line-prefix">+</span><span>  public int updateAccount(AccountUpdate update) {</span></div>
+            <div class="code-line line-add"><span class="line-num">78</span><span class="line-prefix">+</span><span>    int affected = accountEditCustomMapper.updateAccount(toAccountUpdateEntity(update));</span></div>
+            <div class="code-line line-add"><span class="line-num">79</span><span class="line-prefix">+</span><span>    if (affected == 0) {</span></div>
+            <div class="code-line line-add"><span class="line-num">80</span><span class="line-prefix">+</span><span>      return 0;</span></div>
+            <div class="code-line line-add"><span class="line-num">81</span><span class="line-prefix">+</span><span>    }</span></div>
+            <div class="code-line line-add"><span class="line-num">82</span><span class="line-prefix">+</span><span>    accountEditCustomMapper.updateProfile(toProfileUpdateEntity(update));</span></div>
+            <div class="code-line line-add"><span class="line-num">83</span><span class="line-prefix">+</span><span>    return affected;</span></div>
+            <div class="code-line line-add"><span class="line-num">84</span><span class="line-prefix">+</span><span>  }</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>m_accountのversion競合（affected==0）の場合、早期returnしてm_profileのUPDATE自体を発行しない＝「account更新が成功した場合のみprofileも更新する」順序保証をコードで表現。affected==0は呼び出し元の<code>AffectedRows.requireUpdated</code>が検出し<code>OptimisticLockConflictException</code>→409に正規化する（Sprint4以来の既存足場を無改造で流用）。</span>
+          </div>
+        </div>
+        <div class="proof-box">
+          <div class="proof-title">✓ AC-neg3の並行安全性を2並行PUTの実行テストで実証</div>
+          同一readVersion（0）から2スレッドが<code>CountDownLatch</code>で同期して同時に<code>PUT /api/account</code>を実行するテスト（#8の2段ラッチ手法を応用）で、「1件200・1件409」「最終行のfirst_nameは勝者いずれか片方のみ・versionは1のまま」を確認。lost updateが起きないことを実行時に実証している（<code>AccountEditControllerSpec</code>）。
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Implementation notes -->
+  <section>
+    <h2>実装メモ（仕様外の判断・変更・妥協点）</h2>
+    <ul class="note-list">
+      <li class="note-item"><strong><code>m_profile.version</code>列は編集で一切触らない（SETにもWHEREにも含めない）</strong>: DDL上は3表ともversion列を持つが、E2決定「m_account.versionが編集アグリゲート単一の楽観ロックトークン」に従い、m_profile.versionは更新のたびにインクリメントもしない（将来profile単独の楽観ロックが必要になった場合は別途検討する前提の割り切り）。</li>
+      <li class="note-item"><strong><code>AccountApplicationService.updateAccount</code>は更新成功後に再SELECTしない</strong>: UPDATE成功時点で永続化された値は送信した入力値そのものであるため、<code>command</code>の入力値＋<code>expectedVersion+1</code>から直接組み立てて返す設計にした（Sprint12/13の「識別子解決用と最終応答用の読取を同一の集約全体読み込みで済ませない」教訓をさらに進め、そもそも再読取りしない設計）。</li>
+      <li class="note-item"><strong>frontend: 409競合とそれ以外の失敗を<code>hasConflict</code>/<code>hasSaveError</code>の別フラグに分離</strong>: 既存<code>order.ts</code>は409を専用理由として1本にまとめているが、#14は「409だけ再読込を促す」UXが仕様上明確に異なるため判定を分離し、<code>shouldPromptReload</code>ゲッターとして独立させた（Sprint10教訓＝判定をstore getterへ切出しVitest固定）。</li>
+      <li class="note-item"><strong>frontend: 編集フォームは全編集可フィールド（言語設定・お気に入りカテゴリ含む）を表示する</strong>: backendのPUTは部分更新ではなく全項目置換のため、フォームに表示しないフィールドがあると意図せずNULL/既定値へ巻き戻ってしまう。#13登録フォームがこれらを意図的に非表示にした（E5・サーバ既定）のとは対照的に、#14編集フォームでは両方とも表示・編集可能にする必要があると判断した。</li>
+      <li class="note-item"><strong>frontend: <code>AccountEditDetail</code>型は<code>Address</code>を継承しない</strong>: サーバから読み取った値（address2未設定はnull）を表すため<code>Address</code>（フォーム値・空文字許容）とは非互換。View側で明示的に変換する。</li>
+    </ul>
+  </section>
+
+  <!-- Verify -->
+  <section>
+    <h2>動作確認ポイント（ユーザー確認用）</h2>
+    <ul class="verify-list">
+      <li class="verify-item">
+        <div class="verify-num">1</div>
+        <div class="verify-content">
+          <strong>ログイン後、アカウント設定画面（/account）で自分の氏名・連絡先・住所・言語設定・お気に入りカテゴリを編集して保存できること</strong>
+          <span>保存後は成功メッセージが表示され、フォームには保存後の最新値が表示される</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">2</div>
+        <div class="verify-content">
+          <strong>同じアカウントを2つのタブで開き、片方で保存した後にもう片方で保存すると、後から保存した方はエラーになり「再読込」を促されること</strong>
+          <span>先に保存した内容が消えずに残る（後勝ちで無条件に上書きされない）</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">3</div>
+        <div class="verify-content">
+          <strong>「再読込」ボタンを押すと最新の内容がフォームに反映され、そこから編集を再開できること</strong>
+          <span>競合後にユーザーが迷わず復旧できる導線になっている</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">4</div>
+        <div class="verify-content">
+          <strong>アカウント設定画面はログインしていないとアクセスできないこと</strong>
+          <span>/account は認証必須ルート（requiresAuth）</span>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- Scope -->
+  <section>
+    <h2>改修スコープ確認</h2>
+    <div class="scope-group">backend</div>
+    <table class="scope-table">
+      <tr><th>ファイル</th><th>変更</th><th>内容</th></tr>
+      <tr><td><code>presentation/rest/AccountController.java</code></td><td><span class="tag-changed">変更あり</span></td><td>GET /api/account（編集プリフィル）・PUT /api/account 追加（GET /api/account/me は無変更・E3）</td></tr>
+      <tr><td><code>application/service/AccountApplicationService.java</code></td><td><span class="tag-changed">変更あり</span></td><td>getAccountForEdit / updateAccount 追加</td></tr>
+      <tr><td><code>domain/account/AccountEditCommand.java</code> / <code>AccountEditDetail.java</code> / <code>AccountUpdate.java</code></td><td><span class="tag-new">新規</span></td><td>編集用コマンド/応答/更新モデル（allowlist型）</td></tr>
+      <tr><td><code>domain/account/AccountRepository.java</code> / <code>infrastructure/mybatis/account/MyBatisAccountRepository.java</code></td><td><span class="tag-changed">変更あり</span></td><td>findEditDetailByUserId / updateAccount（version楽観ロック）追加</td></tr>
+      <tr><td><code>infrastructure/mybatis/custom/entity,mapper/AccountEdit*</code> / <code>AccountUpdate*</code> / <code>ProfileUpdate*</code></td><td><span class="tag-new">新規</span></td><td>読取/更新用Entity・Mapper（XML含む）</td></tr>
+    </table>
+    <div class="scope-group">frontend</div>
+    <table class="scope-table">
+      <tr><th>ファイル</th><th>変更</th><th>内容</th></tr>
+      <tr><td><code>views/AccountEditView.vue</code></td><td><span class="tag-new">新規</span></td><td>アカウント/プロフィール編集画面（requiresAuth）</td></tr>
+      <tr><td><code>stores/account.ts</code></td><td><span class="tag-new">新規</span></td><td>fetchAccount/updateAccount・hasConflict/shouldPromptReload（409新UX）</td></tr>
+      <tr><td><code>api/accountApi.ts</code></td><td><span class="tag-changed">変更あり</span></td><td>fetchAccount/updateAccount 追加</td></tr>
+      <tr><td><code>domain/account.ts</code></td><td><span class="tag-changed">変更あり</span></td><td>AccountEditDetail型 追加</td></tr>
+      <tr><td><code>router/index.ts</code></td><td><span class="tag-changed">変更あり</span></td><td>/account ルート追加（requiresAuth: true）</td></tr>
+      <tr><td><code>i18n/locales/en.ts</code></td><td><span class="tag-changed">変更あり</span></td><td>account.edit.* 文言追加（成功/409競合/一般エラー含む）</td></tr>
+    </table>
+    <div class="scope-group">意図的に変更していないもの</div>
+    <table class="scope-table">
+      <tr><th>ファイル</th><th>変更</th><th>内容</th></tr>
+      <tr><td><code>AccountController#me()</code>（GET /api/account/me）</td><td><span class="tag-unchanged">変更なし</span></td><td>チェックアウトのプリフィル専用として既存のまま維持（E3）</td></tr>
+      <tr><td>パスワード変更UI/API</td><td><span class="tag-unchanged">対象外</span></td><td>#15へ委譲（m_signon/passwordは本Storyの対象外）</td></tr>
+    </table>
+  </section>
+
+</div>
+</body>
+</html>
