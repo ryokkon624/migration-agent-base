@@ -553,11 +553,53 @@ public ResponseEntity<LoginResponse> me() {
 > （Spock・DBなし）でエスケープ境界値を実証し、`CatalogCustomMapperSpec`（Testcontainers）は
 > 実際のLIKE一致結果の確認のみに絞れた。
 
+### 呼び出し元txのロールバックに影響されない独立監査記録は`@Transactional(REQUIRES_NEW)`の別beanメソッドで実装する
+
+失敗した状態変更（在庫不足・バリデーション失敗等）の監査ログを「呼び出し元の主トランザクションが
+ロールバックされても記録として残す」必要がある場合、`AuditLogRecorder`のような監査コンポーネント側に
+`@Transactional(propagation = Propagation.REQUIRES_NEW)`を付けた専用メソッドを新設し、呼び出し元は
+そのメソッドを呼ぶだけにする。
+
+- **REQUIRES_NEWは必ず別bean（Spring管理コンポーネント）のメソッド経由で呼ぶこと。** Spring AOPの
+  プロキシは自己呼び出し（同一クラス内の`this.xxx()`呼び出し）を素通りするため、`@Transactional`を
+  付けたメソッドを同じクラスの別メソッドから呼んでも新トランザクションは開始されない（Spring AOPの
+  古典的な落とし穴）。呼び出し元（例: `OrderApplicationService`）と監査コンポーネント（`AuditLogRecorder`）が
+  別beanであれば、呼び出しは必ずプロキシを経由するため正しく機能する。
+- 主フローの成功時記録（`recordStateChange`）とは別メソッド（`recordStateChangeIndependently`）として
+  用意し、`@Transactional`を明示的に付けない既存メソッドと伝播レベルを混同しないようにする。
+- 追記専用テーブル（監査ログ等）への独立INSERTは、対象となる主フローのテーブル（在庫等）の行ロックと
+  競合しないためデッドロックの心配がない。
+
+```java
+// OK: 別beanのメソッド経由（プロキシが正しく介在する）
+@Transactional(propagation = Propagation.REQUIRES_NEW)
+public void recordStateChangeIndependently(
+    String action, String targetType, String targetId, String result, Object detail) {
+  // ...insert...
+}
+
+// 呼び出し元（別クラス）
+try {
+  // ...在庫減算・注文INSERT...
+  auditLogRecorder.recordStateChange(action, type, id, "SUCCESS", detail);
+} catch (InsufficientStockException e) {
+  auditLogRecorder.recordStateChangeIndependently(action, null, null, "FAILURE", detail);
+  throw e; // 主txは通常どおりロールバックされるが、監査行は別txで既にコミット済み
+}
+```
+
+> **背景（Sprint 11 #8）**: 注文確定の在庫不足・空カート失敗時にも監査記録を残す要件（SM決定：成功/失敗の
+> 両方を記録）で、`AuditLogRecorder#recordStateChangeIndependently`として新設した。本プロジェクト初の
+> `REQUIRES_NEW`利用。
+
 > Swagger UIのpermitAll・`server.error.*`→`spring.web.error.*`・依存更新後のIDE lint staleness・
 > CSRFトークンのconsume-then-regenerate挙動・セキュリティ上意味のある日時比較はDB側`NOW(6)`で
 > 行うべき問題（Sprint4）・`ON DUPLICATE KEY UPDATE`のSET句左→右評価順依存の二重計算（Sprint4）・
 > `syncTestSchema`が`flyway/sql-test`を同期対象外とする点（Sprint6）・`m_code.code_value`の
 > VARCHAR(10)制約（Sprint6）・MockMvc経由でCSRF Cookie属性（SameSite等）を検証できない制約と
-> bean切り出しユニットテストによる回避策（Sprint9）は、いずれも初出（1回目）のため、2回ルールに従い
-> 本Skillには未反映（`memory/dev/long_term.md`「技術的なハマりポイント」参照）。2回目の発生でSkill昇格を
-> 検討する。
+> bean切り出しユニットテストによる回避策（Sprint9）・GroovyのGStringが`equals(String)`で常にfalseに
+> なる問題（Sprint10）・SpockのStubがインターフェースのデフォルトメソッドへ委譲しない問題（Sprint10）・
+> Spockの`then:`ブロックの引数一致インタラクションが`given:`の裸stubより優先され返り値/副作用が
+> 上書きされる問題（Sprint11）・`m_item.item_id`等VARCHAR(10)自然キー列へテスト用IDを設計する際の
+> 桁数超過（Sprint11）は、いずれも初出（1回目）のため、2回ルールに従い本Skillには未反映
+> （`memory/dev/long_term.md`「技術的なハマりポイント」参照）。2回目の発生でSkill昇格を検討する。

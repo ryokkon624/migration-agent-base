@@ -133,6 +133,16 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   はミューテーションを一切含まない設計（GET専用・確定前段まで）だったため該当リスクが構造的に存在せず、
   3観点レビュー指摘0件・手戻りゼロの完走につながった。
   発生スプリント: Sprint10（#7）
+- **Sprint11（#8・注文確定・在庫の原子的引当。backend主・frontend従）は、Sprint6以来の「secure-by-default
+  土台再利用」パターンが本プロジェクト最難関の難度クラス（初の書込み系トランザクション×並行制御）でも
+  通用することを実証し、3観点レビュー指摘0件を達成した（6回目の3観点クリーン）。** 新規に導入した機構
+  （`@Transactional`のall-or-nothing・item_id昇順固定順減算・`AffectedRows`のsupplier拡張点・
+  `AuditLogRecorder`の`REQUIRES_NEW`失敗監査）はいずれも既存の設計方針（Sprint4で用意された拡張点・
+  Sprint2で用意されたWHO自動付与AOP）の上に積む形で実装でき、新規のセキュリティ機構を自作しなかった。
+  Sprint4以来「モデルtier分離（計画=Opus・実装=Sonnet）」を11スプリント連続で運用しているが、並行制御を
+  伴う書込みドメインという最も難度の高いクラスでも計画フェーズでのAskUserQuestion確定（在庫不足時の
+  ステータス・監査粒度・完了画面スコープ）が実装フェーズでの手戻りを事前に防いだ。
+  発生スプリント: Sprint11（#8）
 
 ## 技術的なハマりポイント
 
@@ -253,6 +263,26 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   直接Stubする必要がある。インターフェースのデフォルトメソッドをStubで検証する際は、呼び出されるメソッド
   自体を直接指定すること（委譲元の抽象メソッドだけをStubしても効果が及ばない）。
   発生スプリント: Sprint10（#7、`AccountApplicationServiceSpec`実装時。初出のため2回ルールに従い本Skillには
+  未反映）
+- **Spockの`Mock()`で同一メソッド呼び出しに対し`given:`ブロックの裸stub（`mock.method(_) >> {...}`）と
+  `then:`ブロックの引数一致インタラクション（`1 * mock.method({matcher})`）を両方宣言すると、`then:`側が
+  優先され`given:`側の返り値/副作用クロージャは無視される。** `OrderApplicationServiceSpec`で
+  `orderCustomMapper.insertOrderHeader(_)`を`given:`で「呼ばれたらorderIdを補完する」よう裸stubしつつ、
+  `then:`で「正しい引数で呼ばれたこと」を別途検証しようとしたところ、`then:`側のインタラクションが
+  マッチした呼び出しでは`given:`側のクロージャ（`h.orderId = ...`の副作用）が実行されず、後続コードが
+  `header.getOrderId()`から`null`を受け取り`NullPointerException`になった（テスト実行で発見）。
+  同一メソッド・同一引数パターンに対して返り値/副作用の設定と呼び出し内容の検証を両方行いたい場合は、
+  `then:`ブロックの1つのインタラクションに引数マッチャーと`>>`（返り値/副作用クロージャ）を両方まとめて
+  書く（`1 * mock.method({matcher}) >> { args -> ... }`）ことで解消する。
+  発生スプリント: Sprint11（#8、`OrderApplicationServiceSpec`実装時。初出のため2回ルールに従い本Skillには
+  未反映）
+- **`VARCHAR(10)`の自然キー列（`m_item.item_id`等）へテスト用に新規IDを設計する際、業務的にわかりやすい
+  長い文字列にすると桁数超過でINSERTが失敗する。** 並行安全性テスト用に`ZZ-ORDER-CONC-1`（15文字）という
+  アイテムIDを新設しようとしたところ`MysqlDataTruncation`で失敗し、`ZZ-ORD-C1`（9文字）へ短縮して解消した。
+  `m_code.code_value`のVARCHAR(10)制約（Sprint6・既知）と同種の「列幅を確認せずにIDを命名する」ミスだが、
+  対象列（`m_item.item_id`）が異なるため本セクションでは初出として記録する。テスト専用の自然キーを新設する
+  際は、命名前に対象列のDDL（`CREATE TABLE`文）で桁数を確認する習慣が必要。
+  発生スプリント: Sprint11（#8、`OrderConcurrencyIntegrationSpec`実装時。初出のため2回ルールに従い本Skillには
   未反映）
 
 ### jpetstore-frontend
@@ -464,6 +494,37 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   では意図的にスコープを絞った。既存の配置規約（`backend-conventions`§9）を変更せずに再利用できたため
   新規のSkill反映は不要だった。
   発生スプリント: Sprint10（#7）
+- **Sprint4で先回りして用意した拡張点（`AffectedRows.requireUpdated(rows, supplier)`の
+  `Supplier<RuntimeException>`オーバーロード）が、設計から3スプリント後に実際の2つ目の利用者（在庫ガード
+  付き減算）で無改造のまま機能することを確認した。** 当初は`version`楽観ロック（`OptimisticLockConflictException`
+  固定）1パターンのみの実績だったが、`InsufficientStockException`という全く異なる例外型を
+  `() -> new InsufficientStockException(itemId)`として渡すだけで対応でき、`AffectedRows`側の変更は一切
+  不要だった。「affected rows==0を判定する」という共通の関心事を、失敗時の意味づけ（楽観ロック競合 or
+  在庫不足）から分離する設計が有効に機能した実例。今後同種の「ガード付きUPDATEでTOCTOUを避ける」ドメイン
+  （予約枠・ポイント残高等）でもこのヘルパーをそのまま再利用できる見込み。
+  発生スプリント: Sprint11（#8）
+- **`ExecutorService`+`CountDownLatch`で2スレッドを完全同期させてからMockMvc経由で同時リクエストを送る
+  並行安全性テストのパターンを確立した。** `readyLatch`（両スレッドがリクエスト直前まで到達したことを
+  確認）→`startLatch`（両スレッドを同時解放）の2段ラッチにより、「たまたま順番に実行されて両方成功する」
+  という偽陰性を排除できる。MockMvcは非同期ディスパッチを使わない限り、呼び出しスレッド自身の中で
+  フィルタチェーン全体（JWT認証含む）を同期実行するため、各ワーカースレッドの`SecurityContextHolder`
+  （デフォルトはThreadLocalスコープ）にそのスレッド専用の認証情報が正しくセットされる。今後の並行制御
+  AC（在庫以外の排他制御ドメイン）でもこのテスト型をそのまま再利用できる。
+  発生スプリント: Sprint11（#8、`OrderConcurrencyIntegrationSpec`）
+- **既存カタログseed（`EST-*`）に依存するテストが多数ある状態で、初めて対象テーブル（`t_inventory`）を
+  実際に書き換えるテストを追加する際は、専用のテストデータ（本Storyでは`ZZ-ORDER-*`/`ZZ-ORD-C1`/
+  `ZZ-INV-1`）を都度INSERT/DELETEして隔離するのが安全である。** `IntegrationTestBase`は
+  Testcontainers・Spring契約を全spec間で共有し、Flywayは通常スイート全体で1回しか実行されないため、
+  あるspecが共有seedの状態を永続的に変更すると、実行順序に依存する形で他specが偽の失敗を起こしうる。
+  カート機能（#4〜#6）は在庫を一切更新しなかったためこれまで問題化しなかったが、注文確定（#8）が
+  本プロジェクトで初めて`t_inventory`を書き換えるドメインだったため、この隔離方針を新たに導入した。
+  今後も「既に共有seedへ依存する既存specがある状態で、初めてそのテーブルを書き換えるテストを足す」
+  局面では同じ隔離方針を踏襲する。
+  発生スプリント: Sprint11（#8）
+- **失敗監査を呼び出し元txのロールバックから独立させる`@Transactional(propagation=REQUIRES_NEW)`パターンは
+  `backend-conventions`§9へ即時反映した**（Spring AOPの自己呼び出し限定という古典的な落とし穴を含む
+  「知らないと書けない参照知識」のため2回ルールの対象外。詳細はSkill本文参照）。
+  発生スプリント: Sprint11（#8）
 
 ### jpetstore-frontend
 - **backendのSpring Security 7 CSRF設定（非XOR `CsrfTokenRequestAttributeHandler`・consume-then-
@@ -738,10 +799,32 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   `memory/dev/long_term.md`「繰り返し指摘されるパターン」の「横断」に記録した。
 - `#skills-changelog` へ `[DEV]` で投稿済み。
 
+### Sprint 11（#8・注文確定・在庫の原子的引当・初の書込系トランザクション×並行制御・backend主/frontend従）
+
+- **`backend-conventions`**: `## 9. jpetstore-backend 固有の注意事項` に「失敗監査等、呼び出し元txの
+  ロールバックに影響されない独立監査記録は`@Transactional(REQUIRES_NEW)`の別beanメソッドで実装する」を
+  新設した（初出だが「知らないと書けない参照知識・実装パターン」の2回ルール例外として即時反映。Spring AOPの
+  自己呼び出し限定という古典的な落とし穴を含み、本プロジェクト初の`REQUIRES_NEW`利用のため）。
+  併せて既存の「Skillに未反映」注記リストへ、Sprint10で発生済みだった2件（GStringの`equals`問題・
+  Spockのデフォルトメソッド委譲問題）とSprint11新出の2件（下記）を追記し一覧を最新化した。
+- **`backend-conventions`へは反映しなかったもの（2回ルールに従いlong_term.md止まり）**: 以下4件は
+  いずれも「初出（1回目）」のため、今回はSkillに反映せず`memory/dev/long_term.md`に留めた:
+  - Spockの`Mock()`で`given:`の裸stubと`then:`の引数一致インタラクションを同一メソッドに両方宣言すると
+    `then:`側が優先され`given:`の副作用が無視される（「技術的なハマりポイント」参照）
+  - `VARCHAR(10)`自然キー列（`m_item.item_id`）へテスト用IDを設計する際の桁数超過（同上）
+  - `ExecutorService`+`CountDownLatch`によるMockMvc並行安全性テストのパターン（「習得したこと」参照。
+    Sprint9のMockMvc CSRF Cookieテスト制約と同様、テスト技法の発見のため2回ルール対象）
+  - 既存共有seedに依存するspecがある状態で初めて対象テーブルを書き換えるテストを足す際の専用データ隔離
+    方針（同上）
+- 3観点レビュー指摘0件（6回目の3観点クリーン。初の書込系トランザクション×並行制御という最難関クラスでの
+  達成）は、チェックリスト項目ではなくプロセス上の教訓のためSkillには反映せず`memory/dev/long_term.md`
+  「繰り返し指摘されるパターン」の「横断」に記録した。
+- `#skills-changelog` へ `[DEV]` で投稿済み。
+
 ## 卒業済みルール
 
 （該当なし。棚卸し対象となるルールが直近15スプリント基準に達していない。
-  jpetstore-backendはSprint2・3・4・6・7・8・9・10の8スプリントのみ、jpetstore-databaseはSprint1・3・6の
-  3スプリントのみ、jpetstore-frontendはSprint5・6・7・8・10の5スプリントのみのため、いずれも対象外。
-  Sprint4・Sprint5・Sprint6・Sprint7・Sprint8・Sprint9・Sprint10 Retroでも棚卸しを実施したが同様の理由で
-  卒業候補なし）
+  jpetstore-backendはSprint2・3・4・6・7・8・9・10・11の9スプリントのみ、jpetstore-databaseはSprint1・3・6の
+  3スプリントのみ、jpetstore-frontendはSprint5・6・7・8・10・11の6スプリントのみのため、いずれも対象外。
+  Sprint4・Sprint5・Sprint6・Sprint7・Sprint8・Sprint9・Sprint10・Sprint11 Retroでも棚卸しを実施したが
+  同様の理由で卒業候補なし）
