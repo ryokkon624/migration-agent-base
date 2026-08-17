@@ -21,6 +21,12 @@ performanceのみ非ブロッキング1件で再修正不要、Sprint9は3観点
 ではなく「習得したこと」「技術的なハマりポイント」に記録する。ただし一部は参照知識/実装パターンとして
 初出からSkillへ即時反映した（詳細は「Skills更新履歴」）。
 
+**Sprint12（#29・初のRepository層導入PoC）は、3観点reviewer自体は全員クリア（Conv/Sec/Perfとも指摘0件）
+だったが、SMがコア精読で3reviewer全員が見落としたperf純増（書込4操作の`findByUserId`二重呼び・+2クエリ/
+操作）を独立発見し、同スプリントで是正した。** reviewerのクリア判定を鵜呑みにせずSMが実コードを読む
+verificationプロセスが機能した事例（3reviewer自動判定＋SM精読の二重チェックの価値を実証）。詳細は下記
+「Sprint12」バレットと`backlog/sprint_12/implementation-notes.md`参照。
+
 Sprint7の`@RestControllerAdvice`catch-all問題（後述「技術的なハマりポイント」）はSprint3に続く2回目の
 発生のため、本スプリントでSkill（`backend-conventions`§9）へ昇格した（唯一の2回ルール昇格ケース）。
 
@@ -54,6 +60,23 @@ Sprint4のセキュリティ非ブロッキング2件（`AuthApplicationService.
   （例: `selectItemsForCart(List<String> itemIds, cartId)`でN行分をまとめて取得しMapへ変換してから
   ループ処理する）を検討する必要がある未解消の技術的負債として記録する。
   発生スプリント: Sprint9（#5/#6、performance-reviewer指摘・SMがスコープ外判定。根本原因はSprint8（#4）由来）
+
+- [パフォーマンス] **Repository層導入（Service→Mapper直呼びの解消）の際、「識別子解決用の読取」と
+  「最終応答用の読取」を同じ集約全体読み込みメソッドで済ませてしまい、書込操作あたりのクエリ数が
+  リファクタ前より純増した。** `CartApplicationService`の書込4操作（addItem/updateItem/removeItem/merge）が、
+  冒頭（cartId取得目的）と末尾（最新カート返却目的）で`CartRepository#findByUserId`（`ensureCart`+
+  `selectCartItems`の合成・4テーブルJOIN込み）を2回呼んでおり、冒頭の`items`ロードが実質不要（`Cart`の
+  コマンドメソッドは集約state=`items`を使わず注入された`StockAvailability`のみで動く設計だったため）
+  だったにもかかわらず、+2クエリ/操作の純増になっていた（addItem例: 原実装4→リファクタ後6）。**convention/
+  security/performanceの3reviewerは全員この差分を見落とし「クリーン」と判定したが、SMがコア精読で発見・
+  確定した**（`backend-conventions`§9の「Application ServiceはRepository経由」パターンをCart PoC（#29）で
+  初適用した際に発生。是正では`ensureCart(userId):Long`（cartIdのみ・items非ロード）と
+  `findByCartId(cartId):Cart`（select-only）に分割し、baselineクエリ数（4/4/3/2+2N）へ復帰した）。
+  今後Repository層を新規導入するStory（#30のCatalog/Account/Order展開）で「識別子解決」と「最終応答」を
+  同じ集約全体読み込みメソッドで済ませていないか棚卸しする必要がある。
+  発生スプリント: Sprint12（#29、3reviewer全員見落とし・SM精読で発見。初出のため2回ルールに従い本Skillには
+  未反映。ただし具体的な回避パターン＝`ensureCart`/`findByCartId`分割自体は`backend-conventions`§9の
+  Cart PoCテンプレへ即時反映済み。詳細は「Skills更新履歴」）
 
 ### jpetstore-frontend
 Sprint5（#24）が初のフロントエンド実装スプリント。3観点レビューでパフォーマンス1件・セキュリティ1件の
@@ -274,8 +297,10 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   同一メソッド・同一引数パターンに対して返り値/副作用の設定と呼び出し内容の検証を両方行いたい場合は、
   `then:`ブロックの1つのインタラクションに引数マッチャーと`>>`（返り値/副作用クロージャ）を両方まとめて
   書く（`1 * mock.method({matcher}) >> { args -> ... }`）ことで解消する。
-  発生スプリント: Sprint11（#8、`OrderApplicationServiceSpec`実装時。初出のため2回ルールに従い本Skillには
-  未反映）
+  発生スプリント: Sprint11（#8、`OrderApplicationServiceSpec`実装時。初出）→ **Sprint12（#29）で2回目発生**
+  （perf是正で新設した`CartApplicationServiceSpec`の`ensureCart`/`findByCartId`スタブと
+  `MyBatisCartRepositorySpec`の`cartCustomMapper.ensureCart`スタブの両方で同じ罠を踏み、NPE/比較失敗で
+  RED化した）→ **2回ルールにより`backend-conventions`§9へ昇格**（詳細は「Skills更新履歴」）。
 - **`VARCHAR(10)`の自然キー列（`m_item.item_id`等）へテスト用に新規IDを設計する際、業務的にわかりやすい
   長い文字列にすると桁数超過でINSERTが失敗する。** 並行安全性テスト用に`ZZ-ORDER-CONC-1`（15文字）という
   アイテムIDを新設しようとしたところ`MysqlDataTruncation`で失敗し、`ZZ-ORD-C1`（9文字）へ短縮して解消した。
@@ -525,6 +550,22 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   `backend-conventions`§9へ即時反映した**（Spring AOPの自己呼び出し限定という古典的な落とし穴を含む
   「知らないと書けない参照知識」のため2回ルールの対象外。詳細はSkill本文参照）。
   発生スプリント: Sprint11（#8）
+- **コードベース初のRepository層導入（Cart PoC・#29）で、#30（Catalog/Account/Order全体展開）が踏襲できる
+  3つの実装パターンを確立した。** いずれも`backend-conventions`§9へ即時反映済み（詳細は「Skills更新履歴」）:
+  1. **record→class＋private ctor＋`reconstruct()`**: 集約（`Cart`/`CartItem`）はrecordのままだと不変条件
+     コマンドメソッドを持てない・外向き射影を型で強制できないため、classへ変換しprivateコンストラクタ＋
+     用途別static工場メソッド（読取再構築用`reconstruct()`／書込専用`forWrite()`）に分離した。
+  2. **軽量identityハンドル（`Cart.identity(cartId)`）**: 集約のコマンドメソッド（`addItem`等）が
+     集約state（`items`）を使わず注入されたVOのみで動く設計（D3）の場合、`items`を空のまま持つ軽量な
+     `Cart`インスタンスを生成するだけでコマンドメソッドを呼べる。これにより「識別子解決」のためだけに
+     集約全体（明細JOIN込み）を読み込む必要が無くなる（perf是正の核）。
+  3. **Repositoryモック合成によるDB非依存クエリ数証明**: 実DBのクエリカウント計測インフラが無い場合でも、
+     「Repository各メソッド＝1 SQL文」（`MyBatisCartRepositorySpec`・Mapper mock）×「Serviceが各
+     Repositoryメソッドを正確に1回だけ呼ぶ」（`CartApplicationServiceSpec`・Repository mock・`N *
+     mock.method(...)`の明示カウント検証）の2つのSpock UTを組み合わせることで、書込1操作あたりの
+     SQL発行数をDB接続なしかつ決定的に裏取りできる。
+  発生スプリント: Sprint12（#29、3reviewer全員クリア後にSMが発見したperf差分の是正で確立。§9のCart PoC
+  テンプレへ即時反映済み＝参照知識・実装パターンの位置づけのため2回ルール対象外）
 
 ### jpetstore-frontend
 - **backendのSpring Security 7 CSRF設定（非XOR `CsrfTokenRequestAttributeHandler`・consume-then-
@@ -821,10 +862,37 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   「繰り返し指摘されるパターン」の「横断」に記録した。
 - `#skills-changelog` へ `[DEV]` で投稿済み。
 
+### Sprint 12（#29・コードベース初のRepository層導入PoC・Cart参照実装）
+
+- **`backend-conventions`**: `## 9. jpetstore-backend 固有の注意事項`の「Application ServiceはRepository
+  経由で永続化にアクセスする」セクション（Sprint12冒頭でSMが規約明文化済み）に、以下2点を追記した:
+  1. **2回ルールによる昇格**: Spockの`Mock()`で`given:`の裸stubと`then:`ブロックの引数一致インタラクション
+     を同一メソッド呼び出しに両方宣言すると、`then:`側が優先され`given:`の返り値/副作用クロージャが無視
+     される問題。Sprint11（`OrderApplicationServiceSpec`）が初出、Sprint12（`CartApplicationServiceSpec`
+     の`ensureCart`/`findByCartId`スタブ・`MyBatisCartRepositorySpec`の`cartCustomMapper.ensureCart`スタブ）
+     で2回目発生したため、§9へ「同一呼び出しへの`given:`/`then:`分離を避け、1つの`then:`インタラクションに
+     matcherと`>>`をまとめて書く」ルールとして新設した（bad/good例付き）。
+  2. **初出だが「知らないと書けない参照知識・実装パターン」の2回ルール例外として即時反映**: #29 Cart PoC
+     で確立した3パターン（record→class＋`reconstruct()`／軽量identityハンドル／Repositoryモック合成による
+     DB非依存クエリ数証明）を、#30（Catalog/Account/Order全体展開）が踏襲すべき先例テンプレとして§9へ
+     追記した（詳細は`memory/dev/long_term.md`「習得したこと」参照）。
+  - 併せて、§9末尾の「未反映の技術的ハマりポイント一覧」注記から、昇格したSpockの罠の記載を除去し
+    一覧を最新化した。
+- **`backend-conventions`へは反映しなかったもの**: Repository層導入時に「識別子解決用の読取」と「最終応答用
+  の読取」を同じ集約全体読み込みメソッドで済ませてしまいクエリ数が純増する問題（3reviewer全員見落とし・
+  SM精読で発見）は「初出（1回目）」のため、2回ルールに従い今回はSkillのチェックリストとしては追加せず
+  `memory/dev/long_term.md`「繰り返し指摘されるパターン」に留めた（ただし回避パターン自体＝`ensureCart`/
+  `findByCartId`分割は上記1のCart PoCテンプレに含まれているため、#30がテンプレを踏襲すれば同じ問題は
+  構造的に再発しない見込み）。
+- 3reviewer全員クリア後にSMのコア精読で新規perf差分が見つかった一件（reviewerプロセスの限界とSM精読の
+  価値の実証）は、チェックリスト項目ではなくプロセス上の教訓のためSkillには反映せず
+  `memory/dev/long_term.md`「繰り返し指摘されるパターン」の「jpetstore-backend」冒頭に記録した。
+- `#skills-changelog` へ `[DEV]` で投稿済み。
+
 ## 卒業済みルール
 
 （該当なし。棚卸し対象となるルールが直近15スプリント基準に達していない。
-  jpetstore-backendはSprint2・3・4・6・7・8・9・10・11の9スプリントのみ、jpetstore-databaseはSprint1・3・6の
-  3スプリントのみ、jpetstore-frontendはSprint5・6・7・8・10・11の6スプリントのみのため、いずれも対象外。
-  Sprint4・Sprint5・Sprint6・Sprint7・Sprint8・Sprint9・Sprint10・Sprint11 Retroでも棚卸しを実施したが
-  同様の理由で卒業候補なし）
+  jpetstore-backendはSprint2・3・4・6・7・8・9・10・11・12の10スプリントのみ、jpetstore-databaseはSprint1・
+  3・6の3スプリントのみ、jpetstore-frontendはSprint5・6・7・8・10・11の6スプリントのみのため、いずれも対象外。
+  Sprint4・Sprint5・Sprint6・Sprint7・Sprint8・Sprint9・Sprint10・Sprint11・Sprint12 Retroでも棚卸しを
+  実施したが同様の理由で卒業候補なし）

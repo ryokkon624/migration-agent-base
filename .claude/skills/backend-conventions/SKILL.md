@@ -634,7 +634,87 @@ Application 層に `infrastructure.mybatis.*` への依存が残っていない�
 > VARCHAR(10)制約（Sprint6）・MockMvc経由でCSRF Cookie属性（SameSite等）を検証できない制約と
 > bean切り出しユニットテストによる回避策（Sprint9）・GroovyのGStringが`equals(String)`で常にfalseに
 > なる問題（Sprint10）・SpockのStubがインターフェースのデフォルトメソッドへ委譲しない問題（Sprint10）・
-> Spockの`then:`ブロックの引数一致インタラクションが`given:`の裸stubより優先され返り値/副作用が
-> 上書きされる問題（Sprint11）・`m_item.item_id`等VARCHAR(10)自然キー列へテスト用IDを設計する際の
-> 桁数超過（Sprint11）は、いずれも初出（1回目）のため、2回ルールに従い本Skillには未反映
-> （`memory/dev/long_term.md`「技術的なハマりポイント」参照）。2回目の発生でSkill昇格を検討する。
+> `m_item.item_id`等VARCHAR(10)自然キー列へテスト用IDを設計する際の桁数超過（Sprint11）・
+> Repository層導入時に「識別子解決用の読取」と「最終応答用の読取」を同じ集約全体読み込みメソッドで
+> 済ませてしまいクエリ数が純増する問題（Sprint12・回避パターンは下記「#29 PoCで確立した実装パターン」
+> 参照）は、いずれも初出（1回目）のため、2回ルールに従い本Skillのチェックリストには未反映
+> （`memory/dev/long_term.md`「技術的なハマりポイント」「繰り返し指摘されるパターン」参照）。
+> 2回目の発生でSkill昇格を検討する。
+
+### Spockの`then:`インタラクションは`given:`の裸stubより優先される（同一呼び出しはmatcherと`>>`を1つのthen:にまとめる）
+
+Spockの`Mock()`で、同一メソッド・同一引数パターンの呼び出しに対し `given:` ブロックの裸stub
+（`mock.method(_) >> {...}`）と `then:` ブロックの引数一致インタラクション（`N * mock.method({matcher})`）を
+**分けて宣言すると、`then:`側が優先され`given:`側の返り値/副作用クロージャが無視される**（Groovy/Spockの
+既知の挙動）。返り値がnull/デフォルト値になり、後続コードがNPEや期待値の比較失敗を起こす。
+
+```groovy
+// NG: given:の裸stubとthen:の引数一致インタラクションを分けて書く
+// → then:が優先されgiven:の副作用(header.cartId = CART_ID)が無視され、cartIdはnullのまま
+def "ensureCartはcartIdを返す"() {
+    given:
+    cartCustomMapper.ensureCart(_ as CartHeaderCustomEntity) >> { CartHeaderCustomEntity h ->
+        h.cartId = CART_ID
+    }
+
+    when:
+    def cartId = repository.ensureCart(USER_ID)
+
+    then:
+    cartId == CART_ID                                        // 失敗（実際はnull）
+    1 * cartCustomMapper.ensureCart({ it.userId == USER_ID })
+}
+
+// OK: 1つのthen:インタラクションにmatcherと>>(返り値/副作用クロージャ)をまとめる
+def "ensureCartはcartIdを返す"() {
+    when:
+    def cartId = repository.ensureCart(USER_ID)
+
+    then:
+    1 * cartCustomMapper.ensureCart({ it.userId == USER_ID }) >> { CartHeaderCustomEntity h ->
+        h.cartId = CART_ID
+    }
+    cartId == CART_ID                                        // 成功
+}
+```
+
+同一呼び出しに対して「返り値/副作用の設定」と「呼び出し内容（引数・回数）の検証」を両方行いたい場合は、
+必ず1つの`then:`インタラクションへ引数マッチャーと`>>`をまとめて書くこと。`given:`側で裸stubを書くのは、
+`then:`側でその呼び出しの引数・回数を明示検証**しない**場合のみに限る。
+
+> **背景（Sprint11 #8で初出→Sprint12 #29で2回目発生・2回ルール昇格）**: Sprint11の
+> `OrderApplicationServiceSpec`（`orderCustomMapper.insertOrderHeader(_)`の`orderId`補完クロージャが
+> `then:`の引数一致検証と衝突しNPE）で初めて発覚。Sprint12の`CartApplicationServiceSpec`
+> （`cartRepository.ensureCart`/`findByCartId`スタブ）・`MyBatisCartRepositorySpec`
+> （`cartCustomMapper.ensureCart`スタブ）の両方で同じ罠を踏みRED化したため2回目と判定し、Skillへ昇格した。
+
+### #29 PoCで確立した実装パターン（#30が踏襲する先例テンプレ）
+
+コードベース初のRepository層導入（Cart PoC・#29）で確立した3パターン。#30（Catalog/Account/Order全体展開）
+はこれらをそのまま踏襲できる。
+
+1. **集約は`record`ではなく`class`＋privateコンストラクタ＋用途別static工場メソッドにする**。不変条件
+   コマンドメソッド（`Cart#addItem`等）を持たせるにはrecordでは不十分（正準コンストラクタが公開されてしまい
+   不正な状態を作れてしまう）。読取再構築用の`reconstruct(...)`（Converterから呼ぶ・全フィールド指定）と、
+   書込専用の`forWrite(...)`（package-private・永続化に必要な最小フィールドのみ）を用途別に分離する。
+   ```java
+   public final class Cart {
+     private Cart(Long cartId, List<CartItem> items) { ... }
+     public static Cart reconstruct(Long cartId, List<CartItem> items) { return new Cart(cartId, items); }
+     public static Cart identity(Long cartId) { return new Cart(cartId, List.of()); } // 下記2参照
+   }
+   ```
+2. **集約のコマンドメソッドが集約state（`items`等）を使わず注入VOのみで動く設計の場合、軽量identityハンドル
+   を用意する**（`Cart.identity(cartId)`）。「識別子解決」のためだけに集約全体（明細JOIN込み）を読み込む
+   必要が無くなり、Repository層導入時にありがちなクエリ数純増（上記「未反映の技術的ハマりポイント一覧」
+   Sprint12参照）を構造的に避けられる。この軽量ハンドルは表示用途には使わない（`items`/`subtotal`は空/ゼロ）
+   ことをJavadocで明記する。
+3. **Repositoryモック合成でDB非依存のクエリ数証明UTを書く**。実DBのクエリカウント計測インフラが無くても、
+   「Repository実装の各メソッド＝1 SQL文であること」（`MyBatisXxxRepositorySpec`・Mapper mock・
+   `N * mapper.method(...)`で検証）と「Application Serviceが各Repositoryメソッドを正確にN回だけ呼ぶこと」
+   （`XxxApplicationServiceSpec`・Repository mock・`N * repository.method(...)`で検証）を組み合わせれば、
+   書込1操作あたりのSQL発行数をDB接続なしかつ決定的に裏取りできる。
+
+> **背景（Sprint12 #29）**: SMが3reviewer全員クリア後にコア精読で発見したperf差分（書込4操作の
+> `findByUserId`二重呼び・+2クエリ/操作）の是正で確立。詳細な設計判断は`memory/dev/long_term.md`
+> 「習得したこと」（jpetstore-backend）参照。

@@ -1,3 +1,3 @@
 # DEV 短期記憶
 
-（Sprint 11 完了。Retroで振り返り済み）
+（Sprint 12 完了。Retroで振り返り済み）
