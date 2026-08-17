@@ -1,11 +1,13 @@
 # SM 短期記憶（今スプリント）
 
-Sprint 13（#30 Repository 層を Catalog/Account/Order へ展開＝refactor・SP8・backend 単一 repo）完了。次スプリント開始時にリセット済み。
+Sprint 14（#9 注文履歴一覧・#10 注文詳細閲覧＝E3 read 機能・security・cross-repo 3-repo）完了。次スプリント開始時にリセット済み。
 
-- 実装: 新規ブランチ `refactor/30-repository-rollout`（3コミット・24ファイル・database ノータッチ）。#29 テンプレを Catalog/Account/Order へ横展開し **Mapper 直呼び全廃**（Application 層の `infrastructure.mybatis` import：Order 8→0/Catalog 5→0/Account 2→0・Auth 除く全 Service 0 件）。Repository 移行は #29+#30 で完了。
-- 確定した設計（ユーザー承認）: **Q1=案A**（Order は rich 集約化せず #8 並行オーケストレーションを Application 残置・最小 write record `NewOrder`/`OrderLine`）／**Q2=統一 `...Repository` 命名**（read も Repository・意味論は CQRS 射影のまま・ユーザーオーバーライド）／**Q3=新規 `domain/inventory`**。O3=`CartRepository#clearItems` 追加・Order は `ensureCart`/`findByCartId`（ORDER BY item_id）再利用。
-- **品質ハイライト**: 3観点 reviewer 全員クリア＋**SM verification（Order/Catalog/Account 精読）も全クリーン**。#29 と違い SM も perf 純増を検出せず＝**DEV が Sprint12 教訓（findByCartId 再利用でクエリ数純増回避）を自発適用**＋#29 テンプレ無改造横展開（C2 実効性検証成功）。#8 並行保証維持・ID-28 非露出・IDOR 安全を確認。
-- PR: backend **#12**（closes #30）→ **マージ済**（merge commit b95159b）。Issue #30 自動クローズ。Sprint Review 指摘なし（「OK」）。
-- Retro 完了（SM/DEV/PO）。Skills 更新: **SM=`scrum-master-workflow` に step 12 追記**（agent-base 毎スプリントコミット標準化・ユーザー指示）／DEV=`backend-conventions §9` に「書込集約の適用範囲（rich 集約 vs 薄い書込 record・Cart/Order の判断軸）」追記・Spock 罠3回目は §9 昇格済で棚卸し／PO=質問傾向引用追記（判断委譲3件目・先例規約未定義4/5件目）。長期記憶反映済。
-- agent-base 成果物: **step 12 に沿ってブランチ切ってコミット＆PR＆マージ（実施中）**。
-- **次スプリント候補**: E3 継続 **#9/#10（注文照会・履歴一覧・詳細閲覧）**。#8 の注文ドメイン基盤（`OrderRepository`/t_order/t_order_line）を再利用。**IDOR 対策（プリンシパル基準・not-owned/not-found 同一応答＝ID-4/SBD-8）が中核**。Repository 移行完了により**新規 Story は最初から Repository 経由**（運用ルール）＝#9/#10 Refinement 時に AC/備考へ反映（PO 申し送り済）。
+- 実装: `feature/9-order-history-detail`（3 repo 同名）。database=複合索引 `(user_id, order_id)` 追加＋単一列索引 `idx_t_order_user_id` を同一 ALTER で DROP（置換・Q1）／backend=GET /api/orders・GET /api/orders/{id} 新設（OrderRepository 経由 SELECT・OwnershipAuthorization[#21]初適用・不存在/非所有とも AccessDeniedException→同一403）／frontend=注文履歴/詳細 View・orderApi GET・Pinia・i18n（詳細は明細+合計+注文日のみ・住所非表示＝Q2）。
+- 品質: **3観点クリーン（7回目相当）＋SM 独立 verification 核心クリーン＋Sprint Review OK**。tier分離14連続。DEV が Sprint12/13 perf 教訓（getOrder header 単一読み＋認可後明細）を自発適用。
+- PR/マージ: frontend #7（closes #9/#10）・backend #13・database #6 → 全マージ済（frontend cc5098f で #9/#10 自動クローズ）。local main 3 repo 同期済（frontend は EOL ノイズで checkout abort→`checkout -f` で対処）。
+- Retro 完了（SM/DEV/PO）。Skills 更新: **SM=変更なし**（学びは long_term）／DEV=`backend-conventions §9` に「所有者限定＋列挙対策 read は不存在も同一 AccessDeniedException(403)」新設／**PO=`rules/database.md` に「索引ハイジーン」節新設（2回ルール昇格）**。long_term 反映済。
+- **要フォロー（次回）**: (1) `@Transactional(readOnly)` の read メソッド不統一（Account=有/Catalog・Order=無）を SM/DEV が収束発見・3 reviewer 4連続未検出＝次回同種発生で reviewer チェックリスト昇格 or rules 明確化を判定。(2) #9 AC/備考への「索引置換」反映を次回 Refinement でユーザー確認（PO 継続項目）。(3) local main 同期の EOL/checkout-abort 落とし穴の再発で scrum-master-workflow step 12 昇格判定。
+- **次スプリント候補**: E3 の残（もしあれば）／E4 プロフィール（#13/#14）等。バックログの Sprint 15 対象は Planning 時に GitHub Projects の Sprint フィールドで特定する。
+
+## agent-base 成果物（step 12・実施中）
+- 対象: backlog/sprint_14/（sprint_backlog.md・review-#9.html・review-#10.html）／memory/{sm,dev,po}/{short_term,long_term}.md／.claude/rules/database.md／.claude/skills/backend-conventions/SKILL.md。ブランチ `docs/sprint-14-orders-inquiry`・`Related: #9, #10`（closes にしない）。

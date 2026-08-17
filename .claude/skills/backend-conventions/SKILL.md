@@ -450,6 +450,34 @@ ownershipAuthorizationService.assertOwner(request.getUserId());
 > 本Storyでは対象ドメインリソースが未実装のため`SecuredPingController#myResource`での実証にとどめ、
 > 各ドメインへの適用（リソースIDから所有者を解決する処理）は各Storyへ委譲した。
 
+### 所有者限定＋列挙対策の read エンドポイントは、不存在も含めて同一の`AccessDeniedException`（403）に正規化する
+
+連番（auto increment等）で推測可能なリソースID（例: `orderId`）に対する本人限定の詳細取得APIは、
+「リソースが存在しない」と「リソースは存在するが自分の所有ではない」を**同一の403**として応答する。
+存在有無で応答（403 vs 404）を分岐させると、攻撃者がIDを総当たりするだけで「そのIDのリソースが
+存在するか」を判別できてしまう（列挙オラクル化・SBD-8）。
+
+```java
+// OK: 不存在・非所有のいずれも同一のAccessDeniedException（→403）に正規化する
+OrderHeader header = orderRepository.findHeaderById(orderId)
+    .orElseThrow(() -> new AccessDeniedException("Order not found or not owned"));
+ownershipAuthorizationService.assertOwner(header.userId());
+```
+
+- **上記「認可チェックはリソースの存在・状態を開示する分岐より前に置く」（§5）との使い分け**:
+  招待トークン等、ID自体が既に推測困難（UUID・署名付きトークン等）なリソースは、
+  `ResourceNotFoundException`（404）→認可チェック（403）の順で構わない（存在確認自体は情報漏洩に
+  ならない）。一方、連番などIDそのものが容易に推測・総当たり可能なリソースは、存在確認の結果自体を
+  秘匿する必要があるため、不存在も`AccessDeniedException`に含めて一律403にする。
+- 明細等の付随データ（例: 注文明細）は**認可通過後にのみ**取得する。所有者解決用の読取（例:
+  ヘッダ）と最終応答用の読取を同一メソッドで済ませ、認可通過前に不要な追加クエリを発行しない
+  （識別子解決用の読取と最終応答用の読取を分けずに使い回す＝Sprint12/13のperf教訓の踏襲）。
+
+> **背景（Sprint 14 #10）**: `OrderApplicationService#getOrder`で`OwnershipAuthorizationService`
+> （#21）を初めて実ドメインへ適用した。`findHeaderById`が空の場合と`assertOwner`が失敗する場合の
+> 両方を同一の`AccessDeniedException`にまとめ、既存の`GlobalExceptionHandler`が403＋監査へ正規化する
+> 経路にそのまま合流させた（新規の例外型・専用ハンドラは不要）。
+
 ### 「現在の自分」を返す自己識別エンドポイント（`/me`パターン）は`permitAll`に入れない
 
 フロントのクライアント状態（Pinia/Reduxストア等）はページリロードで揮発するが、httpOnly Cookieで

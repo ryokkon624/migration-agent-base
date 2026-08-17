@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint 14 Review — #9 自分の注文履歴一覧を表示する</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #f8f7f5; }
+
+  .page { max-width: 860px; margin: 0 auto; padding: 48px 24px; }
+
+  /* Header */
+  .sprint-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin-bottom: 8px; }
+  h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px; }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+  .badge-sprint { background: #e8f0fe; color: #1a56db; }
+  .badge-issue { background: #f0fdf4; color: #166534; }
+  .badge-feature { background: #eff6ff; color: #1d4ed8; }
+  .badge-security { background: #fef2f2; color: #b91c1c; }
+  .badge-database { background: #fefce8; color: #854d0e; }
+  .badge-backend { background: #f0f9ff; color: #0369a1; }
+  .badge-frontend { background: #fdf4ff; color: #7e22ce; }
+
+  /* Sections */
+  section { margin-bottom: 40px; }
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #888; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e5e5e5; }
+
+  /* Problem box */
+  .problem-box { background: #fff8f0; border-left: 3px solid #f59e0b; border-radius: 0 8px 8px 0; padding: 16px 20px; margin-bottom: 16px; }
+  .problem-box .label { font-size: 11px; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .problem-box p { color: #451a03; font-size: 13px; }
+
+  /* Architecture change */
+  .arch-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: center; margin-bottom: 8px; }
+  .arch-box { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; }
+  .arch-box .arch-title { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .arch-box.before { border-color: #fca5a5; }
+  .arch-box.after { border-color: #86efac; }
+  .arch-arrow { font-size: 20px; color: #888; text-align: center; }
+  .flow-item { font-size: 12px; color: #374151; padding: 3px 0; display: flex; align-items: flex-start; gap: 6px; }
+  .flow-item .dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .dot-red { background: #ef4444; }
+  .dot-green { background: #22c55e; }
+
+  /* AC cards */
+  .ac-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+  .ac-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid #f0f0f0; }
+  .ac-check { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .ac-check.done { background: #dcfce7; color: #166534; }
+  .ac-num { font-size: 11px; font-weight: 700; color: #888; }
+  .ac-text { font-size: 13px; font-weight: 600; color: #1a1a1a; flex: 1; }
+  .ac-body { padding: 16px 18px; }
+  .ac-body p { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+
+  /* File change */
+  .file-change { margin-bottom: 16px; }
+  .file-name { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; background: #f3f4f6; color: #374151; padding: 5px 10px; border-radius: 4px 4px 0 0; border: 1px solid #e5e5e5; border-bottom: none; display: flex; justify-content: space-between; }
+  .diff-stat { color: #888; }
+  .code-block { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.7; background: #1e1e2e; color: #cdd6f4; padding: 14px 16px; border-radius: 0 0 6px 6px; overflow-x: auto; white-space: pre; }
+  .code-line { display: flex; }
+  .line-num { color: #45475a; min-width: 28px; user-select: none; }
+  .line-add { background: rgba(166, 227, 161, 0.12); color: #a6e3a1; }
+  .line-del { background: rgba(243, 139, 168, 0.12); color: #f38ba8; }
+  .line-ctx { color: #cdd6f4; }
+  .line-prefix { min-width: 14px; }
+
+  /* Annotation */
+  .annotation { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-size: 12px; color: #78350f; display: flex; gap: 8px; }
+  .annotation-icon { font-size: 14px; flex-shrink: 0; }
+
+  /* Verify section */
+  .verify-list { list-style: none; }
+  .verify-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; }
+  .verify-item:last-child { border-bottom: none; }
+  .verify-num { width: 22px; height: 22px; background: #e8f0fe; color: #1a56db; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .verify-content { flex: 1; }
+  .verify-content strong { font-size: 13px; color: #1a1a1a; display: block; margin-bottom: 3px; }
+  .verify-content span { font-size: 12px; color: #6b7280; }
+
+  /* Scope table */
+  .scope-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .scope-table th { text-align: left; padding: 8px 12px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .scope-table td { padding: 10px 12px; border: 1px solid #e5e5e5; color: #374151; vertical-align: top; }
+  .scope-table tr:hover td { background: #f9fafb; }
+  .tag-changed { font-size: 11px; font-weight: 600; background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 3px; }
+  .tag-unchanged { font-size: 11px; font-weight: 600; background: #f3f4f6; color: #6b7280; padding: 2px 6px; border-radius: 3px; }
+  .scope-group { font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; padding: 10px 12px 4px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="sprint-label">Sprint 14 Review</div>
+  <h1>#9 — 自分の注文履歴一覧を表示する<br>（本人スコープ・サービス層認可）</h1>
+  <div class="meta">
+    <span class="badge badge-sprint">Sprint 14</span>
+    <span class="badge badge-issue">#9</span>
+    <span class="badge badge-feature">feature</span>
+    <span class="badge badge-security">security / E3</span>
+    <span class="badge badge-database">database</span>
+    <span class="badge badge-backend">backend</span>
+    <span class="badge badge-frontend">frontend</span>
+  </div>
+
+  <!-- Problem -->
+  <section>
+    <h2>なぜこの改修が必要だったか</h2>
+    <div class="problem-box">
+      <div class="label">問題（before S3・identity-rebind IDOR）</div>
+      <p>legacy（Struts1 JPetStore）の注文一覧は、セッションやリクエストの <code>username</code> をそのまま認可判断に使っていた。パラメータを差し替えれば他人の注文一覧が閲覧できてしまう「identity-rebind IDOR」だった（<code>spec/security-baseline.md</code> SBD-1）。新ビルドでは注文一覧を新規に実装し、認可をサービス層に集約したうえで<strong>認証プリンシパル（JWTから解決した userId）だけ</strong>を根拠にする。</p>
+    </div>
+    <div class="arch-grid">
+      <div class="arch-box before">
+        <div class="arch-title">before（legacy）</div>
+        <div class="flow-item"><span class="dot dot-red"></span>一覧取得の認可根拠がリクエスト/セッションの username</div>
+        <div class="flow-item"><span class="dot dot-red"></span>username を差し替えれば他人の履歴が見える（IDOR）</div>
+        <div class="flow-item"><span class="dot dot-red"></span>索引は <code>idx_t_order_user_id (user_id)</code> 単一列のみ</div>
+        <div class="flow-item"><span class="dot dot-red"></span>サーバページングなし</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-box after">
+        <div class="arch-title">after（新ビルド）</div>
+        <div class="flow-item"><span class="dot dot-green"></span><code>WHERE user_id = ?</code> はサーバ解決の userId のみ</div>
+        <div class="flow-item"><span class="dot dot-green"></span>request/formの username は認可に一切使わない（AC2）</div>
+        <div class="flow-item"><span class="dot dot-green"></span><code>(user_id, order_id)</code> 複合索引で絞込＋新しい順ソートを1索引で</div>
+        <div class="flow-item"><span class="dot dot-green"></span><code>PageResponse&lt;T&gt;</code>（1-index・size=12既定・cap=100）でサーバページング</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AC breakdown -->
+  <section>
+    <h2>AC別 実装内容</h2>
+
+    <!-- AC1 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC1</div>
+        <div class="ac-text">本人の注文のみを一覧表示（orderId/date/totalPrice）。サーバページングあり（1-index・size=12既定・cap=100）</div>
+      </div>
+      <div class="ac-body">
+        <p>索引・SQL・Repository・Service・Controller・画面まで一気通貫の3-repo実装。ソートは新しい順（<code>order_id DESC</code>）で決定的。</p>
+
+        <div class="file-change">
+          <div class="file-name">
+            <span>jpetstore-database / flyway/sql/V00_000_011__add_t_order_user_order_index.sql（新規）</span>
+            <span class="diff-stat">+22</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">20</span><span class="line-prefix">+</span><span>ALTER TABLE t_order</span></div>
+            <div class="code-line line-add"><span class="line-num">21</span><span class="line-prefix">+</span><span>    ADD INDEX idx_t_order_user_id_order_id (user_id, order_id),</span></div>
+            <div class="code-line line-add"><span class="line-num">22</span><span class="line-prefix">+</span><span>    DROP INDEX idx_t_order_user_id;</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>単一列索引 <code>idx_t_order_user_id</code> は複合索引の左端prefixで代替可能なため、重複索引を残さず同一ALTER文でDROPした。FK <code>fk_t_order_user_id</code> は複合索引の左端prefixで引き続きバッキングされる（SMが安全性を裏取り済）。</span>
+          </div>
+        </div>
+
+        <div class="file-change">
+          <div class="file-name">
+            <span>jpetstore-backend / src/main/resources/mapper/custom/OrderCustomMapper.xml</span>
+            <span class="diff-stat">+16（一覧2SQL分）</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">45</span><span class="line-prefix">+</span><span>&lt;select id="selectOrdersByUserId" resultType="...OrderSummaryCustomEntity"&gt;</span></div>
+            <div class="code-line line-add"><span class="line-num">46</span><span class="line-prefix">+</span><span>    SELECT order_id, order_date, total_price</span></div>
+            <div class="code-line line-add"><span class="line-num">47</span><span class="line-prefix">+</span><span>      FROM t_order</span></div>
+            <div class="code-line line-add"><span class="line-num">48</span><span class="line-prefix">+</span><span>     WHERE user_id = #{userId}</span></div>
+            <div class="code-line line-add"><span class="line-num">49</span><span class="line-prefix">+</span><span>     ORDER BY order_id DESC</span></div>
+            <div class="code-line line-add"><span class="line-num">50</span><span class="line-prefix">+</span><span>     LIMIT #{limit} OFFSET #{offset}</span></div>
+            <div class="code-line line-add"><span class="line-num">51</span><span class="line-prefix">+</span><span>&lt;/select&gt;</span></div>
+            <div class="code-line line-add"><span class="line-num">53</span><span class="line-prefix">+</span><span>&lt;select id="countOrdersByUserId" resultType="long"&gt;</span></div>
+            <div class="code-line line-add"><span class="line-num">54</span><span class="line-prefix">+</span><span>    SELECT COUNT(*) FROM t_order WHERE user_id = #{userId}</span></div>
+            <div class="code-line line-add"><span class="line-num">55</span><span class="line-prefix">+</span><span>&lt;/select&gt;</span></div>
+          </div>
+        </div>
+
+        <div class="file-change">
+          <div class="file-name">
+            <span>jpetstore-backend / domain/order/OrderRepository.java・infrastructure/.../MyBatisOrderRepository.java</span>
+            <span class="diff-stat">+17</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">27</span><span class="line-prefix">+</span><span>/** #9 AC1: 本人の注文履歴一覧を新しい順（order_id DESC）でページング取得する。 */</span></div>
+            <div class="code-line line-add"><span class="line-num">28</span><span class="line-prefix">+</span><span>List&lt;OrderSummary&gt; listByUser(Long userId, int offset, int limit);</span></div>
+            <div class="code-line line-add"><span class="line-num">31</span><span class="line-prefix">+</span><span>/** #9 AC1: 本人の注文件数（ページング用total）。 */</span></div>
+            <div class="code-line line-add"><span class="line-num">32</span><span class="line-prefix">+</span><span>long countByUser(Long userId);</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>Applicationからmapper/entityを直呼びせず、<code>OrderRepository</code>経由でDomainモデル（<code>OrderSummary</code>）に変換して返す（#30で確立したRepository層規約・<code>backend-conventions</code> §9）。</span>
+          </div>
+        </div>
+
+        <div class="file-change">
+          <div class="file-name">
+            <span>jpetstore-backend / application/service/OrderApplicationService.java</span>
+            <span class="diff-stat">+13</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">142</span><span class="line-prefix"> </span><span>public Page&lt;OrderSummary&gt; listOrders(Integer page, Integer size) {</span></div>
+            <div class="code-line line-add"><span class="line-num">143</span><span class="line-prefix">+</span><span>  Long userId = currentUserProvider.requireCurrentUser().userId();</span></div>
+            <div class="code-line line-add"><span class="line-num">144</span><span class="line-prefix">+</span><span>  PageRequest pageRequest = PageRequest.of(page, size);</span></div>
+            <div class="code-line line-add"><span class="line-num">145</span><span class="line-prefix">+</span><span>  List&lt;OrderSummary&gt; content =</span></div>
+            <div class="code-line line-add"><span class="line-num">146</span><span class="line-prefix">+</span><span>      orderRepository.listByUser(userId, pageRequest.offset(), pageRequest.size());</span></div>
+            <div class="code-line line-add"><span class="line-num">147</span><span class="line-prefix">+</span><span>  long totalElements = orderRepository.countByUser(userId);</span></div>
+            <div class="code-line line-add"><span class="line-num">148</span><span class="line-prefix">+</span><span>  return Page.of(content, pageRequest.page(), pageRequest.size(), totalElements);</span></div>
+            <div class="code-line line-ctx"><span class="line-num">149</span><span class="line-prefix"> </span><span>}</span></div>
+          </div>
+        </div>
+
+        <div class="file-change">
+          <div class="file-name">
+            <span>jpetstore-backend / presentation/rest/OrderController.java</span>
+            <span class="diff-stat">+5</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">61</span><span class="line-prefix">+</span><span>/** #9 AC1: 本人の注文履歴一覧（新しい順・1-indexページング・既定size=12・cap=100）。 */</span></div>
+            <div class="code-line line-add"><span class="line-num">62</span><span class="line-prefix">+</span><span>@GetMapping</span></div>
+            <div class="code-line line-add"><span class="line-num">63</span><span class="line-prefix">+</span><span>public PageResponse&lt;OrderSummaryResponse&gt; listOrders(</span></div>
+            <div class="code-line line-add"><span class="line-num">64</span><span class="line-prefix">+</span><span>    @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size) {</span></div>
+            <div class="code-line line-add"><span class="line-num">66</span><span class="line-prefix">+</span><span>  return PageResponse.from(orderApplicationService.listOrders(page, size), OrderSummaryResponse::from);</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span><code>PageResponse&lt;T&gt;</code>・1-index・既定size=12・cap=100 は#1/#2（catalog）で確立済みの先例規約をそのまま再利用。<code>SecurityConfig</code>は無変更（<code>/api/orders/**</code>は既存の<code>anyRequest().authenticated()</code>配下）。</span>
+          </div>
+        </div>
+
+        <div class="file-change">
+          <div class="file-name">
+            <span>jpetstore-frontend / src/api/orderApi.ts・src/stores/order.ts</span>
+            <span class="diff-stat">+9 / +14</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">112</span><span class="line-prefix">+</span><span>export async function fetchOrders(page?: number, size?: number): Promise&lt;PageResult&lt;OrderSummary&gt;&gt; {</span></div>
+            <div class="code-line line-add"><span class="line-num">113</span><span class="line-prefix">+</span><span>  const dto = await request&lt;PageDto&lt;OrderSummaryDto&gt;&gt;(`/api/orders${pageQuery(page, size)}`)</span></div>
+            <div class="code-line line-add"><span class="line-num">114</span><span class="line-prefix">+</span><span>  return toPageResult(dto, toOrderSummary)</span></div>
+            <div class="code-line line-add"><span class="line-num">115</span><span class="line-prefix">+</span><span>}</span></div>
+            <div class="code-line line-ctx"><span class="line-num">81</span><span class="line-prefix"> </span><span>async fetchHistory(page?: number): Promise&lt;void&gt; {</span></div>
+            <div class="code-line line-add"><span class="line-num">82</span><span class="line-prefix">+</span><span>  this.isLoadingHistory = true</span></div>
+            <div class="code-line line-add"><span class="line-num">83</span><span class="line-prefix">+</span><span>  try {</span></div>
+            <div class="code-line line-add"><span class="line-num">84</span><span class="line-prefix">+</span><span>    this.history = await orderApi.fetchOrders(page)</span></div>
+            <div class="code-line line-add"><span class="line-num">85</span><span class="line-prefix">+</span><span>  } catch {</span></div>
+            <div class="code-line line-add"><span class="line-num">86</span><span class="line-prefix">+</span><span>    this.history = emptyPage&lt;OrderSummary&gt;()</span></div>
+            <div class="code-line line-add"><span class="line-num">87</span><span class="line-prefix">+</span><span>  } finally { this.isLoadingHistory = false }</span></div>
+            <div class="code-line line-add"><span class="line-num">88</span><span class="line-prefix">+</span><span>}</span></div>
+          </div>
+        </div>
+
+        <div class="file-change">
+          <div class="file-name">
+            <span>jpetstore-frontend / src/views/order/OrderHistoryView.vue（新規）</span>
+            <span class="diff-stat">+96</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">17</span><span class="line-prefix">+</span><span>const currentPage = computed(() =&gt; {</span></div>
+            <div class="code-line line-add"><span class="line-num">18</span><span class="line-prefix">+</span><span>  const raw = Number(route.query.page)</span></div>
+            <div class="code-line line-add"><span class="line-num">19</span><span class="line-prefix">+</span><span>  return Number.isInteger(raw) &amp;&amp; raw &gt; 0 ? raw : 1</span></div>
+            <div class="code-line line-add"><span class="line-num">20</span><span class="line-prefix">+</span><span>})</span></div>
+            <div class="code-line line-add"><span class="line-num">30</span><span class="line-prefix">+</span><span>watch(currentPage, () =&gt; orderStore.fetchHistory(currentPage.value), { immediate: true })</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span><code>ProductListView.vue</code>（#1/#2）のパターン（<code>route.query.page</code>同期・<code>Pagination.vue</code>・<code>.jps-empty</code>空状態）を無改造で踏襲。行クリックで <code>order-detail</code>（#10）へ遷移する。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC2 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC2 (SBD-1)</div>
+        <div class="ac-text">認可はサービス層で認証プリンシパル基準。リクエストで束縛される値（form/param の username）を認可に使わない</div>
+      </div>
+      <div class="ac-body">
+        <p>userId の取得元は <code>OrderApplicationService.listOrders</code> 内の <code>currentUserProvider.requireCurrentUser().userId()</code> のみ。<code>OrderController.listOrders</code> は <code>page</code>/<code>size</code> しか受理せず、そもそも username を受け取るパラメータを持たない（構造的にAC-neg1を担保）。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>jpetstore-backend / application/service/OrderApplicationService.java（AC1と同一メソッド）</span>
+            <span class="diff-stat">L143</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">143</span><span class="line-prefix">+</span><span>Long userId = currentUserProvider.requireCurrentUser().userId();</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>WHERE句に渡す userId はこの1行のみが唯一の出所。リクエストパラメータ由来の値をここへ混ぜ込む経路が存在しない（before S3のIDORパターンを構造的に再現不可能にしている）。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC3 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC3</div>
+        <div class="ac-text">注文履歴の画面・APIは認証必須（frontend meta.requiresAuth: true）。未認証はサインオン誘導＋元URL復帰</div>
+      </div>
+      <div class="ac-body">
+        <p>ルートに <code>requiresAuth: true</code> を付与するだけで、#18/#24 で確立済みの <code>authGuard</code>／<code>sanitizeRedirectTarget</code> による元URL復帰を無配線で再利用する。backend側は <code>SecurityConfig</code> 無変更（<code>anyRequest().authenticated()</code> のまま）。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>jpetstore-frontend / src/router/index.ts</span>
+            <span class="diff-stat">+13</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">91</span><span class="line-prefix">+</span><span>// #9 AC3: 注文履歴一覧(本人スコープ)。認証必須(既達authGuard/元URL復帰を無配線再利用)。</span></div>
+            <div class="code-line line-add"><span class="line-num">92</span><span class="line-prefix">+</span><span>{</span></div>
+            <div class="code-line line-add"><span class="line-num">93</span><span class="line-prefix">+</span><span>  path: '/account/orders',</span></div>
+            <div class="code-line line-add"><span class="line-num">94</span><span class="line-prefix">+</span><span>  name: 'order-history',</span></div>
+            <div class="code-line line-add"><span class="line-num">95</span><span class="line-prefix">+</span><span>  component: OrderHistoryView,</span></div>
+            <div class="code-line line-add"><span class="line-num">96</span><span class="line-prefix">+</span><span>  meta: { title: 'JPetStore - Order History', requiresAuth: true },</span></div>
+            <div class="code-line line-add"><span class="line-num">97</span><span class="line-prefix">+</span><span>},</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC-neg1 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC-neg1 (SBD-1)</div>
+        <div class="ac-text">?account.username=他人 を与えても、返るのは自分の履歴のみ（before S3 identity-rebind IDOR が一覧でも再現しない）</div>
+      </div>
+      <div class="ac-body">
+        <p>自動化された否定AC回帰テスト（<code>OrderControllerSpec</code>）で先取り実証。攻撃者が別ユーザーの注文を作成したうえで <code>?account.username=&lt;他人&gt;</code> を与えても、自分の1件のみが返ることをアサートする。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>jpetstore-backend / test/.../OrderControllerSpec.groovy</span>
+            <span class="diff-stat">RED→GREEN</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num"> </span><span class="line-prefix"> </span><span>def "#9 AC-neg1(SBD-1): account.usernameクエリを他人に差し替えても自分の履歴のみ返る"() {</span></div>
+            <div class="code-line line-ctx"><span class="line-num"> </span><span class="line-prefix"> </span><span>  given:</span></div>
+            <div class="code-line line-ctx"><span class="line-num"> </span><span class="line-prefix"> </span><span>  def own = insertOrder(userId, ...)</span></div>
+            <div class="code-line line-ctx"><span class="line-num"> </span><span class="line-prefix"> </span><span>  insertOrder(otherUserId, ...)  // 他人の注文</span></div>
+            <div class="code-line line-ctx"><span class="line-num"> </span><span class="line-prefix"> </span><span>  expect:</span></div>
+            <div class="code-line line-ctx"><span class="line-num"> </span><span class="line-prefix"> </span><span>  get("/api/orders").param("account.username", OTHER_USERNAME)...</span></div>
+            <div class="code-line line-ctx"><span class="line-num"> </span><span class="line-prefix"> </span><span>    .andExpect(jsonPath('$.content.length()').value(1))</span></div>
+            <div class="code-line line-ctx"><span class="line-num"> </span><span class="line-prefix"> </span><span>    .andExpect(jsonPath('$.content[0].orderId').value(own))</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Verify -->
+  <section>
+    <h2>動作確認ポイント（ユーザー確認用）</h2>
+    <ul class="verify-list">
+      <li class="verify-item">
+        <div class="verify-num">1</div>
+        <div class="verify-content">
+          <strong>ログイン後 /account/orders で自分の過去注文が新しい順に一覧表示されること</strong>
+          <span>注文番号・日付・合計金額が正しく表示され、直近の注文が先頭に来る</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">2</div>
+        <div class="verify-content">
+          <strong>12件を超える注文があるユーザーでページ送りが機能すること</strong>
+          <span>Paginationで次頁へ進めること、URLが <code>/account/orders?page=2</code> のように同期すること</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">3</div>
+        <div class="verify-content">
+          <strong>他人のusernameをクエリに与えても自分の注文しか表示されないこと</strong>
+          <span>開発者ツールで <code>GET /api/orders?account.username=他人のユーザー名</code> を直接叩いても結果が変わらない（自分の履歴のみ）</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">4</div>
+        <div class="verify-content">
+          <strong>未ログインで /account/orders にアクセスするとサインオン画面へ誘導され、ログイン後に元の画面へ戻ること</strong>
+          <span>#18/#24の元URL復帰の動作がそのまま効いていることの確認</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">5</div>
+        <div class="verify-content">
+          <strong>注文が0件のユーザーでアクセスしても「過去の注文はありません」と表示され、エラーにならないこと</strong>
+          <span>空状態（<code>.jps-empty</code>）が出ることの確認</span>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- Scope -->
+  <section>
+    <h2>改修スコープ確認</h2>
+    <table class="scope-table">
+      <tr>
+        <th>ファイル</th>
+        <th>変更</th>
+        <th>内容</th>
+      </tr>
+      <tr><td colspan="3" class="scope-group">jpetstore-database</td></tr>
+      <tr>
+        <td><code>V00_000_011__add_t_order_user_order_index.sql</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>新規。(user_id, order_id)複合索引を追加し単一列索引をDROP</td>
+      </tr>
+      <tr>
+        <td><code>OrderInventoryTablesSpec.groovy</code> / <code>SchemaMigrationSpecBase.groovy</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>複合索引の存在・単一列索引の消滅をinformation_schemaで検証するテスト・ヘルパ追加</td>
+      </tr>
+      <tr><td colspan="3" class="scope-group">jpetstore-backend</td></tr>
+      <tr>
+        <td><code>OrderApplicationService.java</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td><code>listOrders</code>追加（本人スコープ・ページング組立）</td>
+      </tr>
+      <tr>
+        <td><code>OrderController.java</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td><code>GET /api/orders</code>追加・<code>OrderSummaryResponse</code>DTO新設</td>
+      </tr>
+      <tr>
+        <td><code>OrderRepository.java</code> / <code>MyBatisOrderRepository.java</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td><code>listByUser</code>/<code>countByUser</code>追加</td>
+      </tr>
+      <tr>
+        <td><code>OrderCustomMapper.java</code> / <code>.xml</code> / <code>OrderSummaryCustomEntity.java</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>一覧SELECT2本・Entity新設</td>
+      </tr>
+      <tr>
+        <td><code>OrderSummary.java</code>（domain）</td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>新規。読取専用ドメインモデル</td>
+      </tr>
+      <tr>
+        <td><code>OrderApplicationServiceSpec</code> / <code>OrderControllerSpec</code> / <code>MyBatisOrderRepositorySpec</code> / <code>OrderCustomMapperSpec</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>一覧のページング・本人スコープ・AC-neg1のテスト追加</td>
+      </tr>
+      <tr>
+        <td><code>SecurityConfig.java</code></td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td><code>/api/orders/**</code>は既存の<code>anyRequest().authenticated()</code>配下のまま</td>
+      </tr>
+      <tr>
+        <td><code>Page</code> / <code>PageRequest</code> / <code>PageResponse&lt;T&gt;</code></td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td>#1/#2で確立済みの先例規約を無改造で再利用</td>
+      </tr>
+      <tr><td colspan="3" class="scope-group">jpetstore-frontend</td></tr>
+      <tr>
+        <td><code>domain/order.ts</code> / <code>api/orderApi.ts</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td><code>OrderSummary</code>型・<code>fetchOrders</code>追加</td>
+      </tr>
+      <tr>
+        <td><code>stores/order.ts</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td><code>history</code>state・<code>fetchHistory</code>追加</td>
+      </tr>
+      <tr>
+        <td><code>router/index.ts</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td><code>/account/orders</code>（<code>requiresAuth: true</code>）追加</td>
+      </tr>
+      <tr>
+        <td><code>views/order/OrderHistoryView.vue</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>新規。一覧画面（ページング・空状態・行→詳細遷移）</td>
+      </tr>
+      <tr>
+        <td><code>i18n/locales/en.ts</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td><code>order.history.*</code>キー追加</td>
+      </tr>
+      <tr>
+        <td><code>api/__tests__/orderApi.spec.ts</code> / <code>stores/__tests__/order.spec.ts</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td><code>fetchOrders</code>のURL/変換・<code>fetchHistory</code>成功失敗のテスト追加</td>
+      </tr>
+      <tr>
+        <td>認証系ガード（<code>authGuard.ts</code> 等）</td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td>#18/#24の既存実装を無配線で再利用</td>
+      </tr>
+    </table>
+  </section>
+
+</div>
+</body>
+</html>
