@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint 13 Review — #30 Repository層をCatalog/Account/Orderへ展開</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #f8f7f5; }
+
+  .page { max-width: 900px; margin: 0 auto; padding: 48px 24px; }
+
+  /* Header */
+  .sprint-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin-bottom: 8px; }
+  h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px; }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+  .badge-sprint { background: #e8f0fe; color: #1a56db; }
+  .badge-issue { background: #f0fdf4; color: #166534; }
+  .badge-refactor { background: #fdf4ff; color: #7e22ce; }
+  .badge-backend { background: #eff6ff; color: #1d4ed8; }
+
+  /* Sections */
+  section { margin-bottom: 40px; }
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #888; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e5e5e5; }
+  h3 { font-size: 13px; font-weight: 700; color: #1a1a1a; margin: 20px 0 10px; }
+
+  /* Problem box */
+  .problem-box { background: #fff8f0; border-left: 3px solid #f59e0b; border-radius: 0 8px 8px 0; padding: 16px 20px; margin-bottom: 16px; }
+  .problem-box .label { font-size: 11px; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .problem-box p { color: #451a03; font-size: 13px; }
+
+  /* Unchanged banner */
+  .unchanged-banner { background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 0 8px 8px 0; padding: 14px 20px; margin-bottom: 24px; display: flex; gap: 10px; align-items: flex-start; }
+  .unchanged-banner .icon { font-size: 16px; }
+  .unchanged-banner p { color: #1e3a8a; font-size: 13px; }
+
+  /* Architecture change */
+  .arch-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: center; margin-bottom: 16px; }
+  .arch-box { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; }
+  .arch-box .arch-title { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .arch-box.before { border-color: #fca5a5; }
+  .arch-box.after { border-color: #86efac; }
+  .arch-arrow { font-size: 20px; color: #888; text-align: center; }
+  .flow-item { font-size: 12px; color: #374151; padding: 3px 0; display: flex; align-items: flex-start; gap: 6px; }
+  .flow-item .dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .dot-red { background: #ef4444; }
+  .dot-green { background: #22c55e; }
+
+  /* mybatis import count table */
+  .count-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+  .count-table th { text-align: left; padding: 8px 12px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .count-table td { padding: 8px 12px; border: 1px solid #e5e5e5; color: #374151; text-align: center; }
+  .count-table td:first-child { text-align: left; font-weight: 600; }
+  .count-before-cell { color: #dc2626; font-weight: 700; }
+  .count-after-cell { color: #16a34a; font-weight: 700; }
+
+  /* Design core cards */
+  .design-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; padding: 16px 18px; margin-bottom: 12px; }
+  .design-card .design-tag { display: inline-block; font-size: 11px; font-weight: 700; background: #f3e8ff; color: #7e22ce; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px; }
+  .design-card p { font-size: 13px; color: #374151; }
+  .design-card p + p { margin-top: 6px; }
+
+  /* AC cards */
+  .ac-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+  .ac-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid #f0f0f0; }
+  .ac-check { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .ac-check.done { background: #dcfce7; color: #166534; }
+  .ac-num { font-size: 11px; font-weight: 700; color: #888; }
+  .ac-text { font-size: 13px; font-weight: 600; color: #1a1a1a; flex: 1; }
+  .ac-body { padding: 16px 18px; }
+  .ac-body p { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+
+  /* File change */
+  .file-change { margin-bottom: 16px; }
+  .file-name { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; background: #f3f4f6; color: #374151; padding: 5px 10px; border-radius: 4px 4px 0 0; border: 1px solid #e5e5e5; border-bottom: none; display: flex; justify-content: space-between; }
+  .diff-stat { color: #888; }
+  .code-block { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.7; background: #1e1e2e; color: #cdd6f4; padding: 14px 16px; border-radius: 0 0 6px 6px; overflow-x: auto; }
+  .code-line { display: flex; }
+  .line-num { color: #45475a; min-width: 28px; user-select: none; }
+  .line-add { background: rgba(166, 227, 161, 0.12); color: #a6e3a1; }
+  .line-del { background: rgba(243, 139, 168, 0.12); color: #f38ba8; }
+  .line-ctx { color: #cdd6f4; }
+  .line-prefix { min-width: 14px; }
+
+  /* Annotation */
+  .annotation { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-size: 12px; color: #78350f; display: flex; gap: 8px; }
+  .annotation-icon { font-size: 14px; flex-shrink: 0; }
+
+  /* Note list (implementation notes) */
+  .note-group { margin-bottom: 18px; }
+  .note-group h4 { font-size: 12px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+  .note-list { list-style: none; }
+  .note-item { font-size: 13px; color: #374151; padding: 8px 0; border-bottom: 1px solid #f0f0f0; }
+  .note-item:last-child { border-bottom: none; }
+  .note-item code { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; background: #f3f4f6; padding: 1px 5px; border-radius: 3px; }
+
+  /* Verify section */
+  .verify-list { list-style: none; }
+  .verify-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; }
+  .verify-item:last-child { border-bottom: none; }
+  .verify-num { width: 22px; height: 22px; background: #e8f0fe; color: #1a56db; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .verify-content { flex: 1; }
+  .verify-content strong { font-size: 13px; color: #1a1a1a; display: block; margin-bottom: 3px; }
+  .verify-content span { font-size: 12px; color: #6b7280; }
+
+  /* Scope table */
+  .scope-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .scope-table th { text-align: left; padding: 8px 12px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .scope-table td { padding: 10px 12px; border: 1px solid #e5e5e5; color: #374151; vertical-align: top; }
+  .scope-table tr:hover td { background: #f9fafb; }
+  .tag-new { font-size: 11px; font-weight: 600; background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 3px; }
+  .tag-changed { font-size: 11px; font-weight: 600; background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 3px; }
+  .tag-unchanged { font-size: 11px; font-weight: 600; background: #f3f4f6; color: #6b7280; padding: 2px 6px; border-radius: 3px; }
+  .scope-context { background: #f9fafb; font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="sprint-label">Sprint 13 Review</div>
+  <h1>#30 — Repository層をCatalog/Account/Orderへ展開し、<br>MyBatis Mapper直呼びを全廃する</h1>
+  <div class="meta">
+    <span class="badge badge-sprint">Sprint 13</span>
+    <span class="badge badge-issue">#30</span>
+    <span class="badge badge-refactor">refactor</span>
+    <span class="badge badge-backend">backend</span>
+  </div>
+
+  <div class="unchanged-banner">
+    <span class="icon">🔒</span>
+    <p><strong>内部リファクタのみで、API・エンドポイント・レスポンス形状・画面上の挙動は一切変わりません。</strong>今回の変更はサーバー内部の「データの取り出し方」の構造整理であり、ユーザーが操作する画面・API呼び出し結果はSprint 12以前と完全に同一です。</p>
+  </div>
+
+  <!-- Problem -->
+  <section>
+    <h2>なぜこの改修が必要だったか</h2>
+    <div class="problem-box">
+      <div class="label">問題</div>
+      <p>Cart機能（#29）ではすでに「Application ServiceはRepository（ドメイン層のインターフェース）経由でのみDBにアクセスする」という構造に是正済みだったが、Catalog（商品一覧・検索）・Account（会員情報）・Order（注文確定）の3機能はまだ、Application ServiceがMyBatisのMapper（DBアクセスの実装クラス）を直接呼び出す「ドリフト」状態のままだった。これは3層構造の依存性逆転の原則に反しており、DB非依存の単体テストが書きにくい・DBの実装詳細（Entity）が上位層に漏れる、という保守性の課題があった。</p>
+    </div>
+    <div class="arch-grid">
+      <div class="arch-box before">
+        <div class="arch-title">改修前</div>
+        <div class="flow-item"><span class="dot dot-red"></span>CatalogApplicationService → CatalogCustomMapper（直呼び）</div>
+        <div class="flow-item"><span class="dot dot-red"></span>AccountApplicationService → AccountContactCustomMapper（直呼び）</div>
+        <div class="flow-item"><span class="dot dot-red"></span>OrderApplicationService → Cart/Order/Inventory 3種のMapper（直呼び）</div>
+        <div class="flow-item"><span class="dot dot-red"></span>DBの行(Entity)がApplication層に漏れていた</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-box after">
+        <div class="arch-title">改修後</div>
+        <div class="flow-item"><span class="dot dot-green"></span>CatalogApplicationService → CatalogRepository（インターフェース）</div>
+        <div class="flow-item"><span class="dot dot-green"></span>AccountApplicationService → AccountRepository（インターフェース）</div>
+        <div class="flow-item"><span class="dot dot-green"></span>OrderApplicationService → Cart/Order/Inventory 3種のRepository</div>
+        <div class="flow-item"><span class="dot dot-green"></span>DB変換はRepository実装内に閉じ、Application層は業務モデルのみ扱う</div>
+      </div>
+    </div>
+
+    <h3>grep結果（Application層の infrastructure.mybatis import 件数・AC3）</h3>
+    <table class="count-table">
+      <tr><th>Application Service</th><th>改修前</th><th>改修後</th></tr>
+      <tr><td>OrderApplicationService</td><td class="count-before-cell">8件</td><td class="count-after-cell">0件</td></tr>
+      <tr><td>CatalogApplicationService</td><td class="count-before-cell">5件</td><td class="count-after-cell">0件</td></tr>
+      <tr><td>AccountApplicationService</td><td class="count-before-cell">2件</td><td class="count-after-cell">0件</td></tr>
+      <tr><td>CartApplicationService（#29で対応済）</td><td class="count-before-cell">0件</td><td class="count-after-cell">0件</td></tr>
+      <tr><td>AuthApplicationService（対象外・元々drift無し）</td><td class="count-before-cell">0件</td><td class="count-after-cell">0件</td></tr>
+    </table>
+  </section>
+
+  <!-- Design core -->
+  <section>
+    <h2>設計の核心（実装前にユーザー承認済みの3つの判断）</h2>
+
+    <div class="design-card">
+      <span class="design-tag">Q1 — Orderをどこまで「リッチな集約」にするか</span>
+      <p><strong>案A（採用）: Orderは薄い書込み用データ（<code>NewOrder</code>/<code>OrderLine</code>）にとどめ、リッチな集約クラスは作らない。</strong></p>
+      <p>#8で確立した並行処理の保証（トランザクション境界・item_id昇順の固定順ループ・在庫のガード付き減算・カート全クリア・成功/失敗の監査記録）は、DBトランザクションの都合が強い処理であり、Cartのような「1商品ごとの業務ルール」とは性質が異なる。そのため、これらのオーケストレーション（段取り）は引き続き <code>OrderApplicationService</code> に残し、Repositoryは「1回のSQL文をそのまま実行するだけ」の薄い役割に徹した。</p>
+    </div>
+
+    <div class="design-card">
+      <span class="design-tag">Q2 — Repositoryの命名を統一</span>
+      <p><strong>読み取り専用・書き込み用を問わず、すべて「〜Repository」という名前に統一する（<code>〜Query</code>という名前は使わない）。</strong></p>
+      <p>Catalog/Accountのような読み取り専用の機能も、内部の動き方（DBの行データをそのまま返すのではなく、画面表示用のオブジェクトに変換して返す）は変えず、名前だけをCart/Orderと揃えることで、今後このコードを読む人が迷わないようにした。</p>
+    </div>
+
+    <div class="design-card">
+      <span class="design-tag">Q3 — 在庫の減算を独立した専用インターフェースに</span>
+      <p><strong>新規に <code>domain/inventory/InventoryRepository</code> を作り、在庫減算だけを担当させる。</strong></p>
+      <p>在庫の減算はOrderの一部のように見えるが、実際には「Orderとは別の関心事（在庫管理）」であるため、独立したRepositoryとして切り出した。</p>
+    </div>
+  </section>
+
+  <!-- AC breakdown -->
+  <section>
+    <h2>AC別 実装内容</h2>
+
+    <!-- AC1 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC1</div>
+        <div class="ac-text">Catalog/Account/Orderの各Application ServiceがRepository（インターフェース）のみを注入し、Mapper/Entityのimport・注入が消える</div>
+      </div>
+      <div class="ac-body">
+        <p>もっとも小規模なAccountを例に示す。コンストラクタで受け取るのが「DBアクセスの実装クラス（Mapper）」から「業務上のインターフェース（Repository）」に変わっている。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>application/service/AccountApplicationService.java</span>
+            <span class="diff-stat">+7 / -21</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-del"><span class="line-num">21</span><span class="line-prefix">-</span><span>  private final AccountContactCustomMapper accountContactCustomMapper;</span></div>
+            <div class="code-line line-add"><span class="line-num">21</span><span class="line-prefix">+</span><span>  private final AccountRepository accountRepository;</span></div>
+            <div class="code-line line-ctx"><span class="line-num">22</span><span class="line-prefix"> </span><span>  private final CurrentUserProvider currentUserProvider;</span></div>
+            <div class="code-line line-ctx"><span class="line-num">23</span><span class="line-prefix"> </span><span></span></div>
+            <div class="code-line line-ctx"><span class="line-num">24</span><span class="line-prefix"> </span><span>  public AccountApplicationService(</span></div>
+            <div class="code-line line-del"><span class="line-num">25</span><span class="line-prefix">-</span><span>      AccountContactCustomMapper accountContactCustomMapper,</span></div>
+            <div class="code-line line-del"><span class="line-num">26</span><span class="line-prefix">-</span><span>      CurrentUserProvider currentUserProvider) {</span></div>
+            <div class="code-line line-add"><span class="line-num">25</span><span class="line-prefix">+</span><span>      AccountRepository accountRepository, CurrentUserProvider currentUserProvider) {</span></div>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>application/service/AccountApplicationService.java（getMyContactメソッド）</span>
+            <span class="diff-stat">+3 / -17</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">40</span><span class="line-prefix"> </span><span>    Long userId = currentUserProvider.requireCurrentUser().userId();</span></div>
+            <div class="code-line line-del"><span class="line-num">41</span><span class="line-prefix">-</span><span>    AccountContactCustomEntity entity = accountContactCustomMapper.findByUserId(userId);</span></div>
+            <div class="code-line line-del"><span class="line-num">42</span><span class="line-prefix">-</span><span>    if (entity == null) {</span></div>
+            <div class="code-line line-del"><span class="line-num">43</span><span class="line-prefix">-</span><span>      throw new ResourceNotFoundException("Account not found");</span></div>
+            <div class="code-line line-del"><span class="line-num">44</span><span class="line-prefix">-</span><span>    }</span></div>
+            <div class="code-line line-del"><span class="line-num">45</span><span class="line-prefix">-</span><span>    return toAccountContact(entity);</span></div>
+            <div class="code-line line-del"><span class="line-num">46</span><span class="line-prefix">-</span><span>    // ...（変換用privateメソッドtoAccountContactも削除）</span></div>
+            <div class="code-line line-add"><span class="line-num">41</span><span class="line-prefix">+</span><span>    return accountRepository</span></div>
+            <div class="code-line line-add"><span class="line-num">42</span><span class="line-prefix">+</span><span>        .findContactByUserId(userId)</span></div>
+            <div class="code-line line-add"><span class="line-num">43</span><span class="line-prefix">+</span><span>        .orElseThrow(() -&gt; new ResourceNotFoundException("Account not found"));</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>DBの行データ（Entity）から画面用オブジェクトへの変換処理（旧<code>toAccountContact</code>）はApplication Serviceから削除し、Repository実装側へ丸ごと移設した。同様の書き換えをOrder/Catalogにも適用した。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC2 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC2</div>
+        <div class="ac-text">各Repository実装は infrastructure.mybatis.* に置かれ、DBの行データ→業務モデルへの変換を内包する</div>
+      </div>
+      <div class="ac-body">
+        <p>新規作成した <code>MyBatisCatalogRepository</code>（カタログ用）を例に示す。DBの行データ（<code>CategoryCustomEntity</code>等）を扱うのはこのクラスの中だけで、外部（Application Service）へは業務モデル（<code>Category</code>等）しか渡さない。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>infrastructure/mybatis/catalog/MyBatisCatalogRepository.java（新規）</span>
+            <span class="diff-stat">127行</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">34</span><span class="line-prefix"> </span><span>  @Override</span></div>
+            <div class="code-line line-ctx"><span class="line-num">35</span><span class="line-prefix"> </span><span>  public List&lt;Category&gt; listCategories() {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">36</span><span class="line-prefix"> </span><span>    return catalogCustomMapper.selectAllCategories().stream().map(this::toCategory).toList();</span></div>
+            <div class="code-line line-ctx"><span class="line-num">37</span><span class="line-prefix"> </span><span>  }</span></div>
+            <div class="code-line line-ctx"><span class="line-num">...</span><span class="line-prefix"> </span><span></span></div>
+            <div class="code-line line-ctx"><span class="line-num">99</span><span class="line-prefix"> </span><span>  private Category toCategory(CategoryCustomEntity entity) {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">100</span><span class="line-prefix"> </span><span>    return new Category(entity.getCategoryId(), entity.getName(), entity.getDescription());</span></div>
+            <div class="code-line line-ctx"><span class="line-num">101</span><span class="line-prefix"> </span><span>  }</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>在庫ステータス（在庫あり/残少/在庫切れ）の判定ロジック（<code>StockStatusCalculator.of</code>）もこのクラス内に閉じており、実際の在庫数（qty）そのものはApplication層より上には一切渡らない（在庫数非露出の方針を維持）。</span>
+          </div>
+        </div>
+        <table class="scope-table" style="margin-top:12px;">
+          <tr><th>context</th><th>新規Repositoryインターフェース</th><th>新規実装クラス</th></tr>
+          <tr><td>Account</td><td><code>domain/account/AccountRepository</code></td><td><code>infrastructure/mybatis/account/MyBatisAccountRepository</code></td></tr>
+          <tr><td>Catalog</td><td><code>domain/catalog/CatalogRepository</code></td><td><code>infrastructure/mybatis/catalog/MyBatisCatalogRepository</code></td></tr>
+          <tr><td>Order</td><td><code>domain/order/OrderRepository</code>＋<code>domain/inventory/InventoryRepository</code></td><td><code>infrastructure/mybatis/order/MyBatisOrderRepository</code>＋<code>infrastructure/mybatis/inventory/MyBatisInventoryRepository</code></td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- AC3 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC3</div>
+        <div class="ac-text">Application層に infrastructure.mybatis への依存が残っていないことをgrepで確認（Auth除く全Serviceで0件）</div>
+      </div>
+      <div class="ac-body">
+        <p>「なぜこの改修が必要だったか」セクションのgrep結果表のとおり、Order/Catalog/Accountいずれも0件を達成。Auth（<code>AuthApplicationService</code>）はもともとMapper/Entityに依存しておらず対象外（drift無しのため今回は変更していない）。</p>
+      </div>
+    </div>
+
+    <!-- AC4 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC4</div>
+        <div class="ac-text">各ServiceのDB非依存な単体テスト(Spock)を新設・書換し、既存の統合テストはグリーン維持</div>
+      </div>
+      <div class="ac-body">
+        <p>Catalogは元々サービス単体テストが存在しなかったため、<code>CatalogApplicationServiceSpec</code>を新規作成した（親カテゴリ/商品が存在しない場合に以降のクエリを一切呼ばないこと・空キーワード検索の短絡・注文可否判定の5分岐、をDB接続なしで固定）。Order/Accountは既存の単体テストをMapperモックからRepositoryモックへ全面書き換えした。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>application/service/CatalogApplicationServiceSpec.groovy（新規）</span>
+            <span class="diff-stat">234行・17テストケース</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num"></span><span class="line-prefix"> </span><span>def "listProductsByCategory: カテゴリが存在しなければResourceNotFoundExceptionで一覧/件数クエリは呼ばない"()</span></div>
+            <div class="code-line line-ctx"><span class="line-num"></span><span class="line-prefix"> </span><span>def "searchProducts: 空キーワードは空Pageへ短絡しrepositoryへ一切問い合わせない"()</span></div>
+            <div class="code-line line-ctx"><span class="line-num"></span><span class="line-prefix"> </span><span>def "checkOrderable: quantity=#quantity, stock=#stockQuantity =&gt; orderable=#expectedOrderable, ..."()</span></div>
+          </div>
+        </div>
+        <table class="scope-table" style="margin-top:12px;">
+          <tr><th>context</th><th>新規/書換テスト</th></tr>
+          <tr><td>Account</td><td><code>AccountApplicationServiceSpec</code>（書換）・<code>MyBatisAccountRepositorySpec</code>（新規）</td></tr>
+          <tr><td>Catalog</td><td><code>CatalogApplicationServiceSpec</code>（新規）・<code>MyBatisCatalogRepositorySpec</code>（新規）</td></tr>
+          <tr><td>Order</td><td><code>OrderApplicationServiceSpec</code>（書換）・<code>MyBatisOrderRepositorySpec</code>／<code>MyBatisInventoryRepositorySpec</code>（新規）・<code>MyBatisCartRepositorySpec</code>（clearItemsケース追加）</td></tr>
+        </table>
+        <div class="annotation">
+          <span class="annotation-icon">💡</span>
+          <span>既存の統合テスト（実DBを使ったテスト。<code>CatalogControllerSpec</code>/<code>CatalogCustomMapperSpec</code>/<code>AccountControllerSpec</code>/<code>AccountContactCustomMapperSpec</code>/<code>OrderControllerSpec</code>/<code>InventoryCustomMapperSpec</code>/<code>CartCustomMapperSpec</code>/<code>CartControllerSpec</code>）は一切変更せず、すべてグリーンのまま維持した。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC5 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC5</div>
+        <div class="ac-text">3観点（規約/セキュリティ/パフォーマンス）レビュークリーン・挙動退行なし</div>
+      </div>
+      <div class="ac-body">
+        <p>規約・セキュリティ・パフォーマンスの3観点レビューはいずれも指摘なしでクリアした。特にOrder（注文確定）は#8で確立した「二重発注しても在庫を売り越さない」並行処理の保証を壊していないかが最大の焦点だったが、実装レビューおよび退行ガードとなる統合テスト（<code>OrderConcurrencyIntegrationSpec</code>）がグリーンであることを確認した。</p>
+        <div class="annotation">
+          <span class="annotation-icon">💡</span>
+          <span><strong>Order: クエリ数の純増なし。</strong>Sprint 12（Cart PoC）では、Repository化の際に「識別子解決用の読み取り」と「最終応答用の読み取り」を誤って同じ全件読み込みメソッドで済ませてしまい、書込み操作あたりのクエリ数が増えてしまう問題が発生した。今回のOrderでは、既存の<code>ensureCart</code>（cartIdだけを解決・明細は読まない）と<code>findByCartId</code>（明細を読む）を分けて再利用することで、この教訓を踏まえてクエリ数を増やさずに実装した。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC6 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC6</div>
+        <div class="ac-text">規模に応じてbounded context単位（Catalog/Account/Order）で子Issueに分割してよい</div>
+      </div>
+      <div class="ac-body">
+        <p>2026-08-17のユーザー判断により、子Issueへ分割せず、Catalog・Account・Orderの3つをSprint 13でまとめて一括実施した。実装順は影響範囲の小さい順（Account→Catalog→Order）とし、コミットもcontextごとに3つに分けることでレビューしやすさを確保した。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Implementation notes -->
+  <section>
+    <h2>実装メモ（仕様外の判断・変更・妥協点）</h2>
+
+    <div class="note-group">
+      <h4>共通</h4>
+      <ul class="note-list">
+        <li class="note-item">Entity→業務モデルの変換処理は、Cart（#29）の<code>CartConverter</code>のような独立クラスを新設せず、各<code>MyBatisXxxRepository</code>クラス内のprivateメソッドに閉じた。Account/Catalogはいずれも単一のEntity種別からの変換のみで、Cartのように複数のEntity種別を組み合わせる複雑さが無いため、独立クラスを起こす動機が薄いと判断した。</li>
+      </ul>
+    </div>
+
+    <div class="note-group">
+      <h4>Account</h4>
+      <ul class="note-list">
+        <li class="note-item"><code>AccountRepository#findContactByUserId</code>は「該当行なし」を<code>Optional.empty()</code>で表現し、404エラーへの変換判断はApplication Service側に残した（Cartの<code>findStock</code>と同じ方針）。</li>
+      </ul>
+    </div>
+
+    <div class="note-group">
+      <h4>Catalog</h4>
+      <ul class="note-list">
+        <li class="note-item">在庫の生数量（qty）が必要な「注文可否判定」専用に<code>ItemStock</code>（itemId・stockQuantityのみを持つ小さなオブジェクト）を新設した。商品詳細（<code>ItemDetail</code>）・在庫アイテム一覧（<code>ItemSummary</code>）は引き続き在庫ステータス（在庫あり/残少/在庫切れ）のみを持ち、生数量は持たない（在庫数を外部に出さない方針は維持）。</li>
+        <li class="note-item">商品詳細取得用と注文可否判定用は同じDBの1行を見に行くが別々のメソッドとして分けた。両方が同じ画面操作の中で同時に呼ばれることはないため、クエリ数が増えることはない。</li>
+      </ul>
+    </div>
+
+    <div class="note-group">
+      <h4>Order（最重要）</h4>
+      <ul class="note-list">
+        <li class="note-item"><code>CartRepository</code>に<code>clearItems</code>（カートを空にする処理）を追加した。実装は既存のMapper呼び出しへそのまま委譲しているだけで、Order確定処理は既存の<code>ensureCart</code>/<code>findByCartId</code>をそのまま再利用している。カート明細が「item_idの昇順」で返ってくる既存の並び順（二重発注を防ぐ固定順ループの前提）が、これらのメソッド経由でも保持されることを実装時に再確認した。</li>
+        <li class="note-item">在庫減算後の「0件=在庫不足」判定（<code>AffectedRows.requireUpdated</code>）は、計画どおりApplication Service側に残した。これは「在庫が足りない時にどう振る舞うか」という業務判断であり、Repository側の関心事ではないため。</li>
+        <li class="note-item">DBの作成者/更新者記録（監査カラム）の解決は、Cart（#29）と同じ方針でRepository実装側（<code>MyBatisOrderRepository</code>/<code>MyBatisInventoryRepository</code>）が自己解決する形にした。</li>
+      </ul>
+    </div>
+
+    <div class="note-group">
+      <h4>実装中に気づいたこと</h4>
+      <ul class="note-list">
+        <li class="note-item">テストコード（Spock）で、同じメソッド呼び出しに対して「戻り値の指定」と「呼ばれたことの検証」を別々のブロックに分けて書くと、戻り値の指定が無視されてしまう既知の落とし穴（Sprint 11・12でも発生）に、Catalogのテストで3回目に遭遇した。1つのブロックにまとめる形で解消し、backend-conventionsに記録済みのパターンに沿って対処した。</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- Verify -->
+  <section>
+    <h2>動作確認ポイント（ユーザー確認用）</h2>
+    <ul class="verify-list">
+      <li class="verify-item">
+        <div class="verify-num">1</div>
+        <div class="verify-content">
+          <strong>商品カテゴリ一覧・商品検索・商品詳細画面がこれまでどおり表示されること</strong>
+          <span>内部の実装だけが変わっており、画面の見た目・表示内容は改修前と完全に同じになるはず</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">2</div>
+        <div class="verify-content">
+          <strong>会員情報（マイページ等）の氏名・住所表示がこれまでどおりであること</strong>
+          <span>存在しないアカウントにアクセスした場合のエラー表示（404）も変わらないはず</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">3</div>
+        <div class="verify-content">
+          <strong>カートから注文確定までの一連の操作が正常に完了すること</strong>
+          <span>注文完了後にカートが空になること、注文履歴に正しい合計金額が表示されることを確認</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">4</div>
+        <div class="verify-content">
+          <strong>（可能であれば）在庫が少ない商品を複数タブから同時に注文し、在庫が売り越されないこと</strong>
+          <span>今回最も注意した「二重発注で在庫がマイナスにならない」保証が壊れていないかの最終確認。自動テスト（<code>OrderConcurrencyIntegrationSpec</code>）では確認済みだが、目視でも問題なければ安心材料になる</span>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- Scope -->
+  <section>
+    <h2>改修スコープ確認（24ファイル）</h2>
+    <table class="scope-table">
+      <tr><th>ファイル</th><th>変更</th><th>内容</th></tr>
+
+      <tr><td colspan="3" class="scope-context">Account</td></tr>
+      <tr><td><code>domain/account/AccountRepository.java</code></td><td><span class="tag-new">新規</span></td><td>Repositoryインターフェース</td></tr>
+      <tr><td><code>infrastructure/mybatis/account/MyBatisAccountRepository.java</code></td><td><span class="tag-new">新規</span></td><td>MyBatis実装</td></tr>
+      <tr><td><code>application/service/AccountApplicationService.java</code></td><td><span class="tag-changed">変更あり</span></td><td>Mapper直呼び→Repository経由</td></tr>
+      <tr><td><code>.../AccountApplicationServiceSpec.groovy</code></td><td><span class="tag-changed">変更あり</span></td><td>モック対象をMapper→Repositoryへ</td></tr>
+      <tr><td><code>.../MyBatisAccountRepositorySpec.groovy</code></td><td><span class="tag-new">新規</span></td><td>Repository実装の単体テスト</td></tr>
+
+      <tr><td colspan="3" class="scope-context">Catalog</td></tr>
+      <tr><td><code>domain/catalog/CatalogRepository.java</code></td><td><span class="tag-new">新規</span></td><td>Repositoryインターフェース</td></tr>
+      <tr><td><code>domain/catalog/ItemStock.java</code></td><td><span class="tag-new">新規</span></td><td>注文可否判定専用の生在庫数量モデル</td></tr>
+      <tr><td><code>infrastructure/mybatis/catalog/MyBatisCatalogRepository.java</code></td><td><span class="tag-new">新規</span></td><td>MyBatis実装</td></tr>
+      <tr><td><code>application/service/CatalogApplicationService.java</code></td><td><span class="tag-changed">変更あり</span></td><td>Mapper直呼び→Repository経由</td></tr>
+      <tr><td><code>.../CatalogApplicationServiceSpec.groovy</code></td><td><span class="tag-new">新規</span></td><td>サービス単体テスト（元々存在せず）</td></tr>
+      <tr><td><code>.../MyBatisCatalogRepositorySpec.groovy</code></td><td><span class="tag-new">新規</span></td><td>Repository実装の単体テスト</td></tr>
+
+      <tr><td colspan="3" class="scope-context">Order（+Cart拡張）</td></tr>
+      <tr><td><code>domain/order/OrderRepository.java</code></td><td><span class="tag-new">新規</span></td><td>Repositoryインターフェース</td></tr>
+      <tr><td><code>domain/order/NewOrder.java</code></td><td><span class="tag-new">新規</span></td><td>注文ヘッダ書込み用の最小データ</td></tr>
+      <tr><td><code>domain/order/OrderLine.java</code></td><td><span class="tag-new">新規</span></td><td>注文明細1行分の書込み用データ</td></tr>
+      <tr><td><code>domain/inventory/InventoryRepository.java</code></td><td><span class="tag-new">新規</span></td><td>在庫減算専用のRepositoryインターフェース</td></tr>
+      <tr><td><code>infrastructure/mybatis/order/MyBatisOrderRepository.java</code></td><td><span class="tag-new">新規</span></td><td>MyBatis実装</td></tr>
+      <tr><td><code>infrastructure/mybatis/inventory/MyBatisInventoryRepository.java</code></td><td><span class="tag-new">新規</span></td><td>MyBatis実装</td></tr>
+      <tr><td><code>domain/cart/CartRepository.java</code></td><td><span class="tag-changed">変更あり</span></td><td><code>clearItems</code>メソッド追加</td></tr>
+      <tr><td><code>infrastructure/mybatis/cart/MyBatisCartRepository.java</code></td><td><span class="tag-changed">変更あり</span></td><td><code>clearItems</code>の実装追加</td></tr>
+      <tr><td><code>application/service/OrderApplicationService.java</code></td><td><span class="tag-changed">変更あり</span></td><td>3種のMapper直呼び→3種のRepository経由（並行処理の保証は維持）</td></tr>
+      <tr><td><code>.../OrderApplicationServiceSpec.groovy</code></td><td><span class="tag-changed">変更あり</span></td><td>モック対象を3 Mapper→3 Repositoryへ</td></tr>
+      <tr><td><code>.../MyBatisOrderRepositorySpec.groovy</code></td><td><span class="tag-new">新規</span></td><td>Repository実装の単体テスト</td></tr>
+      <tr><td><code>.../MyBatisInventoryRepositorySpec.groovy</code></td><td><span class="tag-new">新規</span></td><td>Repository実装の単体テスト</td></tr>
+      <tr><td><code>.../MyBatisCartRepositorySpec.groovy</code></td><td><span class="tag-changed">変更あり</span></td><td><code>clearItems</code>のテストケース追加</td></tr>
+
+      <tr><td colspan="3" class="scope-context">変更していないもの</td></tr>
+      <tr><td>各<code>*CustomMapper</code>・XMLマッパー定義</td><td><span class="tag-unchanged">変更なし</span></td><td>SQL自体は既存のまま。Repositoryが委譲するだけ</td></tr>
+      <tr><td>API・エンドポイント・レスポンスDTO</td><td><span class="tag-unchanged">変更なし</span></td><td>フロントエンドから見た挙動は完全に同一</td></tr>
+      <tr><td>SecurityConfig・データベーススキーマ</td><td><span class="tag-unchanged">変更なし</span></td><td>認可・DB構造への影響なし</td></tr>
+      <tr><td>AuthApplicationService（認証）</td><td><span class="tag-unchanged">変更なし</span></td><td>元々Mapper/Entityに依存しておらず対象外</td></tr>
+    </table>
+  </section>
+
+</div>
+</body>
+</html>

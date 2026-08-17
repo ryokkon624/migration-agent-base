@@ -1,11 +1,11 @@
 # SM 短期記憶（今スプリント）
 
-Sprint 12（#29 [E6] Cart を参照実装に Repository 層導入＋集約化＝refactor・SP5・backend 単一 repo）完了。次スプリント開始時にリセット済み。
+Sprint 13（#30 Repository 層を Catalog/Account/Order へ展開＝refactor・SP8・backend 単一 repo）完了。次スプリント開始時にリセット済み。
 
-- 実装: 新規ブランチ `refactor/29-cart-repository-poc`（backend 単一・database ノータッチ）。jpetstore-backend **初の Repository 層導入**（`domain.cart.CartRepository`＋`infrastructure.mybatis.cart.MyBatisCartRepository`＋`CartConverter`）。`Cart`/`CartItem` を record→class 化（`reconstruct()`＋不変条件コマンドメソッド）、`CartApplicationService` は Repository のみ注入で `infrastructure.*` 依存消滅。API・挙動不変・ID-28 型強制。
-- 確定した設計（#30 先例テンプレ）: **D1=案A**（単一 rich 型・射影アクセサで stockQuantity 非露出）／**D2=案A**（細粒度 `upsertItem`/`removeItem`＋`findStock`）／**D3**（`findStock` 別解決で #28 バッチ化 seam）。設計方針は memory 合意済のため SM 計画前先出し AskUserQuestion は投げず、DEV 計画報告後に D1/D2 を確定（2段階の後段主体・初出）。
-- **品質ハイライト**: 3観点 reviewer 全員クリア（初回 conv/sec、perf は reviewer「指摘なし」）だが、**SM verification（コア7ファイル精読）が perf 純増を独立発見**＝カート書込4操作が `findByUserId` を2回呼び（+2クエリ/操作・冒頭 items 未使用・`ensureCart` 二重）。ユーザー承認で是正（`ensureCart`/`findByCartId` 分離→baseline クエリ数 addItem4/updateItem4/removeItem3/merge2+2N/viewCart2）→delta 3観点再レビュー全員クリア。
-- PR: backend **#11**（closes #29）→ **マージ済**（merge commit 2f7ec9e）。Issue #29 自動クローズ。Sprint Review 指摘なし（「問題ありません」）。
-- Retro 完了（SM/DEV/PO）。Skills 更新: **SM=変更なし**（2回ルールで long_term 止まり・Sprint3/7/9/11 同型）／DEV=`backend-conventions §9` に2点（Spock then優先の2回ルール昇格／#29 PoC 実装パターン3点を #30 先例テンプレとして即時反映）／PO=質問傾向2件追記（傾向1=既昇格3件目・傾向2=リファクタ起票時の実コード未裏取り初出）・意思決定ログ7件。長期記憶反映済。
-- agent-base 成果物: レトロ完了後にブランチ切ってコミット＆PR＆マージ（ユーザー指示・**実施中**）。
-- **次スプリント候補**: #30（Repository 層 全体展開・Catalog/Account/Order・Ready/SP8・#29 完了で着手可）＝#29 の2方針を先例テンプレに踏襲。または E3 継続 #9/#10（注文照会・履歴）。PO TODO: #30 Refinement 時に #29 の先例2方針を AC/備考へ反映＋リファクタ起票時の実コード裏取り（傾向2 監視）。
+- 実装: 新規ブランチ `refactor/30-repository-rollout`（3コミット・24ファイル・database ノータッチ）。#29 テンプレを Catalog/Account/Order へ横展開し **Mapper 直呼び全廃**（Application 層の `infrastructure.mybatis` import：Order 8→0/Catalog 5→0/Account 2→0・Auth 除く全 Service 0 件）。Repository 移行は #29+#30 で完了。
+- 確定した設計（ユーザー承認）: **Q1=案A**（Order は rich 集約化せず #8 並行オーケストレーションを Application 残置・最小 write record `NewOrder`/`OrderLine`）／**Q2=統一 `...Repository` 命名**（read も Repository・意味論は CQRS 射影のまま・ユーザーオーバーライド）／**Q3=新規 `domain/inventory`**。O3=`CartRepository#clearItems` 追加・Order は `ensureCart`/`findByCartId`（ORDER BY item_id）再利用。
+- **品質ハイライト**: 3観点 reviewer 全員クリア＋**SM verification（Order/Catalog/Account 精読）も全クリーン**。#29 と違い SM も perf 純増を検出せず＝**DEV が Sprint12 教訓（findByCartId 再利用でクエリ数純増回避）を自発適用**＋#29 テンプレ無改造横展開（C2 実効性検証成功）。#8 並行保証維持・ID-28 非露出・IDOR 安全を確認。
+- PR: backend **#12**（closes #30）→ **マージ済**（merge commit b95159b）。Issue #30 自動クローズ。Sprint Review 指摘なし（「OK」）。
+- Retro 完了（SM/DEV/PO）。Skills 更新: **SM=`scrum-master-workflow` に step 12 追記**（agent-base 毎スプリントコミット標準化・ユーザー指示）／DEV=`backend-conventions §9` に「書込集約の適用範囲（rich 集約 vs 薄い書込 record・Cart/Order の判断軸）」追記・Spock 罠3回目は §9 昇格済で棚卸し／PO=質問傾向引用追記（判断委譲3件目・先例規約未定義4/5件目）。長期記憶反映済。
+- agent-base 成果物: **step 12 に沿ってブランチ切ってコミット＆PR＆マージ（実施中）**。
+- **次スプリント候補**: E3 継続 **#9/#10（注文照会・履歴一覧・詳細閲覧）**。#8 の注文ドメイン基盤（`OrderRepository`/t_order/t_order_line）を再利用。**IDOR 対策（プリンシパル基準・not-owned/not-found 同一応答＝ID-4/SBD-8）が中核**。Repository 移行完了により**新規 Story は最初から Repository 経由**（運用ルール）＝#9/#10 Refinement 時に AC/備考へ反映（PO 申し送り済）。

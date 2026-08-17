@@ -1,8 +1,8 @@
 # PO 短期記憶（今スプリント）
 
-## Sprint 12 Retro（2026-08-17）で棚卸し済み
+## Sprint 13 Retro（2026-08-17）で棚卸し済み
 
-Sprint 11 Retro以降の文脈（2026-08-17の#28〜30 Repository層リファクタRefinement〔実コードでのdrift実態確認・4決定〕、およびSprint12計画フェーズ〔#29 Cart Repository PoC〕でのDEV確認2件〔D1集約の型戦略・D2 Repository書込メソッド粒度〕）はSprint 12 Retroで棚卸し済み。要点は `memory/po/long_term.md`（質問傾向へSprint12セクション追記〔傾向1「先例規約未定義」＝Sprint5#24・Sprint6#1に続く3件目の再発・既存チェックリスト項目の引用リストへ追記／傾向2「リファクタ/是正Story起票時のスコープ実コード未裏取り」＝初出・傾向記録に留める〕・意思決定ログ7件追記〔#28〜30 Refinement4決定＋#29 D1/D2の2決定〕）に反映済み。
+Sprint 12 Retro以降の文脈（Sprint13計画フェーズ〔#30 Repository層全展開〕でのDEV確認3件〔Q1 Order集約 vs orchestration・Q2 read/write Repository命名統一・Q3 InventoryRepositoryのパッケージ配置〕）はSprint 13 Retroで棚卸し済み。要点は `memory/po/long_term.md`（質問傾向へSprint13セクション追記〔傾向1「architecture-conventionsのPO判断委譲パターン」＝Sprint6#1・Sprint8#4に続く3件目の再発〔Q1〕／傾向2「先例規約未定義」＝Sprint5#24・Sprint6#1・Sprint12#29に続く4件目・5件目の再発〔Q2・Q3〕・いずれも既存チェックリスト項目の引用リストへ追記のみで再昇格なし〕・意思決定ログ3件追記〔Q1〜Q3〕）に反映済み。Q2のユーザーオーバーライド（統一Repository命名）は独立傾向化しない方針とした。
 
 ### 未解決の判断事項
 
@@ -16,15 +16,17 @@ Sprint 11 Retro以降の文脈（2026-08-17の#28〜30 Repository層リファク
 - #4のAC5/AC-neg1または備考へ、未ログインカートの在庫上限検証手段（`GET /api/items/{itemId}/orderable?quantity=N`・qty非露出維持）を次回Refinementでユーザーに確認のうえ反映する（Sprint8計画フェーズD1で決定）。
 - #4のAC3備考へ、カート画面ルートが公開（`meta.requiresAuth`なし）・認証必須は`/api/cart/**` APIのみである旨を次回Refinementでユーザーに確認のうえ反映する（Sprint8計画フェーズD2で決定）。
 - #29のAC1/備考へ、Sprint12計画フェーズで確定したD1（集約の型戦略＝単一rich型・`stockQuantity`はprivate内部保持＋外向きは射影アクセサのみ公開）・D2（Repository書込メソッド粒度＝細粒度`upsertItem`/`removeItem`をドメイン語彙メソッドで残す）を反映するかは次回Refinementでユーザーに確認のうえ判断する。
+- #30のAC/方針欄へ、Sprint13計画フェーズで確定したQ1（Order集約=richな集約を新設せず#8のorchestrationをOrderApplicationServiceに残す。方針欄「#29の集約パターンに準拠」の文言を是正）・Q2（read/write Repositoryは統一`...Repository`命名。`...Query`分離は不採用）・Q3（`InventoryRepository`は新規`domain/inventory`パッケージ）を反映するかは次回Refinementでユーザーに確認のうえ判断する。
 
 ### 次回PO稼働時のTODO
 
 - 残りの Ready昇格＋SP付与: #13〜#17（E4）＋#26（E6依存版currency）。#27（refactor・SP1・Draft）はスプリント差し込み時にReady昇格。**#13〜17（E4）Refinement 時は「新規 Story は Repository 経由で実装」の運用ルール（2026-08-17決定）を各 Issue の AC/備考に反映すること。**
+- E3継続（#9/#10 注文照会・履歴）が次スプリント候補。#29/#30でRepository層全展開が完了したため、**#9/#10 Refinement時も「新規StoryはRepository経由で実装」の運用ルール（2026-08-17決定）をAC/備考に反映すること。**
 - #30のRefinement時、#29計画フェーズで確定した先例規約2点（集約の型戦略＝単一rich型・`stockQuantity`はprivate内部保持＋外向きは射影アクセサのみ公開／Repository書込メソッド粒度＝細粒度`upsertItem`/`removeItem`をドメイン語彙メソッドで残す）をAC/備考に反映できないか確認する。
 - 確認メール（#8備考）の将来Feature化（Issue起票 or ドロップ）の判断。
 - #23のAC/備考へ、Sprint2質問ログで判明した5観点（スコープ境界・実証手段・監査ログ範囲・秘密管理・他repo連携）を反映（着手可否含め次回Refinementで判断）。
-- 振る舞いを変える新判断が出たら都度 `spec/intended-diff-ledger.md` への追記要否を判定する（Sprint6はID-28、Sprint7はID-29、Sprint8はID-19具体化、Sprint10はID-30を追記済み・Sprint9は追記なし〔SBD-2/17は既存維持項目のため台帳対象外と判定〕・Sprint11はID-22の説明強化のみ追記〔新規差分IDの追加なし〕・Sprint12は台帳追記なし〔#28〜30/D1/D2はいずれもAPI仕様・レスポンス形状に影響しない内部実装リファクタと判定〕）。
-- architecture-conventionsのPO判断委譲パターン（§3.1区分値のm_code採用・§4.3更新系エンティティのversion列）は2セクションで再発しチェックリストへ正式昇格済み（Sprint8 Retro）。architecture-conventions文書自体の一般原則firmup（個別確認を減らす明文化）要否は、さらなる再発またはユーザーとの次回接点で判断する。
+- 振る舞いを変える新判断が出たら都度 `spec/intended-diff-ledger.md` への追記要否を判定する（Sprint6はID-28、Sprint7はID-29、Sprint8はID-19具体化、Sprint10はID-30を追記済み・Sprint9は追記なし〔SBD-2/17は既存維持項目のため台帳対象外と判定〕・Sprint11はID-22の説明強化のみ追記〔新規差分IDの追加なし〕・Sprint12は台帳追記なし〔#28〜30/D1/D2はいずれもAPI仕様・レスポンス形状に影響しない内部実装リファクタと判定〕・Sprint13は台帳追記なし〔#30はQ1〜Q3含めAPI仕様・レスポンス形状不変の内部リファクタと判定〕）。
+- architecture-conventionsのPO判断委譲パターン（§3.1区分値のm_code採用・§4.3更新系エンティティのversion列・§9集約深度）は3セクションで再発しチェックリストへ正式昇格済み（Sprint8 Retro。Sprint13 #30・§9で3件目の実例追加）。architecture-conventions文書自体の一般原則firmup（個別確認を減らす明文化）要否は、さらなる再発またはユーザーとの次回接点で判断する。
 - Sprint7傾向3（specがPOへ確定を委譲した論点の計画フェーズ確認）は初出のため、次回以降の同種発生時に正式昇格を判断する。
 - Sprint11傾向2（監査ログACの成功/失敗粒度未定義）は初出のため、次回以降の同種Story（監査ログを扱うStory）で再発した場合、正式昇格を判断する。
 - Sprint12傾向2（リファクタ/是正Story起票時のスコープが実コード未裏取りでずれる）は初出のため、次回以降の同種Story（既存コードの棚卸し是正が目的のリファクタ・是正系Story）で再発した場合、「起票前に対象範囲をgrep等の実コード確認で裏取りする」観点としてチェックリストへの正式昇格を判断する。
