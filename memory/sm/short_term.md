@@ -9,7 +9,7 @@ Sprint 19（#36 テーマ切替/#25 日本語ローカライズ完全実装/#37 
 - (1) teammate 完了は idle≠完了。成果物直接確認（memory/スレッド/branch）。**★副作用を伴う最終化（Discord投稿/コミット等）の未反映 nudge は「既に完了済みなら再実行せず Message ID を返答して（重複投稿しないで）」の冪等指示にする**（Sprint19 で idle 直後 stale read の nudge が二重投稿を招いた＝反映遅延4回目・次回再発で scrum-master-workflow 冒頭 idle 注記へ昇格判定）。
 - (2) frontend EOL(CRLF) ノイズ → #35 `.gitattributes`（`* text=auto eol=lf`）で恒久対策**実装・マージ済**。次スプリント以降に再発しないか観測（再発ゼロなら要フォロー(2)クローズ）。
 - (3) curl 破壊系（merge PUT 等）が分類器ブロック → PR マージは `mcp__github__merge_pull_request`（Sprint19 で全3PR マージ成功）、Issue操作は MCP github、Projects は GraphQL curl POST（通る）。
-- (4) git push/fetch/pull は `origin`（credential helper・token URL は分類器ブロック）。**frontend push が2分でタイムアウトすることあり**（Sprint19・個別 push＋長めタイムアウト〔300s〕で解消）。
+- (4) **git push は環境で挙動が割れる（Sprint19 で判明）**: product repo は `git push origin`（credential helper）で成功（frontend は2分でタイムアウト→個別 push＋300s で解消）。**agent-base は `git push origin` が GCM ダイアログ待ちで5分+ハング→token URL 埋め込み `git push "https://x-access-token:$GITHUB_PERSONAL_ACCESS_TOKEN@github.com/ryokkon624/migration-agent-base.git" <branch>` で回避成功**（Sprint8 GCM ハング教訓の再来。Sprint17/18「token URL 分類器ブロック」とは逆＝今回は token URL が通り credential helper がハング＝環境で揺れる）。fetch/pull・ls-remote（read）は credential helper で問題なし。**push ハング時は token URL を試す**。
 - (5) DEV(dev-s19-impl) が Sprint Review HTML 生成時に mcp__github__* 不可で curl フォールバック使用と報告（SM は MCP 使用可）。次回 reviewer/DEV の github MCP 可否に留意。
 
 ## 次スプリント候補
