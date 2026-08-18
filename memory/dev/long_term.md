@@ -20,7 +20,11 @@ performanceのみ非ブロッキング1件で再修正不要、Sprint9は3観点
 （#30・Repository層をCatalog/Account/Orderへ全展開）も3観点とも指摘0件かつSMコア精読でも指摘0件でクリーン、
 Sprint14（#9/#10・注文履歴一覧/詳細。`OwnershipAuthorizationService`の初の実ドメイン適用）も3観点とも
 指摘0件でクリーン、Sprint15（#11/#12/#28。既達Story群のハードニング＝回帰テスト＋明文化＋カートマージ
-N+1バッチ化retrofit）も3観点とも指摘0件かつSM独立verificationでも指摘0件でクリーン＝tier分離15連続）。
+N+1バッチ化retrofit）も3観点とも指摘0件かつSM独立verificationでも指摘0件でクリーン、Sprint16（#13/#14・
+E4ユーザー登録＋アカウント編集・version楽観ロック初実装。Sprint16 Retro時点ではPRマージ前で未確定のため
+本行への反映を次回Retroへ持ち越していた）も3観点とも指摘0件かつSM verificationでも指摘0件でクリーン、
+Sprint17（#15/#16/#17・E4アカウントセキュリティ完結＝PW変更再認証・CSRF・入力検証）も3観点とも指摘0件
+かつSM verificationでも指摘0件でクリーン＝tier分離17連続）。
 以下の発見はいずれもDEV自身がTDD・実機検証中に見つけたもので初出＝1回目のため、2回ルールに従い本セクション
 ではなく「習得したこと」「技術的なハマりポイント」に記録する。ただし一部は参照知識/実装パターンとして
 初出からSkillへ即時反映した（詳細は「Skills更新履歴」）。
@@ -373,6 +377,23 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   際は、命名前に対象列のDDL（`CREATE TABLE`文）で桁数を確認する習慣が必要。
   発生スプリント: Sprint11（#8、`OrderConcurrencyIntegrationSpec`実装時。初出のため2回ルールに従い本Skillには
   未反映）
+- **Spring Framework 7.0で`HttpStatus.UNPROCESSABLE_ENTITY`が`UNPROCESSABLE_CONTENT`へ改名されていた
+  （値422自体は不変・RFC 9110の呼称変更への追随）。** ACやbacklogには明記されていなかったが、
+  `./gradlew compileJava`のコンパイルノート（非推奨警告）で発覚し、`GlobalExceptionHandler`側の参照を
+  即座に是正した（JSON応答の`code`フィールド文字列自体は既存の`"UNPROCESSABLE_ENTITY"`のまま維持・
+  Java enum定数名の改名とは独立）。`server.error.*`→`spring.web.error.*`（Sprint2）と同種のSpring本体側
+  リネームだが対象箇所が異なるため本セクションでは初出として記録する。
+  発生スプリント: Sprint17（#15、`GlobalExceptionHandler`実装時のコンパイル警告で発覚。初出のため2回ルールに
+  従い本Skillには未反映）
+- **bcryptは入力を72バイトまでしか使わず、それを超えるバイト列は暗黙に切り詰められる（文字数ではなく
+  UTF-8バイト長で判定する必要がある）。** 新設`@StrongPassword`制約の上限バリデーションを当初「72文字
+  以下」で実装しかけたが、マルチバイト文字（日本語等）を含むパスワードは72文字未満でも72バイトを超え
+  うるため、`value.getBytes(StandardCharsets.UTF_8).length <= 72`のようにバイト長で判定する形に修正した
+  （ASCIIのみのパスワードでは文字数=バイト数のため従来の直感と一致し見過ごしやすい。frontend側の
+  `isStrongPassword`も`TextEncoder`でバイト長判定をミラーした）。既存の`backend-conventions`§9
+  「PasswordEncoderは...」節（Sprint3・bcrypt関連の参照知識）へ追記した（新規チェックリスト項目ではなく
+  同一トピックの既存参照知識セクションへの追記のため2回ルール対象外）。
+  発生スプリント: Sprint17（#15、`StrongPasswordValidator`実装時にDEVが自己発見）
 
 ### jpetstore-frontend
 - **vue-i18n（v11・Composition API）のメッセージ文字列中の`@`はlinked message構文（`@:key`形式）として
@@ -408,6 +429,13 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   使う既存View群のテストで`find('form')`/`find('button')`のような汎用セレクタが使われていないか
   確認すること。
   発生スプリント: Sprint7（#2、ヘッダ検索バー追加時に発覚）
+- **`npm run format`（Prettier）実行時、意図せず編集していない多数のファイルがLF→CRLFへ改行コード変換
+  されノイズとして`git status`に出現した。** backendの`V00_000_001`/`V00_000_002`マイグレーションファイルで
+  確認済みの既知パターンと同種だが、frontendでの発生は本スプリントが初めてだった。`git diff --stat`で
+  実際に意図した差分があるファイルのみを特定し、それらのみを`git add`する選択addで、無関係な改行コード
+  変更を誤ってコミットすることを回避した。
+  発生スプリント: Sprint17（#15/#16/#17、コミット前の`git status`確認時に発覚。初出のため2回ルールに
+  従い本Skillには未反映）
 
 ## 習得したこと
 
@@ -708,6 +736,33 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   実際のドメインでの検証は後続Storyに委ねる」設計（`OwnershipAuthorizationService`のSprint4→Sprint14と
   同型のパターン）が、version楽観ロックでも同様に機能したことを確認できた。
   発生スプリント: Sprint16（#14）
+- **共有のパスワード強度制約は、Bean Validationのカスタムアノテーション（`@StrongPassword`＋
+  `ConstraintValidator`）として1本化し、新規登録（`RegisterRequest.password`）とパスワード変更
+  （`PasswordChangeRequest.newPassword`）の両方のDTOへ同一の制約を付与するだけで済む設計にした。**
+  文字種（英大/英小/数字/記号）の判定・長さ上限（bcrypt 72バイト制約・上記「技術的なハマりポイント」参照）
+  といったロジックを`ConstraintValidator`側に1箇所集約したことで、2つのDTOへ`@StrongPassword`を付けるだけで
+  済み、DTOごとに同じ検証ロジックを重複実装せずに済んだ。今後パスワードを新規に受け取るDTO（パスワード
+  リセット等）が追加された場合も、同じ制約を付与するだけで一貫した強度検証を適用できる。
+  発生スプリント: Sprint17（#15/#17）
+- **認証隣接の失敗系統を、既存の401/403のセマンティクスと衝突しない専用ステータス（422）へ意図的に分離
+  する設計判断を、ユーザー確認のうえ計画フェーズで確定した。** パスワード変更APIの「現在パスワード誤り」を
+  素朴に401や403で返すと、httpClientの401→silent refresh+retry経路（`httpClient.ts:77`）が誤発火したり、
+  403がCSRF欠落の意味と衝突したりする（既存語彙との衝突）。422（Unprocessable Entity。現状のAPI語彙で
+  未使用）を新設`InvalidCurrentPasswordException`用に割り当て、既存の400（弱PW/不正入力＝Bean Validation）・
+  401（真の未認証）・403（CSRF欠落）と完全に分離した三系統＋αのステータス設計にした。新しいドメインエラーの
+  HTTPステータスを設計する際は、意味的に近い既存ステータス（401/403等）がフロント側の横断的な処理
+  （silent refresh等）にフックされていないかを先に確認し、衝突する場合は未使用の専用ステータスを割り当てる、
+  という判断軸として再利用できる（`backend-conventions`§9へ即時反映。詳細は「Skills更新履歴」）。
+  発生スプリント: Sprint17（#15、計画フェーズのユーザー確認事項Q1で確定）
+- **アカウントの機微な変更（パスワード変更）後のトークンローテートを、新規実装せず既存の
+  `AuthApplicationService.issueTokensFor(currentUser, response)`（`RegistrationApplicationService`が登録直後の
+  トークン発行に使っていたメソッド）へそのまま委譲する設計にした。** `AccountApplicationService`に
+  `AuthApplicationService`を注入するだけで済み（`RegistrationApplicationService`が既に同じ構成を取っていた
+  ため循環依存の懸念がないことも計画時点で確認済み）、新しいトークン発行経路を増やさずに済んだ。アカウントの
+  機微操作（メールアドレス変更・二要素認証設定変更等）後にセッション/トークンのローテートが必要になる将来の
+  Storyでも、専用の発行ロジックを新設せずこのメソッドへ委譲できないかまず検討する価値がある。既存メソッドの
+  新規コンテキストでの再利用でありパターン自体は既存のため`backend-conventions`は変更していない。
+  発生スプリント: Sprint17（#15、計画フェーズのユーザー確認事項Q3で確定）
 
 ### jpetstore-frontend
 - **backendのSpring Security 7 CSRF設定（非XOR `CsrfTokenRequestAttributeHandler`・consume-then-
@@ -1141,11 +1196,40 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   自己発見（設計判断の訂正・初実装パターンの確立）のみを対象にした。
 - `#skills-changelog` へ `[DEV]` で投稿済み。
 
+### Sprint 17（#15/#16/#17・E4アカウントセキュリティ完結＝PW変更再認証・CSRF・入力検証）
+
+- **`backend-conventions`**: `## 9. jpetstore-backend 固有の注意事項` に以下2点を反映した:
+  1. **既存節への追記（2回ルール対象外）**: 「PasswordEncoderはDelegatingPasswordEncoderを使い...」節へ、
+     bcryptの72バイト上限はUTF-8バイト長で判定する必要がある（文字数ではない）という注意点を追記した。
+     新規チェックリスト項目ではなく既存のbcrypt関連参照知識セクションの拡充のため。
+  2. **初出だが「知らないと書けない参照知識・実装パターン」の2回ルール例外として即時反映**: 認証隣接の
+     失敗系統（現在パスワード誤り等）を既存の401（silent refresh誤発火）/403（CSRF欠落）と衝突しない
+     専用ステータス（422）へ分離する設計判断・共有`@StrongPassword`制約によるDTO横断のパスワード強度検証
+     1本化を新設した。今後パスワード変更に類する「認証隣接の新しい失敗系統」を設計するStoryが踏襲できる
+     判断軸・実装パターンのため。
+- **`backend-conventions`/`frontend-conventions`へ反映しなかったもの**: 以下はいずれも初出（1回目）または
+  既存パターンのStory固有再利用であり、`memory/dev/long_term.md`への記録に留めた:
+  - `HttpStatus.UNPROCESSABLE_ENTITY`→`UNPROCESSABLE_CONTENT`（Spring Framework 7.0改名）→
+    「技術的なハマりポイント」（jpetstore-backend）に初出として記録。
+  - `npm run format`（Prettier）実行時のfrontend初のCRLF EOLノイズと選択addでの回避→「技術的なハマり
+    ポイント」（jpetstore-frontend）に初出として記録。
+  - パスワード変更後のトークンローテートに既存`AuthApplicationService.issueTokensFor`を再利用した設計→
+    新規パターンではなく既存メソッドの再利用のため「習得したこと」（jpetstore-backend）に記録。
+  - `AddressForm.vue`（checkout共用）への後方互換opt-inプロップ（`errors?`/`maxLengths?`）拡張→ Sprint7で
+    確立済みの「共通コンポーネント拡張時の既存利用箇所への影響配慮」の再適用でありStory固有判断のため、
+    `backlog/sprint_17/implementation-notes.md`に記録済み・本ファイルへは重複記録しない。
+- 3reviewer・SM verificationとも指摘0件（tier分離17連続クリーン）は、チェックリスト項目ではなくプロセス上
+  の教訓のためSkillには反映せず`memory/dev/long_term.md`「繰り返し指摘されるパターン」（jpetstore-backend
+  冒頭）に記録した（あわせてSprint16分の反映持ち越しも本Retroで解消した）。
+- `#skills-changelog` へ `[DEV]` で投稿済み。
+
 ## 卒業済みルール
 
 （該当なし。棚卸し対象となるルールが直近15スプリント基準に達していない。
-  jpetstore-backendはSprint2・3・4・6・7・8・9・10・11・12・13・14・15・16の14スプリントのみ、
+  jpetstore-backendはSprint2・3・4・6・7・8・9・10・11・12・13・14・15・16・17の15スプリントのみ、
   jpetstore-databaseはSprint1・3・6・14・16の5スプリントのみ、jpetstore-frontendはSprint5・6・7・8・10・
-  11・14・15・16の9スプリントのみのため、いずれも対象外。§9昇格済みの最古ルール（catch-all例外横取り・
-  Sprint7昇格）でも昇格から9スプリント（Sprint8〜16）しか経過しておらず15スプリントに満たない。
-  Sprint4〜Sprint15 Retroに続きSprint16 Retroでも棚卸しを実施したが同様の理由で卒業候補なし）
+  11・14・15・16・17の10スプリントのみのため、いずれも対象外。§9昇格済みルールの昇格後経過スプリント数
+  （直近15スプリント基準の分子）は、catch-all例外横取り（Sprint7昇格）が10スプリント（Sprint8〜17）・
+  Spockの`given:`裸stub×`then:`引数一致（Sprint12昇格）が5スプリント（Sprint13〜17）・DB-backedレート
+  制限（Sprint16昇格）が1スプリント（Sprint17）で、いずれも15スプリントに満たない。
+  Sprint4〜Sprint16 Retroに続きSprint17 Retroでも棚卸しを実施したが同様の理由で卒業候補なし）
