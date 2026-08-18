@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint 17 Review — #16 アカウント状態変更（登録/編集/PW変更）に CSRF 対策を施す</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #f8f7f5; }
+
+  .page { max-width: 860px; margin: 0 auto; padding: 48px 24px; }
+
+  /* Header */
+  .sprint-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin-bottom: 8px; }
+  h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px; }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+  .badge-sprint { background: #e8f0fe; color: #1a56db; }
+  .badge-issue { background: #f0fdf4; color: #166534; }
+  .badge-security { background: #fef2f2; color: #b91c1c; }
+  .badge-scope { background: #fff7ed; color: #c2410c; }
+
+  /* Sections */
+  section { margin-bottom: 40px; }
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #888; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e5e5e5; }
+
+  /* Problem box */
+  .problem-box { background: #fff8f0; border-left: 3px solid #f59e0b; border-radius: 0 8px 8px 0; padding: 16px 20px; margin-bottom: 16px; }
+  .problem-box .label { font-size: 11px; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .problem-box p { color: #451a03; font-size: 13px; }
+
+  /* Architecture change */
+  .arch-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: center; margin-bottom: 8px; }
+  .arch-box { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; }
+  .arch-box .arch-title { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .arch-box.before { border-color: #fca5a5; }
+  .arch-box.after { border-color: #86efac; }
+  .arch-arrow { font-size: 20px; color: #888; text-align: center; }
+  .flow-item { font-size: 12px; color: #374151; padding: 3px 0; display: flex; align-items: flex-start; gap: 6px; }
+  .flow-item .dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .dot-red { background: #ef4444; }
+  .dot-green { background: #22c55e; }
+
+  /* AC cards */
+  .ac-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+  .ac-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid #f0f0f0; }
+  .ac-check { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .ac-check.done { background: #dcfce7; color: #166534; }
+  .ac-num { font-size: 11px; font-weight: 700; color: #888; }
+  .ac-text { font-size: 13px; font-weight: 600; color: #1a1a1a; flex: 1; }
+  .ac-body { padding: 16px 18px; }
+  .ac-body p { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+
+  /* Attack card */
+  .attack-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 8px; }
+  .attack-box { border-radius: 8px; padding: 16px; border: 1px solid #e5e5e5; }
+  .attack-box.blocked { background: #fef2f2; border-color: #fca5a5; }
+  .attack-box.allowed { background: #f0fdf4; border-color: #86efac; }
+  .attack-box .attack-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .attack-box.blocked .attack-title { color: #b91c1c; }
+  .attack-box.allowed .attack-title { color: #166534; }
+  .attack-box .attack-result { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .attack-box.blocked .attack-result { color: #b91c1c; }
+  .attack-box.allowed .attack-result { color: #166534; }
+  .attack-box p { font-size: 12px; color: #4b5563; }
+
+  /* File change */
+  .file-change { margin-bottom: 16px; }
+  .file-name { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; background: #f3f4f6; color: #374151; padding: 5px 10px; border-radius: 4px 4px 0 0; border: 1px solid #e5e5e5; border-bottom: none; display: flex; justify-content: space-between; }
+  .diff-stat { color: #888; }
+  .code-block { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.7; background: #1e1e2e; color: #cdd6f4; padding: 14px 16px; border-radius: 0 0 6px 6px; overflow-x: auto; }
+  .code-line { display: flex; }
+  .line-num { color: #45475a; min-width: 28px; user-select: none; }
+  .line-add { background: rgba(166, 227, 161, 0.12); color: #a6e3a1; }
+  .line-del { background: rgba(243, 139, 168, 0.12); color: #f38ba8; }
+  .line-ctx { color: #cdd6f4; }
+  .line-prefix { min-width: 14px; }
+
+  /* Annotation */
+  .annotation { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-size: 12px; color: #78350f; display: flex; gap: 8px; }
+  .annotation-icon { font-size: 14px; flex-shrink: 0; }
+
+  /* Note list (implementation notes) */
+  .note-list { list-style: none; }
+  .note-item { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; font-size: 13px; color: #374151; }
+  .note-item strong { color: #1a1a1a; }
+
+  /* Verify section */
+  .verify-list { list-style: none; }
+  .verify-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; }
+  .verify-item:last-child { border-bottom: none; }
+  .verify-num { width: 22px; height: 22px; background: #e8f0fe; color: #1a56db; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .verify-content { flex: 1; }
+  .verify-content strong { font-size: 13px; color: #1a1a1a; display: block; margin-bottom: 3px; }
+  .verify-content span { font-size: 12px; color: #6b7280; }
+
+  /* Scope table */
+  .scope-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .scope-table th { text-align: left; padding: 8px 12px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .scope-table td { padding: 10px 12px; border: 1px solid #e5e5e5; color: #374151; vertical-align: top; }
+  .scope-table tr:hover td { background: #f9fafb; }
+  .tag-new { font-size: 11px; font-weight: 600; background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 3px; }
+  .tag-changed { font-size: 11px; font-weight: 600; background: #e8f0fe; color: #1a56db; padding: 2px 6px; border-radius: 3px; }
+  .tag-unchanged { font-size: 11px; font-weight: 600; background: #f3f4f6; color: #6b7280; padding: 2px 6px; border-radius: 3px; }
+  .scope-group { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.05em; margin: 16px 0 6px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="sprint-label">Sprint 17 Review</div>
+  <h1>#16 — アカウント状態変更（登録/編集/PW変更）に CSRF 対策を施す</h1>
+  <div class="meta">
+    <span class="badge badge-sprint">Sprint 17</span>
+    <span class="badge badge-issue">#16</span>
+    <span class="badge badge-security">security / E4</span>
+    <span class="badge badge-scope">backend 主（回帰テスト＋明文化）</span>
+  </div>
+
+  <!-- Problem -->
+  <section>
+    <h2>なぜこの改修が必要だったか</h2>
+    <div class="problem-box">
+      <div class="label">問題</div>
+      <p>登録（#13）・編集（#14）のCSRF対策は既に実装・テスト済みだったが、本Sprintで新設したパスワード変更エンドポイント（#15・<code>POST /api/account/password</code>）はCSRF検証済みかどうかが未確認のまま出荷されるリスクがあった。CSRFトークンなしで外部サイトからの偽装リクエストがアカウント状態を変更できてしまうと、S5+S2+S6の複合攻撃（遠隔乗っ取り）の起点になる。</p>
+    </div>
+    <div class="arch-grid">
+      <div class="arch-box before">
+        <div class="arch-title">改修前</div>
+        <div class="flow-item"><span class="dot dot-red"></span>register/edit のCSRF保護は実装済み・テスト済み（既達）</div>
+        <div class="flow-item"><span class="dot dot-red"></span>PW変更エンドポイント自体が存在しない＝CSRF検証が不可能</div>
+        <div class="flow-item"><span class="dot dot-red"></span>CSRF設計（SameSite=Strict + double-submit）の意図がコードコメントとして明文化されていない</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-box after">
+        <div class="arch-title">改修後</div>
+        <div class="flow-item"><span class="dot dot-green"></span>PW変更もCSRFトークン必須（SecurityConfig無改造で自動適用）</div>
+        <div class="flow-item"><span class="dot dot-green"></span>CSRFトークン無しPOSTは403、GETは405（回帰テスト1本追加）</div>
+        <div class="flow-item"><span class="dot dot-green"></span>「新規Originフィルタは足さない」設計をAccountControllerのJavadocで明文化</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Attack demo -->
+  <section>
+    <h2>攻撃シナリオの実証</h2>
+    <div class="attack-grid">
+      <div class="attack-box blocked">
+        <div class="attack-title">攻撃者（外部サイト）</div>
+        <div class="attack-result">403 Forbidden</div>
+        <p>CSRFトークン無しで <code>POST /api/account/password</code> を叩く（外部サイトに埋め込まれた偽装フォーム等）。<code>X-XSRF-TOKEN</code> ヘッダが無いため拒否される。パスワードハッシュも変更されない。</p>
+      </div>
+      <div class="attack-box allowed">
+        <div class="attack-title">正規ユーザー（自サイト）</div>
+        <div class="attack-result">204 No Content</div>
+        <p>JPetStore SPA上の操作は <code>httpClient.ts</code> が自動的に <code>XSRF-TOKEN</code> Cookie値を <code>X-XSRF-TOKEN</code> ヘッダへ添付するため、通常の操作は成功する。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- AC breakdown -->
+  <section>
+    <h2>AC別 実装内容</h2>
+
+    <!-- AC1 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC1 (SBD-3)</div>
+        <div class="ac-text">newAccount/editAccount/PW変更に CSRF トークン必須・非冪等POST・Origin/SameSite 検証</div>
+      </div>
+      <div class="ac-body">
+        <p>register（#13）・edit（#14）はSprint16以前から<code>SecurityConfig</code>のCSRF機構（<code>CookieCsrfTokenRepository</code>のSameSite=Strict + 非XORのcookie-to-header double-submit）配下で既に検証済み。今回新設した <code>POST /api/account/password</code> も <code>/api/account/**</code> の一部（<code>anyRequest().authenticated()</code> 配下）のため、<b>SecurityConfigを一切変更せずに</b>同じCSRF機構が自動適用される。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../presentation/rest/AccountController.java（クラスJavadoc）</span>
+            <span class="diff-stat">L35-43（明文化）</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">35</span><span class="line-prefix">+</span><span> * &lt;p&gt;&lt;b&gt;#15/#16: {@link #changePassword}のステータス設計（計画フェーズ確定・三系統分離）&lt;/b&gt;: ...</span></div>
+            <div class="code-line line-add"><span class="line-num">38</span><span class="line-prefix">+</span><span> * CookieCsrfTokenRepository}のSameSite=Strict + 非XORのcookie-to-header double-submit）がこのエンドポイントにも</span></div>
+            <div class="code-line line-add"><span class="line-num">39</span><span class="line-prefix">+</span><span> * 無改造で適用される（{@code /api/account/**}が{@code csrf()}設定配下のため）。新規のOrigin/Refererフィルタは追加しない</span></div>
+            <div class="code-line line-add"><span class="line-num">40</span><span class="line-prefix">+</span><span> * （Sprint9 #6・{@code SecurityConfig}既存コメントと同方針）。</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">ℹ️</span>
+            <span><b>意図的設計（計画フェーズ確定・欠落ではない）</b>: 新規のOrigin/Refererアローリストフィルタは追加しない。SameSite=Strict + double-submit CSRFトークンで外部オリジンの状態変更を拒否する既存方針（Sprint9 #6同方針）を踏襲する。</span>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/test/groovy/.../PasswordChangeControllerSpec.groovy（#16回帰テスト）</span>
+            <span class="diff-stat">L178-190</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">178</span><span class="line-prefix"> </span><span>  def "#16 AC-neg1(SBD-3): CSRFトークン無しでPOST /api/account/passwordすると403になり、hashは変更されない"() {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">179</span><span class="line-prefix"> </span><span>    given:</span></div>
+            <div class="code-line line-ctx"><span class="line-num">180</span><span class="line-prefix"> </span><span>    def originalHash = storedPasswordHash()</span></div>
+            <div class="code-line line-ctx"><span class="line-num">182</span><span class="line-prefix"> </span><span>    expect:</span></div>
+            <div class="code-line line-ctx"><span class="line-num">183</span><span class="line-prefix"> </span><span>    mockMvc.perform(post("/api/account/password").cookie(accessTokenCookie)</span></div>
+            <div class="code-line line-ctx"><span class="line-num">186</span><span class="line-prefix"> </span><span>            .andExpect(status().isForbidden())</span></div>
+            <div class="code-line line-ctx"><span class="line-num">188</span><span class="line-prefix"> </span><span>    and:</span></div>
+            <div class="code-line line-ctx"><span class="line-num">189</span><span class="line-prefix"> </span><span>    storedPasswordHash() == originalHash</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span><code>.with(csrf())</code> を意図的に付けずにPOSTし、403になること・パスワードハッシュが変更されないことの両方を検証する（AC1「CSRFトークン必須」の直接実証）。</span>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/test/groovy/.../PasswordChangeControllerSpec.groovy（GETでの状態変更不可）</span>
+            <span class="diff-stat">L192-196</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">192</span><span class="line-prefix"> </span><span>  def "#16 AC-neg1: GET /api/account/passwordは405になる(状態変更エンドポイントはPOSTのみ)"() {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">193</span><span class="line-prefix"> </span><span>    expect:</span></div>
+            <div class="code-line line-ctx"><span class="line-num">194</span><span class="line-prefix"> </span><span>    mockMvc.perform(get("/api/account/password").cookie(accessTokenCookie))</span></div>
+            <div class="code-line line-ctx"><span class="line-num">195</span><span class="line-prefix"> </span><span>            .andExpect(status().isMethodNotAllowed())</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC-neg1 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC-neg1 (SBD-3)</div>
+        <div class="ac-text">外部オリジンからの登録/編集/PW変更が拒否される。GET での状態変更リンクが存在しない</div>
+      </div>
+      <div class="ac-body">
+        <p>register/edit の否定AC（外部オリジン起点＝CSRFトークン無し拒否・GET不可）はSprint16以前から<code>RegistrationControllerSpec</code>・<code>AccountEditControllerSpec</code>で実証済み（既達）。今回、PW変更ぶんの同型テストを追加したことで、アカウント系の状態変更（登録/編集/PW変更）3経路すべてで否定ACが揃った。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/test/groovy/.../RegistrationControllerSpec.groovy（既達・参照）</span>
+            <span class="diff-stat">L283（CSRFなしPOST→403）/ L292（GET→405）</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">283</span><span class="line-prefix"> </span><span>    def "CSRFトークン無しでPOST /api/registerすると403になる(SBD-3)"() { ... }</span></div>
+            <div class="code-line line-ctx"><span class="line-num">292</span><span class="line-prefix"> </span><span>    def "GET /api/registerは405になる(状態変更エンドポイントはPOSTのみ)"() { ... }</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">ℹ️</span>
+            <span>本Storyでは変更していない既存テスト（Sprint16 #13で実装済み）。PW変更ぶんの同型テストと合わせて3経路とも回帰していることを確認済み。</span>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/test/groovy/.../AccountEditControllerSpec.groovy（既達・参照）</span>
+            <span class="diff-stat">L243（CSRFなしPUT→403）</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">243</span><span class="line-prefix"> </span><span>    def "GET/PUT /api/accountはCSRFトークン無しのPUTだと403になる(SBD-3)"() { ... }</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Implementation notes -->
+  <section>
+    <h2>実装メモ（仕様外の判断・変更・妥協点）</h2>
+    <ul class="note-list">
+      <li class="note-item"><strong>新規Origin/Refererアローリストフィルタは追加しなかった</strong>: SameSite=Strict + double-submit CSRFトークンで外部オリジンの状態変更を既に拒否できているため（Sprint9 #6と同方針）。過剰実装を避け、既存機構の回帰確認と設計の明文化に絞った。</li>
+      <li class="note-item"><strong><code>SecurityConfig.java</code> は本Storyで一切変更していない</strong>: PW変更エンドポイントが <code>/api/account/**</code>（既存の <code>anyRequest().authenticated()</code> 配下）に収まるため、CSRF・認証のいずれも追加設定なしで自動的に保護される。これは「欠落」ではなく計画フェーズで確定した意図的スコープ。</li>
+      <li class="note-item"><strong>CSRF設計の明文化は <code>AccountController</code> クラスJavadocに集約した</strong>: 独立した <code>package-info.java</code> は新設せず、変更の起点となった <code>changePassword</code> メソッドと同じファイルに設計意図（ステータス分離・CSRF既存機構の再利用・全セッション失効の対象外化）をまとめて記載した。</li>
+    </ul>
+  </section>
+
+  <!-- Verify -->
+  <section>
+    <h2>動作確認ポイント（ユーザー確認用）</h2>
+    <ul class="verify-list">
+      <li class="verify-item">
+        <div class="verify-num">1</div>
+        <div class="verify-content">
+          <strong>通常のブラウザ操作（登録・編集・パスワード変更）はこれまでどおり問題なく完了すること</strong>
+          <span>SPAが自動的にCSRFトークンを付与するため、正規の操作では変化を感じない</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">2</div>
+        <div class="verify-content">
+          <strong>ブラウザの開発者ツールでCSRF Cookie（XSRF-TOKEN）を削除してからパスワード変更を送信すると拒否されること</strong>
+          <span>403エラーになり、パスワードは変更されない（外部サイトからの偽装リクエストを模擬した確認）</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">3</div>
+        <div class="verify-content">
+          <strong>登録・編集・パスワード変更のいずれも、URLを直接GETで開いて状態変更するリンクが存在しないこと</strong>
+          <span>各画面はフォーム送信（POST/PUT）のみで完結し、GETでの状態変更用リンクは提供されていない</span>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- Scope -->
+  <section>
+    <h2>改修スコープ確認</h2>
+    <div class="scope-group">backend</div>
+    <table class="scope-table">
+      <tr><th>ファイル</th><th>変更</th><th>内容</th></tr>
+      <tr><td><code>presentation/rest/AccountController.java</code></td><td><span class="tag-changed">変更あり</span></td><td>クラスJavadocへCSRF設計の明文化を追加（#15実装と同一コミット）</td></tr>
+      <tr><td><code>presentation/rest/PasswordChangeControllerSpec.groovy</code></td><td><span class="tag-new">新規</span></td><td>PW変更ぶんのCSRF回帰テスト2本（403/405）を含む</td></tr>
+      <tr><td><code>config/SecurityConfig.java</code></td><td><span class="tag-unchanged">変更なし</span></td><td>既存のCSRF機構（SameSite=Strict + double-submit）がPW変更にも無改造で適用される</td></tr>
+      <tr><td><code>presentation/rest/RegistrationControllerSpec.groovy</code> / <code>AccountEditControllerSpec.groovy</code>（CSRF関連部分）</td><td><span class="tag-unchanged">変更なし</span></td><td>Sprint16以前に実装済みの既存回帰テストをそのまま再利用（本Storyでの変更なし）</td></tr>
+    </table>
+    <div class="scope-group">frontend</div>
+    <table class="scope-table">
+      <tr><th>ファイル</th><th>変更</th><th>内容</th></tr>
+      <tr><td><code>api/httpClient.ts</code></td><td><span class="tag-unchanged">変更なし</span></td><td>既存のCSRFトークン自動付与機構（POST/PUT/PATCH/DELETE）がPW変更にも無改造で適用される</td></tr>
+    </table>
+  </section>
+
+</div>
+</body>
+</html>

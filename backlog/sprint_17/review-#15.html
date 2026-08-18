@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint 17 Review — #15 パスワード変更に現在パスワード確認（再認証）を必須にする</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #f8f7f5; }
+
+  .page { max-width: 860px; margin: 0 auto; padding: 48px 24px; }
+
+  /* Header */
+  .sprint-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin-bottom: 8px; }
+  h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px; }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+  .badge-sprint { background: #e8f0fe; color: #1a56db; }
+  .badge-issue { background: #f0fdf4; color: #166534; }
+  .badge-security { background: #fef2f2; color: #b91c1c; }
+  .badge-scope { background: #fff7ed; color: #c2410c; }
+
+  /* Sections */
+  section { margin-bottom: 40px; }
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #888; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e5e5e5; }
+
+  /* Problem box */
+  .problem-box { background: #fff8f0; border-left: 3px solid #f59e0b; border-radius: 0 8px 8px 0; padding: 16px 20px; margin-bottom: 16px; }
+  .problem-box .label { font-size: 11px; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .problem-box p { color: #451a03; font-size: 13px; }
+
+  /* Architecture change */
+  .arch-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: center; margin-bottom: 8px; }
+  .arch-box { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; }
+  .arch-box .arch-title { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .arch-box.before { border-color: #fca5a5; }
+  .arch-box.after { border-color: #86efac; }
+  .arch-arrow { font-size: 20px; color: #888; text-align: center; }
+  .flow-item { font-size: 12px; color: #374151; padding: 3px 0; display: flex; align-items: flex-start; gap: 6px; }
+  .flow-item .dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .dot-red { background: #ef4444; }
+  .dot-green { background: #22c55e; }
+
+  /* AC cards */
+  .ac-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+  .ac-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid #f0f0f0; }
+  .ac-check { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .ac-check.done { background: #dcfce7; color: #166534; }
+  .ac-num { font-size: 11px; font-weight: 700; color: #888; }
+  .ac-text { font-size: 13px; font-weight: 600; color: #1a1a1a; flex: 1; }
+  .ac-body { padding: 16px 18px; }
+  .ac-body p { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+
+  /* File change */
+  .file-change { margin-bottom: 16px; }
+  .file-name { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; background: #f3f4f6; color: #374151; padding: 5px 10px; border-radius: 4px 4px 0 0; border: 1px solid #e5e5e5; border-bottom: none; display: flex; justify-content: space-between; }
+  .diff-stat { color: #888; }
+  .code-block { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.7; background: #1e1e2e; color: #cdd6f4; padding: 14px 16px; border-radius: 0 0 6px 6px; overflow-x: auto; }
+  .code-line { display: flex; }
+  .line-num { color: #45475a; min-width: 28px; user-select: none; }
+  .line-add { background: rgba(166, 227, 161, 0.12); color: #a6e3a1; }
+  .line-del { background: rgba(243, 139, 168, 0.12); color: #f38ba8; }
+  .line-ctx { color: #cdd6f4; }
+  .line-prefix { min-width: 14px; }
+
+  /* Annotation */
+  .annotation { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-size: 12px; color: #78350f; display: flex; gap: 8px; }
+  .annotation-icon { font-size: 14px; flex-shrink: 0; }
+
+  /* Note list (implementation notes) */
+  .note-list { list-style: none; }
+  .note-item { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; font-size: 13px; color: #374151; }
+  .note-item strong { color: #1a1a1a; }
+
+  /* Verify section */
+  .verify-list { list-style: none; }
+  .verify-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; }
+  .verify-item:last-child { border-bottom: none; }
+  .verify-num { width: 22px; height: 22px; background: #e8f0fe; color: #1a56db; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .verify-content { flex: 1; }
+  .verify-content strong { font-size: 13px; color: #1a1a1a; display: block; margin-bottom: 3px; }
+  .verify-content span { font-size: 12px; color: #6b7280; }
+
+  /* Scope table */
+  .scope-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .scope-table th { text-align: left; padding: 8px 12px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .scope-table td { padding: 10px 12px; border: 1px solid #e5e5e5; color: #374151; vertical-align: top; }
+  .scope-table tr:hover td { background: #f9fafb; }
+  .tag-new { font-size: 11px; font-weight: 600; background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 3px; }
+  .tag-changed { font-size: 11px; font-weight: 600; background: #e8f0fe; color: #1a56db; padding: 2px 6px; border-radius: 3px; }
+  .tag-unchanged { font-size: 11px; font-weight: 600; background: #f3f4f6; color: #6b7280; padding: 2px 6px; border-radius: 3px; }
+  .scope-group { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.05em; margin: 16px 0 6px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="sprint-label">Sprint 17 Review</div>
+  <h1>#15 — パスワード変更に現在パスワード確認（再認証）を必須にする</h1>
+  <div class="meta">
+    <span class="badge badge-sprint">Sprint 17</span>
+    <span class="badge badge-issue">#15</span>
+    <span class="badge badge-security">security / E4</span>
+    <span class="badge badge-scope">2-repo（backend + frontend）</span>
+  </div>
+
+  <!-- Problem -->
+  <section>
+    <h2>なぜこの改修が必要だったか</h2>
+    <div class="problem-box">
+      <div class="label">問題</div>
+      <p>これまでSPA上にはパスワードを変更する画面/APIが一切存在しなかった。もしセッションが乗っ取られた場合（Cookie窃取等）、現在パスワードの確認なしにパスワードを変更できる経路があると、正規ユーザーがアカウントを取り戻せなくなる（S6是正）。パスワード変更は「現在パスワードによる再認証」を必須にし、変更成功時はセッションを新しいトークンにローテートする必要がある。</p>
+    </div>
+    <div class="arch-grid">
+      <div class="arch-box before">
+        <div class="arch-title">改修前</div>
+        <div class="flow-item"><span class="dot dot-red"></span>パスワード変更の画面/APIが存在しない</div>
+        <div class="flow-item"><span class="dot dot-red"></span>userId起点で現在パスワードハッシュを取得する経路がない（既存はusername起点・login専用）</div>
+        <div class="flow-item"><span class="dot dot-red"></span>アカウント編集画面からパスワード変更への導線がない</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-box after">
+        <div class="arch-title">改修後</div>
+        <div class="flow-item"><span class="dot dot-green"></span><code>/account/password</code>（<code>PasswordChangeView.vue</code>・requiresAuth）</div>
+        <div class="flow-item"><span class="dot dot-green"></span><code>POST /api/account/password</code> → 現在PW再認証 → 強度検証 → bcrypt更新</div>
+        <div class="flow-item"><span class="dot dot-green"></span>現在PW誤り=422／弱PW=400／未認証=401／CSRF欠落=403 の三系統分離</div>
+        <div class="flow-item"><span class="dot dot-green"></span>成功時は <code>issueTokensFor</code> で現在セッションのトークンをローテート（Q3）</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AC breakdown -->
+  <section>
+    <h2>AC別 実装内容</h2>
+
+    <!-- AC1 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC1 (SBD-16)</div>
+        <div class="ac-text">パスワード変更は現在パスワード確認/再認証を必須にする</div>
+      </div>
+      <div class="ac-body">
+        <p>非冪等の <code>POST /api/account/password</code> を新設。<code>SecurityConfig</code> は無変更（<code>/api/account/**</code> は既存の <code>anyRequest().authenticated()</code> 配下＝未認証は自動的に401・CSRFも既存機構がそのまま適用）。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../presentation/rest/AccountController.java</span>
+            <span class="diff-stat">L73-85, L185-195</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">80</span><span class="line-prefix">+</span><span>  @PostMapping("/password")</span></div>
+            <div class="code-line line-add"><span class="line-num">81</span><span class="line-prefix">+</span><span>  @ResponseStatus(HttpStatus.NO_CONTENT)</span></div>
+            <div class="code-line line-add"><span class="line-num">82</span><span class="line-prefix">+</span><span>  public void changePassword(</span></div>
+            <div class="code-line line-add"><span class="line-num">83</span><span class="line-prefix">+</span><span>      @Valid @RequestBody PasswordChangeRequest request, HttpServletResponse response) {</span></div>
+            <div class="code-line line-add"><span class="line-num">84</span><span class="line-prefix">+</span><span>    accountApplicationService.changePassword(request.toCommand(), response);</span></div>
+            <div class="code-line line-add"><span class="line-num">85</span><span class="line-prefix">+</span><span>  }</span></div>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../application/service/AccountApplicationService.java</span>
+            <span class="diff-stat">L147-163</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">147</span><span class="line-prefix">+</span><span>  @Transactional</span></div>
+            <div class="code-line line-add"><span class="line-num">148</span><span class="line-prefix">+</span><span>  public void changePassword(PasswordChangeCommand command, HttpServletResponse response) {</span></div>
+            <div class="code-line line-add"><span class="line-num">149</span><span class="line-prefix">+</span><span>    AuthenticatedUser user = currentUserProvider.requireCurrentUser();</span></div>
+            <div class="code-line line-add"><span class="line-num">150</span><span class="line-prefix">+</span><span>    String storedHash =</span></div>
+            <div class="code-line line-add"><span class="line-num">151</span><span class="line-prefix">+</span><span>        accountRepository</span></div>
+            <div class="code-line line-add"><span class="line-num">152</span><span class="line-prefix">+</span><span>            .findPasswordHashByUserId(user.userId())</span></div>
+            <div class="code-line line-add"><span class="line-num">153</span><span class="line-prefix">+</span><span>            .orElseThrow(() -&gt; new ResourceNotFoundException("Account not found"));</span></div>
+            <div class="code-line line-add"><span class="line-num">154</span><span class="line-prefix">+</span><span></span></div>
+            <div class="code-line line-add"><span class="line-num">155</span><span class="line-prefix">+</span><span>    if (!passwordEncoder.matches(command.currentPassword(), storedHash)) {</span></div>
+            <div class="code-line line-add"><span class="line-num">156</span><span class="line-prefix">+</span><span>      throw new InvalidCurrentPasswordException();</span></div>
+            <div class="code-line line-add"><span class="line-num">157</span><span class="line-prefix">+</span><span>    }</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>userId起点で現在パスワードハッシュを取得する経路が既存に無かった（既存 <code>AccountAuthCustomMapper.findByUsername</code> はusername起点・login専用）ため、新設 <code>SignonCustomMapper</code>（単純PK SELECT/UPDATEのためアノテーション方式）を <code>AccountRepository</code> 経由で追加した。</span>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../infrastructure/mybatis/custom/mapper/SignonCustomMapper.java</span>
+            <span class="diff-stat">新規 37行</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">20</span><span class="line-prefix">+</span><span>  @Select("SELECT password_hash FROM m_signon WHERE user_id = #{userId}")</span></div>
+            <div class="code-line line-add"><span class="line-num">21</span><span class="line-prefix">+</span><span>  String findPasswordHashByUserId(@Param("userId") Long userId);</span></div>
+            <div class="code-line line-add"><span class="line-num">29</span><span class="line-prefix">+</span><span>  @Update(</span></div>
+            <div class="code-line line-add"><span class="line-num">31</span><span class="line-prefix">+</span><span>      UPDATE m_signon</span></div>
+            <div class="code-line line-add"><span class="line-num">32</span><span class="line-prefix">+</span><span>         SET password_hash = #{passwordHash}, version = version + 1,</span></div>
+            <div class="code-line line-add"><span class="line-num">33</span><span class="line-prefix">+</span><span>             update_user_id = #{updateUserId}, update_program = #{updateProgram}</span></div>
+            <div class="code-line line-add"><span class="line-num">34</span><span class="line-prefix">+</span><span>       WHERE user_id = #{userId}</span></div>
+            <div class="code-line line-add"><span class="line-num">36</span><span class="line-prefix">+</span><span>  int updatePassword(SignonUpdateCustomEntity entity);</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">ℹ️</span>
+            <span><b>意図的設計（計画フェーズ確定・欠落ではない）</b>: <code>m_signon</code> はversion楽観ロック対象外。現在PW再認証ゲート自体が競合防止を担保するため、WHEREにversionガードを付けていない（<code>version = version + 1</code>は整合のため加算のみ）。</span>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../presentation/rest/exception/GlobalExceptionHandler.java</span>
+            <span class="diff-stat">+14</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">93</span><span class="line-prefix">+</span><span>  @ExceptionHandler(InvalidCurrentPasswordException.class)</span></div>
+            <div class="code-line line-add"><span class="line-num">94</span><span class="line-prefix">+</span><span>  public ResponseEntity&lt;ErrorResponse&gt; handleInvalidCurrentPassword(</span></div>
+            <div class="code-line line-add"><span class="line-num">95</span><span class="line-prefix">+</span><span>      InvalidCurrentPasswordException e, HttpServletRequest request) {</span></div>
+            <div class="code-line line-add"><span class="line-num">98</span><span class="line-prefix">+</span><span>    return build(HttpStatus.UNPROCESSABLE_CONTENT, "UNPROCESSABLE_ENTITY", e.getMessage(), request);</span></div>
+            <div class="code-line line-add"><span class="line-num">99</span><span class="line-prefix">+</span><span>  }</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span><b>計画フェーズで確定したステータス三系統分離</b>: 現在PW誤り=422（<code>httpClient</code>のsilent-refreshを誤発火させる401、CSRF欠落と衝突する403のいずれも避けた）／弱PW・不正入力（Bean Validation）=400／真の未認証=401／CSRF欠落=403。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC2 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC2 (SBD-5)</div>
+        <div class="ac-text">新パスワードはハッシュ＋ソルトで保存。強度検証（8字以上・複数文字種）</div>
+      </div>
+      <div class="ac-body">
+        <p>新パスワードは共有制約 <code>@StrongPassword</code>（8〜72文字・UTF-8で72バイト以下・英大/英小/数字/記号の4種中2種以上）で検証したうえで、既存の bcrypt <code>PasswordEncoder</code> でエンコードして保存する。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../presentation/rest/validation/StrongPassword.java / StrongPasswordValidator.java</span>
+            <span class="diff-stat">新規（31行 + 68行）</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">22</span><span class="line-prefix">+</span><span>    int length = value.length();</span></div>
+            <div class="code-line line-add"><span class="line-num">23</span><span class="line-prefix">+</span><span>    if (length &lt; MIN_LENGTH || length &gt; MAX_LENGTH) {</span></div>
+            <div class="code-line line-add"><span class="line-num">24</span><span class="line-prefix">+</span><span>      return false;</span></div>
+            <div class="code-line line-add"><span class="line-num">25</span><span class="line-prefix">+</span><span>    }</span></div>
+            <div class="code-line line-add"><span class="line-num">26</span><span class="line-prefix">+</span><span>    if (value.getBytes(StandardCharsets.UTF_8).length &gt; MAX_LENGTH) {</span></div>
+            <div class="code-line line-add"><span class="line-num">27</span><span class="line-prefix">+</span><span>      return false;</span></div>
+            <div class="code-line line-add"><span class="line-num">28</span><span class="line-prefix">+</span><span>    }</span></div>
+            <div class="code-line line-add"><span class="line-num">29</span><span class="line-prefix">+</span><span>    return countCharClasses(value) &gt;= MIN_CHAR_CLASSES;</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>#17（register.password）と本Story（<code>PasswordChangeRequest.newPassword</code>）の両方が同一制約を共有する1本化設計（Q1確定・仕様分岐防止）。長さ上限72はbcryptの72バイト上限に合わせ、マルチバイト文字混入時の暗黙切り詰めを防ぐためUTF-8バイト長も別途検証する。</span>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../presentation/rest/AccountController.java（PasswordChangeRequest）</span>
+            <span class="diff-stat">L189-195</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">189</span><span class="line-prefix">+</span><span>  public record PasswordChangeRequest(</span></div>
+            <div class="code-line line-add"><span class="line-num">190</span><span class="line-prefix">+</span><span>      @NotBlank String currentPassword, @StrongPassword String newPassword) {</span></div>
+            <div class="code-line line-add"><span class="line-num">191</span><span class="line-prefix">+</span><span></span></div>
+            <div class="code-line line-add"><span class="line-num">192</span><span class="line-prefix">+</span><span>    PasswordChangeCommand toCommand() {</span></div>
+            <div class="code-line line-add"><span class="line-num">193</span><span class="line-prefix">+</span><span>      return new PasswordChangeCommand(currentPassword, newPassword);</span></div>
+            <div class="code-line line-add"><span class="line-num">194</span><span class="line-prefix">+</span><span>    }</span></div>
+            <div class="code-line line-add"><span class="line-num">195</span><span class="line-prefix">+</span><span>  }</span></div>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../application/service/AccountApplicationService.java</span>
+            <span class="diff-stat">L159-162</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">159</span><span class="line-prefix">+</span><span>    String newHash = passwordEncoder.encode(command.newPassword());</span></div>
+            <div class="code-line line-add"><span class="line-num">160</span><span class="line-prefix">+</span><span>    accountRepository.updatePassword(user.userId(), newHash);</span></div>
+            <div class="code-line line-add"><span class="line-num">161</span><span class="line-prefix">+</span><span></span></div>
+            <div class="code-line line-add"><span class="line-num">162</span><span class="line-prefix">+</span><span>    authApplicationService.issueTokensFor(user, response);</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span><b>Q3（トークンローテート）</b>: 変更成功時に #13登録の自動ログインと同じ <code>AuthApplicationService#issueTokensFor</code> を流用し、現在セッションを fresh JWT へ再発行する。他デバイスのトークンは既存の短命access + refresh失効に委ねる（全セッション即時失効は今スプリント対象外・別Issue級）。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC-neg1 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC-neg1 (SBD-16)</div>
+        <div class="ac-text">現在パスワード無し/誤りでの PW 変更が拒否される</div>
+      </div>
+      <div class="ac-body">
+        <p>統合テスト（Testcontainers＋MockMvc・実際のSecurityフィルタチェーン経由）で、現在PW誤り・空欄・弱い新PWのいずれもDB更新に至らないことをハッシュ値の不変性まで実証している。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/test/groovy/.../PasswordChangeControllerSpec.groovy</span>
+            <span class="diff-stat">新規 197行</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">133</span><span class="line-prefix"> </span><span>  def "AC-neg1: 現在PWが誤りだと422になり、hashは変更されない"() {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">134</span><span class="line-prefix"> </span><span>    given:</span></div>
+            <div class="code-line line-ctx"><span class="line-num">135</span><span class="line-prefix"> </span><span>    def originalHash = storedPasswordHash()</span></div>
+            <div class="code-line line-ctx"><span class="line-num">137</span><span class="line-prefix"> </span><span>    expect:</span></div>
+            <div class="code-line line-ctx"><span class="line-num">138</span><span class="line-prefix"> </span><span>    mockMvc.perform(post("/api/account/password").with(csrf()).cookie(accessTokenCookie)</span></div>
+            <div class="code-line line-ctx"><span class="line-num">140</span><span class="line-prefix"> </span><span>            .content(changeBody("WrongCurrent#1", NEW_PASSWORD)))</span></div>
+            <div class="code-line line-ctx"><span class="line-num">141</span><span class="line-prefix"> </span><span>            .andExpect(status().isUnprocessableEntity())</span></div>
+            <div class="code-line line-ctx"><span class="line-num">144</span><span class="line-prefix"> </span><span>    and:</span></div>
+            <div class="code-line line-ctx"><span class="line-num">145</span><span class="line-prefix"> </span><span>    storedPasswordHash() == originalHash</span></div>
+            <div class="code-line line-ctx"><span class="line-num">146</span><span class="line-prefix"> </span><span>  }</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>同ファイルに「現在PWが空だと400になる（<code>@NotBlank</code>）」「未認証（Cookie無し）で401になる」テストも含む。<code>m_signon</code>フィクスチャは <code>AuthLoginLogoutSpec</code> と同型（テスト自身が既知パスワードのbcryptハッシュを自己INSERT）で用意した。</span>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/test/groovy/.../AccountApplicationServiceSpec.groovy</span>
+            <span class="diff-stat">+70</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">214</span><span class="line-prefix"> </span><span>    def "changePassword: 現在PWが不一致ならInvalidCurrentPasswordExceptionになり、更新もトークン発行もしない(AC-neg1・422)"() {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">223</span><span class="line-prefix"> </span><span>        then:</span></div>
+            <div class="code-line line-ctx"><span class="line-num">224</span><span class="line-prefix"> </span><span>        thrown(InvalidCurrentPasswordException)</span></div>
+            <div class="code-line line-ctx"><span class="line-num">225</span><span class="line-prefix"> </span><span>        0 * accountRepository.updatePassword(_, _)</span></div>
+            <div class="code-line line-ctx"><span class="line-num">226</span><span class="line-prefix"> </span><span>        0 * authApplicationService.issueTokensFor(_, _)</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Frontend -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">frontend</div>
+        <div class="ac-text">パスワード変更画面・API・ストア・導線</div>
+      </div>
+      <div class="ac-body">
+        <p><code>PasswordChangeView.vue</code>（新規）は現在PW・新PW・確認用PWの3フィールドを持つフォーム。送信前にクライアント側で強度/一致をチェックし（<code>isStrongPassword</code>・#17共有）、backend権威の422/400をエラーメッセージへマッピングする。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/views/PasswordChangeView.vue</span>
+            <span class="diff-stat">新規 152行</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">32</span><span class="line-prefix">+</span><span>async function handleSubmit() {</span></div>
+            <div class="code-line line-add"><span class="line-num">33</span><span class="line-prefix">+</span><span>  if (hasClientValidationError.value) {</span></div>
+            <div class="code-line line-add"><span class="line-num">34</span><span class="line-prefix">+</span><span>    return</span></div>
+            <div class="code-line line-add"><span class="line-num">35</span><span class="line-prefix">+</span><span>  }</span></div>
+            <div class="code-line line-add"><span class="line-num">36</span><span class="line-prefix">+</span><span>  const success = await accountStore.changePassword({</span></div>
+            <div class="code-line line-add"><span class="line-num">37</span><span class="line-prefix">+</span><span>    currentPassword: currentPassword.value,</span></div>
+            <div class="code-line line-add"><span class="line-num">38</span><span class="line-prefix">+</span><span>    newPassword: newPassword.value,</span></div>
+            <div class="code-line line-add"><span class="line-num">39</span><span class="line-prefix">+</span><span>  })</span></div>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/stores/account.ts</span>
+            <span class="diff-stat">+30（changePassword action）</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">96</span><span class="line-prefix">+</span><span>    async changePassword(payload: {</span></div>
+            <div class="code-line line-add"><span class="line-num">97</span><span class="line-prefix">+</span><span>      currentPassword: string</span></div>
+            <div class="code-line line-add"><span class="line-num">98</span><span class="line-prefix">+</span><span>      newPassword: string</span></div>
+            <div class="code-line line-add"><span class="line-num">99</span><span class="line-prefix">+</span><span>    }): Promise&lt;boolean&gt; {</span></div>
+            <div class="code-line line-add"><span class="line-num">104</span><span class="line-prefix">+</span><span>        await accountApi.changePassword(payload)</span></div>
+            <div class="code-line line-add"><span class="line-num">105</span><span class="line-prefix">+</span><span>        this.passwordChangeSuccess = true</span></div>
+            <div class="code-line line-add"><span class="line-num">108</span><span class="line-prefix">+</span><span>        this.passwordChangeError = toPasswordChangeErrorReason(error)</span></div>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/router/index.ts / src/views/AccountEditView.vue</span>
+            <span class="diff-stat">ルート追加 / 導線リンク追加</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">123</span><span class="line-prefix">+</span><span>  { path: '/account/password', name: 'account-password',</span></div>
+            <div class="code-line line-add"><span class="line-num">125</span><span class="line-prefix">+</span><span>    component: PasswordChangeView, meta: { requiresAuth: true } },</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>アカウント編集画面（<code>AccountEditView.vue</code>）末尾に「Change Password」ボタンを追加し、<code>/account/password</code> への導線を設けた。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Implementation notes -->
+  <section>
+    <h2>実装メモ（仕様外の判断・変更・妥協点）</h2>
+    <ul class="note-list">
+      <li class="note-item"><strong><code>HttpStatus.UNPROCESSABLE_ENTITY</code> は Spring Framework 7.0 で非推奨化されていた</strong>: <code>UNPROCESSABLE_CONTENT</code>（値=422は不変・RFC 9110の呼称変更）へ是正した。JSON応答の <code>code</code> フィールドは既存の <code>"UNPROCESSABLE_ENTITY"</code> 文字列のまま維持している。</li>
+      <li class="note-item"><strong><code>PasswordChangeControllerSpec</code> の <code>m_signon</code> フィクスチャは自己INSERT</strong>: <code>AuthLoginLogoutSpec</code> と同型で、テスト自身が <code>passwordEncoder.encode()</code> で生成した既知パスワードのbcryptハッシュを用意した。</li>
+      <li class="note-item"><strong><code>SignonCustomMapper.updatePassword</code> はPOJO（<code>SignonUpdateCustomEntity</code>）を単一パラメータとするアノテーション方式</strong>: 複数 <code>@Param</code> スカラーではなくPOJOにした理由は、<code>AuditProgramInterceptor</code>が警告する「paramがMapの場合の意図しないput混入」を構造的に回避するため（既存 <code>AccountUpdateCustomEntity</code> と同じ設計判断）。</li>
+      <li class="note-item"><strong>実機 <code>bootRun</code> 起動確認は省略した</strong>: <code>SecurityConfig</code> は無変更（新規permitAll追加なし）であり、新規エンドポイントは統合テスト（実際のSecurityフィルタチェーンを全経路通過）で401/403/404/405/422/400/204の全応答を実証済みのため、十分にカバーできていると判断した。</li>
+    </ul>
+  </section>
+
+  <!-- Verify -->
+  <section>
+    <h2>動作確認ポイント（ユーザー確認用）</h2>
+    <ul class="verify-list">
+      <li class="verify-item">
+        <div class="verify-num">1</div>
+        <div class="verify-content">
+          <strong>アカウント編集画面（/account/edit）から「Change Password」ボタンでパスワード変更画面に遷移できること</strong>
+          <span>これまで遷移先が存在しなかった</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">2</div>
+        <div class="verify-content">
+          <strong>現在のパスワードを間違えて入力すると変更が拒否され、明確なエラーメッセージが表示されること</strong>
+          <span>「Current password is incorrect.」等。パスワードは実際には変更されない</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">3</div>
+        <div class="verify-content">
+          <strong>正しい現在パスワードと強いパスワードを入力すると、変更が成功し成功メッセージが表示されること</strong>
+          <span>「Your password has been changed.」</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">4</div>
+        <div class="verify-content">
+          <strong>パスワード変更後、再ログインを求められることなくそのまま画面操作を続けられること</strong>
+          <span>現在セッションのトークンが裏でローテートされているため（成功画面から他画面へ遷移して確認）</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">5</div>
+        <div class="verify-content">
+          <strong>弱いパスワード（英小文字のみ等・1種類の文字種のみ）を入力すると、送信前にエラー表示されること</strong>
+          <span>フォーム送信を待たずにその場でフィードバックされる</span>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- Scope -->
+  <section>
+    <h2>改修スコープ確認</h2>
+    <div class="scope-group">backend</div>
+    <table class="scope-table">
+      <tr><th>ファイル</th><th>変更</th><th>内容</th></tr>
+      <tr><td><code>presentation/rest/validation/StrongPassword.java</code> / <code>StrongPasswordValidator.java</code></td><td><span class="tag-new">新規</span></td><td>#15/#17共有のPW強度Bean Validation制約</td></tr>
+      <tr><td><code>domain/account/PasswordChangeCommand.java</code></td><td><span class="tag-new">新規</span></td><td>PW変更ユースケースの入力コマンド（allowlist）</td></tr>
+      <tr><td><code>domain/exception/InvalidCurrentPasswordException.java</code></td><td><span class="tag-new">新規</span></td><td>現在PW誤りの専用例外（422へ正規化）</td></tr>
+      <tr><td><code>infrastructure/mybatis/custom/mapper/SignonCustomMapper.java</code> / <code>entity/SignonUpdateCustomEntity.java</code></td><td><span class="tag-new">新規</span></td><td>userId起点のm_signon SELECT/UPDATE（アノテーション方式）</td></tr>
+      <tr><td><code>presentation/rest/AccountController.java</code></td><td><span class="tag-changed">変更あり</span></td><td>POST /api/account/password 追加・PasswordChangeRequest DTO</td></tr>
+      <tr><td><code>application/service/AccountApplicationService.java</code></td><td><span class="tag-changed">変更あり</span></td><td>changePassword()ユースケース追加</td></tr>
+      <tr><td><code>domain/account/AccountRepository.java</code> / <code>infrastructure/mybatis/account/MyBatisAccountRepository.java</code></td><td><span class="tag-changed">変更あり</span></td><td>findPasswordHashByUserId / updatePassword 追加</td></tr>
+      <tr><td><code>presentation/rest/exception/GlobalExceptionHandler.java</code></td><td><span class="tag-changed">変更あり</span></td><td>InvalidCurrentPasswordException→422の正規化を追加</td></tr>
+      <tr><td><code>config/SecurityConfig.java</code></td><td><span class="tag-unchanged">変更なし</span></td><td>/api/account/**が既にauthenticated()配下・CSRFも既存機構がそのまま適用</td></tr>
+    </table>
+    <div class="scope-group">frontend</div>
+    <table class="scope-table">
+      <tr><th>ファイル</th><th>変更</th><th>内容</th></tr>
+      <tr><td><code>views/PasswordChangeView.vue</code></td><td><span class="tag-new">新規</span></td><td>パスワード変更画面</td></tr>
+      <tr><td><code>utils/accountValidation.ts</code></td><td><span class="tag-new">新規</span></td><td>isStrongPassword等（#17と共有）</td></tr>
+      <tr><td><code>api/accountApi.ts</code></td><td><span class="tag-changed">変更あり</span></td><td>changePassword() 追加</td></tr>
+      <tr><td><code>stores/account.ts</code></td><td><span class="tag-changed">変更あり</span></td><td>changePassword action・PasswordChangeErrorReason 追加</td></tr>
+      <tr><td><code>router/index.ts</code></td><td><span class="tag-changed">変更あり</span></td><td>/account/password ルート追加（requiresAuth）</td></tr>
+      <tr><td><code>views/AccountEditView.vue</code></td><td><span class="tag-changed">変更あり</span></td><td>パスワード変更画面への導線リンク追加</td></tr>
+      <tr><td><code>i18n/locales/en.ts</code></td><td><span class="tag-changed">変更あり</span></td><td>account.password.* 文言追加</td></tr>
+    </table>
+  </section>
+
+</div>
+</body>
+</html>

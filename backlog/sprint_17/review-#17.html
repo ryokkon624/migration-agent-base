@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint 17 Review — #17 アカウント入力検証（email形式・最大長・PW強度）を強化する</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #f8f7f5; }
+
+  .page { max-width: 860px; margin: 0 auto; padding: 48px 24px; }
+
+  /* Header */
+  .sprint-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin-bottom: 8px; }
+  h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px; }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+  .badge-sprint { background: #e8f0fe; color: #1a56db; }
+  .badge-issue { background: #f0fdf4; color: #166534; }
+  .badge-feature { background: #fdf4ff; color: #7e22ce; }
+  .badge-scope { background: #fff7ed; color: #c2410c; }
+
+  /* Sections */
+  section { margin-bottom: 40px; }
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #888; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e5e5e5; }
+
+  /* Problem box */
+  .problem-box { background: #fff8f0; border-left: 3px solid #f59e0b; border-radius: 0 8px 8px 0; padding: 16px 20px; margin-bottom: 16px; }
+  .problem-box .label { font-size: 11px; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .problem-box p { color: #451a03; font-size: 13px; }
+
+  /* Architecture change */
+  .arch-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: center; margin-bottom: 8px; }
+  .arch-box { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; }
+  .arch-box .arch-title { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .arch-box.before { border-color: #fca5a5; }
+  .arch-box.after { border-color: #86efac; }
+  .arch-arrow { font-size: 20px; color: #888; text-align: center; }
+  .flow-item { font-size: 12px; color: #374151; padding: 3px 0; display: flex; align-items: flex-start; gap: 6px; }
+  .flow-item .dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .dot-red { background: #ef4444; }
+  .dot-green { background: #22c55e; }
+
+  /* Mock UI (inline error) */
+  .mock-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 8px; }
+  .mock-box { border-radius: 8px; padding: 16px; border: 1px solid #e5e5e5; background: white; }
+  .mock-box .mock-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; color: #888; }
+  .mock-field { margin-bottom: 10px; }
+  .mock-field label { font-size: 11px; color: #6b7280; display: block; margin-bottom: 3px; }
+  .mock-input { width: 100%; padding: 6px 10px; border-radius: 5px; border: 1px solid #d1d5db; font-size: 12px; font-family: monospace; }
+  .mock-input.invalid { border-color: #ef4444; background: #fef2f2; }
+  .mock-error { font-size: 11px; color: #b91c1c; margin-top: 3px; }
+
+  /* AC cards */
+  .ac-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+  .ac-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid #f0f0f0; }
+  .ac-check { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .ac-check.done { background: #dcfce7; color: #166534; }
+  .ac-num { font-size: 11px; font-weight: 700; color: #888; }
+  .ac-text { font-size: 13px; font-weight: 600; color: #1a1a1a; flex: 1; }
+  .ac-body { padding: 16px 18px; }
+  .ac-body p { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+
+  /* File change */
+  .file-change { margin-bottom: 16px; }
+  .file-name { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; background: #f3f4f6; color: #374151; padding: 5px 10px; border-radius: 4px 4px 0 0; border: 1px solid #e5e5e5; border-bottom: none; display: flex; justify-content: space-between; }
+  .diff-stat { color: #888; }
+  .code-block { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.7; background: #1e1e2e; color: #cdd6f4; padding: 14px 16px; border-radius: 0 0 6px 6px; overflow-x: auto; }
+  .code-line { display: flex; }
+  .line-num { color: #45475a; min-width: 28px; user-select: none; }
+  .line-add { background: rgba(166, 227, 161, 0.12); color: #a6e3a1; }
+  .line-del { background: rgba(243, 139, 168, 0.12); color: #f38ba8; }
+  .line-ctx { color: #cdd6f4; }
+  .line-prefix { min-width: 14px; }
+
+  /* Annotation */
+  .annotation { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-size: 12px; color: #78350f; display: flex; gap: 8px; }
+  .annotation-icon { font-size: 14px; flex-shrink: 0; }
+
+  /* Note list (implementation notes) */
+  .note-list { list-style: none; }
+  .note-item { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; font-size: 13px; color: #374151; }
+  .note-item strong { color: #1a1a1a; }
+
+  /* Verify section */
+  .verify-list { list-style: none; }
+  .verify-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; }
+  .verify-item:last-child { border-bottom: none; }
+  .verify-num { width: 22px; height: 22px; background: #e8f0fe; color: #1a56db; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .verify-content { flex: 1; }
+  .verify-content strong { font-size: 13px; color: #1a1a1a; display: block; margin-bottom: 3px; }
+  .verify-content span { font-size: 12px; color: #6b7280; }
+
+  /* Scope table */
+  .scope-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .scope-table th { text-align: left; padding: 8px 12px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .scope-table td { padding: 10px 12px; border: 1px solid #e5e5e5; color: #374151; vertical-align: top; }
+  .scope-table tr:hover td { background: #f9fafb; }
+  .tag-new { font-size: 11px; font-weight: 600; background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 3px; }
+  .tag-changed { font-size: 11px; font-weight: 600; background: #e8f0fe; color: #1a56db; padding: 2px 6px; border-radius: 3px; }
+  .tag-unchanged { font-size: 11px; font-weight: 600; background: #f3f4f6; color: #6b7280; padding: 2px 6px; border-radius: 3px; }
+  .scope-group { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.05em; margin: 16px 0 6px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="sprint-label">Sprint 17 Review</div>
+  <h1>#17 — アカウント入力検証（email形式・最大長・PW強度）を強化する</h1>
+  <div class="meta">
+    <span class="badge badge-sprint">Sprint 17</span>
+    <span class="badge badge-issue">#17</span>
+    <span class="badge badge-feature">feature / E4</span>
+    <span class="badge badge-scope">2-repo（backend retrofit + frontend インライン UI）</span>
+  </div>
+
+  <!-- Problem -->
+  <section>
+    <h2>なぜこの改修が必要だったか</h2>
+    <div class="problem-box">
+      <div class="label">問題</div>
+      <p>登録（#13）・編集（#14）のリクエストDTOは「非空（<code>@NotBlank</code>）＋パスワード一致」のみを検証していた。email形式が不正でも、DBカラム幅を超える値でも（切り詰めエラーの温床）、弱いパスワード（例: 数字のみ8桁）でも、サーバは受理してしまう状態だった。フォーム送信後にサーバエラーで初めて気づくのはUXとしても悪い。</p>
+    </div>
+    <div class="arch-grid">
+      <div class="arch-box before">
+        <div class="arch-title">改修前</div>
+        <div class="flow-item"><span class="dot dot-red"></span>email形式チェックなし（<code>"not-an-email"</code>でも通る）</div>
+        <div class="flow-item"><span class="dot dot-red"></span>各項目の最大長チェックなし（DBカラム幅超過で切り詰めエラーの温床）</div>
+        <div class="flow-item"><span class="dot dot-red"></span>パスワード強度チェックなし（8桁の数字だけでも登録できる）</div>
+        <div class="flow-item"><span class="dot dot-red"></span>フィールド単位のインラインエラー表示がない（フォーム単位のアラートのみ）</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-box after">
+        <div class="arch-title">改修後</div>
+        <div class="flow-item"><span class="dot dot-green"></span><code>@Email</code>（backend）＋frontend自前の簡易チェックでUX向上</div>
+        <div class="flow-item"><span class="dot dot-green"></span>各項目に <code>@Size(max)</code>（DBカラム幅と整合・Q2確定）</div>
+        <div class="flow-item"><span class="dot dot-green"></span><code>@StrongPassword</code>（8〜72文字・4種中2種以上・#15と共有）</div>
+        <div class="flow-item"><span class="dot dot-green"></span>register/edit/PW変更のいずれもフィールド単位のインラインエラー表示</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Mock UI -->
+  <section>
+    <h2>インラインエラー表示（AC3）</h2>
+    <div class="mock-grid">
+      <div class="mock-box">
+        <div class="mock-title">改修前 — フォーム単位アラートのみ</div>
+        <div class="mock-field">
+          <label>Email</label>
+          <input class="mock-input" value="not-an-email" readonly />
+        </div>
+        <div class="mock-field">
+          <label>Username</label>
+          <input class="mock-input" value="a_very_long_username_over_80_chars..." readonly />
+        </div>
+        <p style="font-size:11px;color:#6b7280;">送信するまでどのフィールドが問題か分からない</p>
+      </div>
+      <div class="mock-box">
+        <div class="mock-title">改修後 — フィールド単位インラインエラー</div>
+        <div class="mock-field">
+          <label>Email</label>
+          <input class="mock-input invalid" value="not-an-email" readonly />
+          <div class="mock-error">Please enter a valid email address.</div>
+        </div>
+        <div class="mock-field">
+          <label>Username</label>
+          <input class="mock-input invalid" value="a_very_long_username_over_80_chars..." readonly maxlength="80" />
+          <div class="mock-error">This field is too long.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AC breakdown -->
+  <section>
+    <h2>AC別 実装内容</h2>
+
+    <!-- AC1 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC1</div>
+        <div class="ac-text">email 形式・各項目の最大長・必須を検証（as-is は非空＋PW一致のみ）</div>
+      </div>
+      <div class="ac-body">
+        <p>各項目の最大長は「DEV が DDL（<code>V00_000_004__create_account_tables.sql</code>）から実測したカラム幅に整合させる」（Q2確定）。register/edit両方のDTOへ <code>@Email</code>・<code>@Size(max)</code> を追加した。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../presentation/rest/RegistrationController.java（RegisterRequest）</span>
+            <span class="diff-stat">L59-74</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-del"><span class="line-num">-</span><span class="line-prefix">-</span><span>      @NotBlank String username,</span></div>
+            <div class="code-line line-del"><span class="line-num">-</span><span class="line-prefix">-</span><span>      @NotBlank String email,</span></div>
+            <div class="code-line line-add"><span class="line-num">60</span><span class="line-prefix">+</span><span>      @NotBlank @Size(max = 80) String username,</span></div>
+            <div class="code-line line-add"><span class="line-num">63</span><span class="line-prefix">+</span><span>      @NotBlank @Email @Size(max = 80) String email,</span></div>
+            <div class="code-line line-add"><span class="line-num">67</span><span class="line-prefix">+</span><span>      @Size(max = 40) String address2,</span></div>
+            <div class="code-line line-add"><span class="line-num">70</span><span class="line-prefix">+</span><span>      @NotBlank @Size(max = 20) String postalCode,</span></div>
+            <div class="code-line line-add"><span class="line-num">71</span><span class="line-prefix">+</span><span>      @NotBlank @Size(max = 20) String country,</span></div>
+            <div class="code-line line-add"><span class="line-num">74</span><span class="line-prefix">+</span><span>      @Size(max = 10) String favoriteCategoryId) {</span></div>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../presentation/rest/AccountController.java（AccountEditRequest）</span>
+            <span class="diff-stat">L119-132</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">121</span><span class="line-prefix">+</span><span>      @NotBlank @Size(max = 80) String firstName,</span></div>
+            <div class="code-line line-add"><span class="line-num">123</span><span class="line-prefix">+</span><span>      @NotBlank @Email @Size(max = 80) String email,</span></div>
+            <div class="code-line line-add"><span class="line-num">126</span><span class="line-prefix">+</span><span>      @Size(max = 40) String address2,</span></div>
+            <div class="code-line line-add"><span class="line-num">129</span><span class="line-prefix">+</span><span>      @NotBlank @Size(max = 20) String postalCode,</span></div>
+            <div class="code-line line-add"><span class="line-num">130</span><span class="line-prefix">+</span><span>      @NotBlank @Size(max = 20) String country,</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>実測カラム幅（DDL）: username/email/first_name/last_name/address1/city/state/phone/language_preference = 80、address2 = 40、postal_code/country = 20、favorite_category_id = 10。password はhash格納（255）のためPW強度制約（8〜72）が支配しカラム幅非依存。</span>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/utils/accountValidation.ts（frontendミラー）</span>
+            <span class="diff-stat">L17-31</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">17</span><span class="line-prefix">+</span><span>export const ACCOUNT_FIELD_MAX_LENGTH = {</span></div>
+            <div class="code-line line-add"><span class="line-num">18</span><span class="line-prefix">+</span><span>  username: 80,</span></div>
+            <div class="code-line line-add"><span class="line-num">19</span><span class="line-prefix">+</span><span>  email: 80,</span></div>
+            <div class="code-line line-add"><span class="line-num">25</span><span class="line-prefix">+</span><span>  address2: 40,</span></div>
+            <div class="code-line line-add"><span class="line-num">28</span><span class="line-prefix">+</span><span>  postalCode: 20,</span></div>
+            <div class="code-line line-add"><span class="line-num">29</span><span class="line-prefix">+</span><span>  country: 20,</span></div>
+            <div class="code-line line-add"><span class="line-num">31</span><span class="line-prefix">+</span><span>  favoriteCategoryId: 10,</span></div>
+            <div class="code-line line-add"><span class="line-num">32</span><span class="line-prefix">+</span><span>} as const</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>backendのDDL実測値をfrontend側にもミラーし、<code>maxlength</code>属性・送信前チェックの両方に使う（backendが権威400のbackstop）。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC2 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC2 (SBD-5 関連)</div>
+        <div class="ac-text">パスワード強度（8字以上・複数文字種・PO決定）を検証</div>
+      </div>
+      <div class="ac-body">
+        <p>#15と共有の <code>@StrongPassword</code> 制約（8〜72文字・UTF-8で72バイト以下・英大/英小/数字/記号の4種中2種以上）を <code>register.password</code> に付与した（PW強度ロジックを1本化・別実装で仕様分岐させない）。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../presentation/rest/RegistrationController.java</span>
+            <span class="diff-stat">L61</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-del"><span class="line-num">-</span><span class="line-prefix">-</span><span>      @NotBlank String password,</span></div>
+            <div class="code-line line-add"><span class="line-num">61</span><span class="line-prefix">+</span><span>      @StrongPassword String password,</span></div>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/test/groovy/.../validation/StrongPasswordValidatorSpec.groovy</span>
+            <span class="diff-stat">新規 90行</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">66</span><span class="line-prefix"> </span><span>    def "isValid: 文字種が1種類のみはfalse(#value)"() {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">71</span><span class="line-prefix"> </span><span>                "alllowercase",  // 小文字のみ</span></div>
+            <div class="code-line line-ctx"><span class="line-num">72</span><span class="line-prefix"> </span><span>                "ALLUPPERCASE",  // 大文字のみ</span></div>
+            <div class="code-line line-ctx"><span class="line-num">73</span><span class="line-prefix"> </span><span>                "12345678",      // 数字のみ</span></div>
+            <div class="code-line line-ctx"><span class="line-num">56</span><span class="line-prefix"> </span><span>    def "isValid: 文字数は72以下でもUTF-8バイト長が72を超える場合はfalse(bcrypt 72バイト上限・暗黙切り詰め防止)"() {</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>8〜72文字境界・73文字超過・文字種1種類/2種類・マルチバイト文字混入時のUTF-8バイト長超過を網羅的にテストしている（Spring context不要のplain Spock）。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC3 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC3</div>
+        <div class="ac-text">検証エラーは分かりやすいインラインエラーで表示（trace 非露出）</div>
+      </div>
+      <div class="ac-body">
+        <p>frontend自前のフィールド単位検証（<code>utils/accountValidation.ts</code>）＋backendの権威400のbackstop、という既定方針（計画フェーズ確定）。backendの <code>ErrorResponse</code> は拡張せず一律固定文言のまま（既存 <code>GlobalExceptionHandler.handleValidation</code> が既に一律400・trace非露出）。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/utils/accountValidation.ts</span>
+            <span class="diff-stat">新規 116行</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">47</span><span class="line-prefix">+</span><span>export function isValidEmail(value: string): boolean {</span></div>
+            <div class="code-line line-add"><span class="line-num">48</span><span class="line-prefix">+</span><span>  if (value.length === 0 || containsWhitespace(value)) {</span></div>
+            <div class="code-line line-add"><span class="line-num">49</span><span class="line-prefix">+</span><span>    return false</span></div>
+            <div class="code-line line-add"><span class="line-num">50</span><span class="line-prefix">+</span><span>  }</span></div>
+            <div class="code-line line-add"><span class="line-num">51</span><span class="line-prefix">+</span><span>  const atIndex = value.indexOf('@')</span></div>
+            <div class="code-line line-add"><span class="line-num">99</span><span class="line-prefix">+</span><span>export function isStrongPassword(value: string): boolean {</span></div>
+            <div class="code-line line-add"><span class="line-num">114</span><span class="line-prefix">+</span><span>export function isWithinMaxLength(value: string, max: number): boolean {</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>正規表現の文字クラスは一切使わず、1文字ずつ走査して判定する（過去セッションで正規表現の文字クラスリテラルが編集ツールにより意図せず書き換わる事象が複数回発生したための回避策・<code>redirectValidator.ts</code>と同じ方針）。</span>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/components/checkout/AddressForm.vue</span>
+            <span class="diff-stat">+48（opt-inプロップ）</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">9</span><span class="line-prefix">+</span><span>const props = defineProps&lt;{</span></div>
+            <div class="code-line line-add"><span class="line-num">10</span><span class="line-prefix">+</span><span>  modelValue: Address</span></div>
+            <div class="code-line line-add"><span class="line-num">11</span><span class="line-prefix">+</span><span>  idPrefix: string</span></div>
+            <div class="code-line line-add"><span class="line-num">12</span><span class="line-prefix">+</span><span>  errors?: Partial&lt;Record&lt;keyof Address, string&gt;&gt;</span></div>
+            <div class="code-line line-add"><span class="line-num">13</span><span class="line-prefix">+</span><span>  maxLengths?: Partial&lt;Record&lt;keyof Address, number&gt;&gt;</span></div>
+            <div class="code-line line-add"><span class="line-num">14</span><span class="line-prefix">+</span><span>}&gt;()</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">ℹ️</span>
+            <span><b>意図的設計</b>: <code>errors</code>/<code>maxLengths</code>は後方互換のopt-inプロップ（未指定=挙動不変）。checkout側の <code>CheckoutAddressStep.vue</code> は本Storyで未変更のため挙動は不変（Sprint7共用フォーム教訓の踏襲）。</span>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/views/RegisterView.vue</span>
+            <span class="diff-stat">+41 / -3</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">30</span><span class="line-prefix">+</span><span>const passwordWeak = computed(() =&gt; password.value.length &gt; 0 &amp;&amp; !isStrongPassword(password.value))</span></div>
+            <div class="code-line line-add"><span class="line-num">31</span><span class="line-prefix">+</span><span>const usernameTooLong = computed(() =&gt; username.value.length &gt; ACCOUNT_FIELD_MAX_LENGTH.username)</span></div>
+            <div class="code-line line-add"><span class="line-num">46</span><span class="line-prefix">+</span><span>const addressErrors = computed&lt;Partial&lt;Record&lt;keyof Address, string&gt;&gt;&gt;(() =&gt; {</span></div>
+            <div class="code-line line-add"><span class="line-num">47</span><span class="line-prefix">+</span><span>  const errors: Partial&lt;Record&lt;keyof Address, string&gt;&gt; = {}</span></div>
+            <div class="code-line line-add"><span class="line-num">49</span><span class="line-prefix">+</span><span>  if (current.email.length &gt; 0 &amp;&amp; !isValidEmail(current.email)) {</span></div>
+            <div class="code-line line-add"><span class="line-num">50</span><span class="line-prefix">+</span><span>    errors.email = t('account.validation.emailInvalid')</span></div>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/views/AccountEditView.vue</span>
+            <span class="diff-stat">+44 / -1</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">72</span><span class="line-prefix">+</span><span>const addressErrors = computed&lt;Partial&lt;Record&lt;keyof Address, string&gt;&gt;&gt;(() =&gt; {</span></div>
+            <div class="code-line line-add"><span class="line-num">76</span><span class="line-prefix">+</span><span>    errors.email = t('account.validation.emailInvalid')</span></div>
+            <div class="code-line line-add"><span class="line-num">90</span><span class="line-prefix">+</span><span>  if (Object.keys(addressErrors.value).length &gt; 0) {</span></div>
+            <div class="code-line line-add"><span class="line-num">91</span><span class="line-prefix">+</span><span>    return</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>register/edit両方とも同じ「フィールド単位errors算出→AddressFormへ渡す」パターンで実装（PasswordChangeView側は#15のインライン検証をこのファイルとは別に持つ）。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC-neg1 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC-neg1</div>
+        <div class="ac-text">不正 email 形式・超過長・弱いPWが拒否される</div>
+      </div>
+      <div class="ac-body">
+        <p>register/edit/PW変更いずれについても、backend側の権威400をアカウント作成/更新が発生しないことまで統合テストで実証している。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/test/groovy/.../RegistrationControllerSpec.groovy</span>
+            <span class="diff-stat">+56（新規テスト4本）</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">195</span><span class="line-prefix"> </span><span>    def "AC-neg1(#17 Q2): 不正なemail形式は400になり、アカウントは作成されない"() { ... }</span></div>
+            <div class="code-line line-ctx"><span class="line-num">214</span><span class="line-prefix"> </span><span>    def "AC-neg1(#17 Q2): usernameがDBカラム幅(80)を超えると400になる"() { ... }</span></div>
+            <div class="code-line line-ctx"><span class="line-num">230</span><span class="line-prefix"> </span><span>    def "AC-neg1(#17 Q1): 弱いパスワード(文字種1種のみ)は400になり、アカウントは作成されない"() { ... }</span></div>
+            <div class="code-line line-ctx"><span class="line-num">242</span><span class="line-prefix"> </span><span>    def "AC-neg1(#17 Q1): パスワードが8文字未満は400になる"() { ... }</span></div>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/test/groovy/.../AccountEditControllerSpec.groovy</span>
+            <span class="diff-stat">+25（新規テスト2本）</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">251</span><span class="line-prefix"> </span><span>    def "AC-neg1(#17 Q2): 不正なemail形式は400になり、更新されない"() { ... }</span></div>
+            <div class="code-line line-ctx"><span class="line-num">265</span><span class="line-prefix"> </span><span>    def "AC-neg1(#17 Q2): firstNameがDBカラム幅(80)を超えると400になる"() { ... }</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>email形式不正のテストは、更新後もDBの<code>first_name</code>が変更前の値のままであることまで確認し、「拒否＝実際にDBへ反映されない」ことを実証する。</span>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/test/groovy/.../PasswordChangeControllerSpec.groovy</span>
+            <span class="diff-stat">L156-168</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">156</span><span class="line-prefix"> </span><span>    def "#17 Q1: 弱い新PW(文字種1種のみ)は400になり、hashは変更されない"() {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">163</span><span class="line-prefix"> </span><span>                .content(changeBody(CURRENT_PASSWORD, "alllowercase")))</span></div>
+            <div class="code-line line-ctx"><span class="line-num">164</span><span class="line-prefix"> </span><span>                .andExpect(status().isBadRequest())</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">ℹ️</span>
+            <span>#15のPW変更エンドポイントにも同じ<code>@StrongPassword</code>制約が適用されているため、弱い新PWは同じく400で拒否される（1本化制約の効果をここでも実証）。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Implementation notes -->
+  <section>
+    <h2>実装メモ（仕様外の判断・変更・妥協点）</h2>
+    <ul class="note-list">
+      <li class="note-item"><strong><code>auth.ts</code> の <code>RegisterErrorReason</code> を <code>PASSWORD_MISMATCH</code> → <code>VALIDATION_ERROR</code> へ一般化した</strong>: 400の原因がemail形式/最大長/PW強度等に拡大したため固定文言のままでは実態と合わなくなった。RegisterView自身のクライアント側パスワード一致プレチェック文言は <code>account.register.passwordMismatch</code> として別キーに分離し、backend由来の <code>VALIDATION_ERROR</code> と混同しないようにした（既存 <code>auth.spec.ts</code> のテスト名・アサーションも合わせて更新）。</li>
+      <li class="note-item"><strong>backendの<code>@StrongPassword</code>のUTF-8バイト長判定は<code>String#getBytes(UTF_8).length</code>を使用</strong>し、frontend側<code>isStrongPassword</code>は<code>TextEncoder</code>でミラーした（両者で同じ判定結果になることをVitest/Spock両方で確認）。</li>
+      <li class="note-item"><strong>frontend<code>accountValidation.ts</code>のemail検証・PW強度判定は正規表現の文字クラスを一切使わずに実装した</strong>（<code>long_term.md</code>記録済みの「正規表現の文字クラスリテラルが編集ツールで意図せず書き換わる」既知リスクの回避策）。</li>
+      <li class="note-item"><strong>backendの<code>ErrorResponse</code>はfield-levelに拡張しない既定方針を維持した</strong>: frontend自前検証が正常系ではbackendの400経路を潰すため、backendは一律固定文言のbackstopのままで十分と判断した（計画フェーズ確定・2ラウンド目で変更なし）。</li>
+    </ul>
+  </section>
+
+  <!-- Verify -->
+  <section>
+    <h2>動作確認ポイント（ユーザー確認用）</h2>
+    <ul class="verify-list">
+      <li class="verify-item">
+        <div class="verify-num">1</div>
+        <div class="verify-content">
+          <strong>登録画面/アカウント編集画面でメールアドレス欄に「not-an-email」のような不正な値を入力すると、その場に赤字のエラーメッセージが表示されること</strong>
+          <span>「Please enter a valid email address.」がフィールド直下に表示される</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">2</div>
+        <div class="verify-content">
+          <strong>ユーザー名欄に81文字以上入力しようとすると、80文字目以降が入力できないこと</strong>
+          <span>maxlength属性で入力自体が制限される</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">3</div>
+        <div class="verify-content">
+          <strong>登録画面でパスワード欄に「alllowercase」（英小文字のみ）を入力すると、その場にエラー表示され送信できないこと</strong>
+          <span>「Password must be 8-72 characters and include at least 2 of: ...」</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">4</div>
+        <div class="verify-content">
+          <strong>ブラウザの開発者ツールでクライアント検証を回避してリクエストを直接送っても、サーバ側で400エラーになりアカウントが作成/更新されないこと</strong>
+          <span>frontendはUX向上のための事前チェックに過ぎず、backendが権威的な検証を行っている</span>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- Scope -->
+  <section>
+    <h2>改修スコープ確認</h2>
+    <div class="scope-group">backend</div>
+    <table class="scope-table">
+      <tr><th>ファイル</th><th>変更</th><th>内容</th></tr>
+      <tr><td><code>presentation/rest/validation/StrongPassword.java</code> / <code>StrongPasswordValidator.java</code></td><td><span class="tag-new">新規</span></td><td>PW強度共有制約（#15と共有）</td></tr>
+      <tr><td><code>presentation/rest/RegistrationController.java</code>（RegisterRequest）</td><td><span class="tag-changed">変更あり</span></td><td>@Email/@Size/@StrongPassword を各フィールドに追加</td></tr>
+      <tr><td><code>presentation/rest/AccountController.java</code>（AccountEditRequest）</td><td><span class="tag-changed">変更あり</span></td><td>@Email/@Size を各フィールドに追加</td></tr>
+      <tr><td><code>presentation/rest/exception/GlobalExceptionHandler.java</code></td><td><span class="tag-unchanged">変更なし</span></td><td>既存の一律400正規化（handleValidation）がそのまま適用される</td></tr>
+    </table>
+    <div class="scope-group">frontend</div>
+    <table class="scope-table">
+      <tr><th>ファイル</th><th>変更</th><th>内容</th></tr>
+      <tr><td><code>utils/accountValidation.ts</code></td><td><span class="tag-new">新規</span></td><td>isValidEmail/isStrongPassword/isWithinMaxLength/ACCOUNT_FIELD_MAX_LENGTH</td></tr>
+      <tr><td><code>components/checkout/AddressForm.vue</code></td><td><span class="tag-changed">変更あり</span></td><td>errors?/maxLengths? opt-inプロップ追加（checkout側は挙動不変）</td></tr>
+      <tr><td><code>views/RegisterView.vue</code></td><td><span class="tag-changed">変更あり</span></td><td>フィールド単位インライン検証（username/password/address系）</td></tr>
+      <tr><td><code>views/AccountEditView.vue</code></td><td><span class="tag-changed">変更あり</span></td><td>フィールド単位インライン検証（address系）</td></tr>
+      <tr><td><code>stores/auth.ts</code></td><td><span class="tag-changed">変更あり</span></td><td>RegisterErrorReasonをPASSWORD_MISMATCH→VALIDATION_ERRORへ一般化</td></tr>
+      <tr><td><code>i18n/locales/en.ts</code></td><td><span class="tag-changed">変更あり</span></td><td>account.validation.* 文言追加</td></tr>
+    </table>
+  </section>
+
+</div>
+</body>
+</html>

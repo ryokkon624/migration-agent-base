@@ -407,9 +407,17 @@ mybatis:
   `defaultPasswordEncoderForMatches`が未設定のため、プレフィックスからアルゴリズムを解決できない）
 - DB seed・テストフィクスチャで bcrypt ハッシュを直接書く場合も、必ず `{bcrypt}` プレフィックスを含めること
 - 将来 argon2 等へ移行する場合も、プレフィックス判定により既存ハッシュを壊さず段階移行できる
+- **bcryptは入力を72バイトまでしか使わず、それを超えるバイト列は暗黙に切り詰められる。** パスワード強度
+  バリデータ等で上限文字数を設ける場合、`length()`（文字数）ではなく
+  `value.getBytes(StandardCharsets.UTF_8).length`（UTF-8バイト長）で判定すること。マルチバイト文字
+  （日本語等）を含むパスワードは、文字数が72未満でもバイト長が72を超えうる（ASCIIのみの入力では文字数=
+  バイト数のため誤りに気づきにくい）。
 
 > **背景（Sprint 3 #19）**: `jpetstore-backend`の`PasswordEncoderConfig`で採用。デモシード
 > （`jpetstore-database`の`R__test_user.sql`）の`password_hash`にも`{bcrypt}`プレフィックスを付与した。
+> **Sprint 17 #15**: 新設`@StrongPassword`制約（下記参照）の上限バリデーションで、文字数判定のままだと
+> マルチバイトパスワードの暗黙切り詰めを見逃すことが判明し、UTF-8バイト長判定に修正した
+> （frontend側`isStrongPassword`も`TextEncoder`でミラー）。
 
 ### DaoAuthenticationProviderの`hideUserNotFoundExceptions`既定動作を壊さない（列挙不可・SBD-6）
 
@@ -860,3 +868,57 @@ Sprint4（#20/#21）で用意した足場（`AffectedRows.requireUpdated(rows)` 
 > **背景（Sprint16 #14）**: 並行安全性（AC-neg3・同一readVersionへの2並行PUT）はSprint11（#8）の2段ラッチ
 > テスト手法（`CountDownLatch`×2）を応用し初回でgreen化できた（C1チャレンジ実証）。詳細な設計判断は
 > `memory/dev/long_term.md`「習得したこと」（jpetstore-backend）参照。
+
+### 認証隣接の失敗系統は既存の401/403と衝突しない専用ステータスに分離する
+
+ログイン以外の「認証済みユーザーが本人性を再証明する」系のAPI（パスワード変更等）で、再証明の失敗
+（例: 現在パスワード誤り）を401や403でそのまま返すと、以下の既存語彙と衝突する。
+
+- **401**: `httpClient`の401検知→silent refresh+retry経路（本人性再証明の失敗を「トークン失効」と誤認し、
+  不要なrefreshトライ・誤ったリトライを引き起こす）
+- **403**: CSRFトークン欠落時の応答と同じステータスになり、フロント側で原因を判別できない
+
+意味的に近い既存ステータス（401/403）がフロント側の横断的処理にフックされている場合は、衝突を避けるため
+**未使用の専用ステータス**を割り当てる。本人性再証明の失敗系統は以下のように分離する。
+
+| 失敗系統 | ステータス | 例外/経路 |
+|---|---|---|
+| 現在パスワード誤り（本人性再証明の失敗） | **422** | 新設`InvalidCurrentPasswordException`→`GlobalExceptionHandler` |
+| 弱いパスワード/不正な入力形式 | 400 | Bean Validation（`MethodArgumentNotValidException`） |
+| 真の未認証（トークン失効等） | 401 | 既存のhttpClient silent-refresh経路 |
+| CSRFトークン欠落 | 403 | 既存のCSRF保護 |
+
+新しいドメインエラーのHTTPステータスを設計する際は、まずフロント側の横断的処理（401 silent refresh・
+403判定等）が対象ステータスにフックされていないかを確認し、衝突する場合はAPI語彙内で未使用のステータス
+（422等）を専用に割り当てること。
+
+### パスワード等の共有バリデーション制約はBean Validationカスタム制約に1本化する
+
+同一の検証ロジック（例: パスワード強度＝英大/英小/数字/記号の4種中2種以上・8〜72バイト）を複数のDTO
+（新規登録・パスワード変更等）で使う場合は、専用の`@interface`＋`ConstraintValidator`（例:
+`@StrongPassword`）として1本化し、各DTOのフィールドへ付与するだけにする。DTOごとに同じ検証ロジックを
+重複実装しない。
+
+```java
+// presentation/rest/validation/StrongPassword.java
+@Constraint(validatedBy = StrongPasswordValidator.class)
+@Target(ElementType.FIELD)
+@Retention(RetentionPolicy.RUNTIME)
+public @interface StrongPassword {
+  String message() default "...";
+  Class<?>[] groups() default {};
+  Class<? extends Payload>[] payload() default {};
+}
+
+// 適用側: 複数DTOへ同一制約を付与するだけ
+public record RegisterRequest(..., @StrongPassword String password) {}
+public record PasswordChangeRequest(@NotBlank String currentPassword, @StrongPassword String newPassword) {}
+```
+
+上限バイト長判定（72バイト・bcrypt制約）は上記「PasswordEncoderは...」節参照。
+
+> **背景（Sprint17 #15/#17）**: パスワード変更API（#15）でのAC3インライン検証設計時に確定。既存の
+> `RegisterRequest.password`（#17）と新設`PasswordChangeRequest.newPassword`（#15）の両方へ
+> `@StrongPassword`を付与し、DTOごとの重複実装を回避した。ステータス分離は計画フェーズのユーザー確認
+> （現在PW誤り=422／`httpClient.ts`のsilent refresh誤発火とCSRF 403との衝突回避）で確定した。詳細な
+> 設計判断は`memory/dev/long_term.md`「習得したこと」（jpetstore-backend）参照。
