@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint 19 Review — #25 日本語ローカライズ（全画面 i18n リソース整備）</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #f8f7f5; }
+
+  .page { max-width: 900px; margin: 0 auto; padding: 48px 24px; }
+
+  .sprint-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin-bottom: 8px; }
+  h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px; }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+  .badge-sprint { background: #e8f0fe; color: #1a56db; }
+  .badge-issue { background: #f0fdf4; color: #166534; }
+  .badge-feature { background: #eff6ff; color: #1d4ed8; }
+  .badge-repo { background: #fff7ed; color: #c2410c; }
+  .badge-crossrepo { background: #fdf4ff; color: #7e22ce; }
+
+  section { margin-bottom: 40px; }
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #888; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e5e5e5; }
+
+  .problem-box { background: #fff8f0; border-left: 3px solid #f59e0b; border-radius: 0 8px 8px 0; padding: 16px 20px; margin-bottom: 16px; }
+  .problem-box .label { font-size: 11px; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .problem-box p { color: #451a03; font-size: 13px; }
+
+  .arch-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: center; margin-bottom: 8px; }
+  .arch-box { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; }
+  .arch-box .arch-title { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .arch-box.before { border-color: #fca5a5; }
+  .arch-box.after { border-color: #86efac; }
+  .arch-arrow { font-size: 20px; color: #888; text-align: center; }
+  .flow-item { font-size: 12px; color: #374151; padding: 3px 0; display: flex; align-items: flex-start; gap: 6px; }
+  .flow-item .dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .dot-red { background: #ef4444; }
+  .dot-green { background: #22c55e; }
+
+  .key-count-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-top: 16px; }
+  .key-count-box { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; text-align: center; }
+  .key-count-box .label { font-size: 11px; color: #888; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+  .key-count-box .count { font-size: 30px; font-weight: 700; line-height: 1; color: #1d4ed8; }
+  .key-count-box .sublabel { font-size: 11px; color: #888; margin-top: 4px; }
+
+  .ac-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+  .ac-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid #f0f0f0; flex-wrap: wrap; }
+  .ac-check { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .ac-check.done { background: #dcfce7; color: #166534; }
+  .ac-num { font-size: 11px; font-weight: 700; color: #888; }
+  .ac-text { font-size: 13px; font-weight: 600; color: #1a1a1a; flex: 1; }
+  .ac-repo-tag { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 3px; background: #fff7ed; color: #c2410c; text-transform: uppercase; }
+  .ac-body { padding: 16px 18px; }
+  .ac-body p { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+
+  .file-change { margin-bottom: 16px; }
+  .file-name { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; background: #f3f4f6; color: #374151; padding: 5px 10px; border-radius: 4px 4px 0 0; border: 1px solid #e5e5e5; border-bottom: none; display: flex; justify-content: space-between; }
+  .diff-stat { color: #888; }
+  .code-block { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.7; background: #1e1e2e; color: #cdd6f4; padding: 14px 16px; border-radius: 0 0 6px 6px; overflow-x: auto; }
+  .code-line { display: flex; }
+  .line-num { color: #45475a; min-width: 28px; user-select: none; }
+  .line-add { background: rgba(166, 227, 161, 0.12); color: #a6e3a1; }
+  .line-del { background: rgba(243, 139, 168, 0.12); color: #f38ba8; }
+  .line-ctx { color: #cdd6f4; }
+  .line-prefix { min-width: 14px; }
+
+  .annotation { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-size: 12px; color: #78350f; display: flex; gap: 8px; }
+  .annotation-icon { font-size: 14px; flex-shrink: 0; }
+
+  .verify-list { list-style: none; }
+  .verify-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; }
+  .verify-item:last-child { border-bottom: none; }
+  .verify-num { width: 22px; height: 22px; background: #e8f0fe; color: #1a56db; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .verify-content { flex: 1; }
+  .verify-content strong { font-size: 13px; color: #1a1a1a; display: block; margin-bottom: 3px; }
+  .verify-content span { font-size: 12px; color: #6b7280; }
+
+  .device-verify-box { background: #eff6ff; border: 1px solid #93c5fd; border-radius: 10px; padding: 18px 20px; margin-bottom: 16px; }
+  .device-verify-box .label { font-size: 11px; font-weight: 700; color: #1d4ed8; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+  .device-verify-list { list-style: none; }
+  .device-verify-item { display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid #dbeafe; }
+  .device-verify-item:last-child { border-bottom: none; }
+  .device-verify-num { width: 20px; height: 20px; background: #1d4ed8; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .device-verify-content strong { font-size: 13px; color: #1e3a8a; display: block; margin-bottom: 2px; }
+  .device-verify-content span { font-size: 12px; color: #3730a3; }
+
+  .screen-checklist { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 10px; }
+  .screen-item { font-size: 12px; background: #f9fafb; border: 1px solid #e5e5e5; border-radius: 6px; padding: 8px 10px; color: #374151; }
+
+  .scope-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .scope-table th { text-align: left; padding: 8px 12px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .scope-table td { padding: 10px 12px; border: 1px solid #e5e5e5; color: #374151; vertical-align: top; }
+  .scope-table tr:hover td { background: #f9fafb; }
+  .tag-changed { font-size: 11px; font-weight: 600; background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 3px; }
+  .tag-new { font-size: 11px; font-weight: 600; background: #dbeafe; color: #1d4ed8; padding: 2px 6px; border-radius: 3px; }
+  .tag-unchanged { font-size: 11px; font-weight: 600; background: #f3f4f6; color: #6b7280; padding: 2px 6px; border-radius: 3px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="sprint-label">Sprint 19 Review</div>
+  <h1>#25 — 日本語ローカライズ（全画面 i18n リソース整備）</h1>
+  <div class="meta">
+    <span class="badge badge-sprint">Sprint 19</span>
+    <span class="badge badge-issue">#25</span>
+    <span class="badge badge-feature">feature（完全実装）</span>
+    <span class="badge badge-crossrepo">cross-repo</span>
+    <span class="badge badge-repo">frontend</span>
+    <span class="badge badge-repo">backend</span>
+  </div>
+
+  <!-- Problem -->
+  <section>
+    <h2>なぜこの改修が必要だったか</h2>
+    <div class="problem-box">
+      <div class="label">背景</div>
+      <p>i18n基盤（文言外部化）自体は#24で導入済みだったが、<code>en.ts</code>のみで<code>ja.ts</code>は皆無・言語切替UIも無く、日本語ロケールでの利用ができなかった。Planningでユーザーが「完全実装」を選択し、#36と同じ<code>usePreferencesStore</code>（単一ソース）を共有する形で、翻訳リソース・DB権威の言語切替・日付整形まで一括で仕上げた。</p>
+    </div>
+    <div class="arch-grid">
+      <div class="arch-box before">
+        <div class="arch-title">改修前</div>
+        <div class="flow-item"><span class="dot dot-red"></span><code>ja.ts</code>皆無・localeは<code>'en'</code>固定ハードワイヤ</div>
+        <div class="flow-item"><span class="dot dot-red"></span>言語切替UIがアプリ内に無い</div>
+        <div class="flow-item"><span class="dot dot-red"></span>注文日付は素のISO文字列表示（未整形）</div>
+        <div class="flow-item"><span class="dot dot-red"></span>langprefはDB保存のみでlocale未適用</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-box after">
+        <div class="arch-title">改修後</div>
+        <div class="flow-item"><span class="dot dot-green"></span><code>ja.ts</code>全画面翻訳（en.tsと完全shape一致）</div>
+        <div class="flow-item"><span class="dot dot-green"></span>ヘッダーに言語切替ドロップダウン（English/日本語）</div>
+        <div class="flow-item"><span class="dot dot-green"></span><code>datetimeFormats.short</code>でlocale連動の日付表示</div>
+        <div class="flow-item"><span class="dot dot-green"></span>ログイン/再水和でDB権威のlangprefを自動適用</div>
+      </div>
+    </div>
+
+    <div class="key-count-grid">
+      <div class="key-count-box">
+        <div class="label">翻訳キー数</div>
+        <div class="count">~170</div>
+        <div class="sublabel">9 namespace・en.tsと完全shape一致（Vitestで自動検証）</div>
+      </div>
+      <div class="key-count-box">
+        <div class="label">対象画面</div>
+        <div class="count">全15</div>
+        <div class="sublabel">app/home/catalog/auth/account/cart/checkout/orderComplete/order</div>
+      </div>
+      <div class="key-count-box">
+        <div class="label">frontend変更行数</div>
+        <div class="count">+488</div>
+        <div class="sublabel">-18（ja.ts新規+285行を含む）</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AC breakdown -->
+  <section>
+    <h2>AC別 実装内容</h2>
+
+    <!-- AC1 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC1</div>
+        <div class="ac-text">日本語メッセージリソース（i18nキーのja翻訳）を全画面分整備する</div>
+        <span class="ac-repo-tag">frontend</span>
+      </div>
+      <div class="ac-body">
+        <p><code>src/i18n/locales/ja.ts</code>を新規作成し、<code>en.ts</code>の全9 namespace（app/home/catalog/auth/account/cart/checkout/orderComplete/order）を完全にミラーする構造で翻訳した。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/i18n/locales/ja.ts（新規）</span>
+            <span class="diff-stat">+285</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">1</span><span class="line-prefix">+</span><span>// #25: 日本語ローカライズ。en.ts とキー構造(shape)を完全にミラーする</span></div>
+            <div class="code-line line-add"><span class="line-num">3</span><span class="line-prefix">+</span><span>export default {</span></div>
+            <div class="code-line line-add"><span class="line-num">4</span><span class="line-prefix">+</span><span>  app: { header: { nav: { home: 'ホーム', catalog: 'カタログ', cart: 'カート', ... } } },</span></div>
+            <div class="code-line line-add"><span class="line-num">105</span><span class="line-prefix">+</span><span>  auth: { signon: { title: 'サインイン', error: 'ユーザー名またはパスワードが...' } },</span></div>
+            <div class="code-line line-add"><span class="line-num">260</span><span class="line-prefix">+</span><span>  order: { history: { title: '注文履歴' }, detail: { title: '注文 #{orderId}' } },</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>shape整合性は手作業チェックではなく、<code>i18n/__tests__/index.spec.ts</code>に追加した自動テスト（<code>en.ts</code>/<code>ja.ts</code>のキーパスを再帰的に収集し完全一致を検証）で担保している。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC2 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC2</div>
+        <div class="ac-text">UI文言（ラベル・ボタン・バリデーション/エラーメッセージ）を日本語化する</div>
+        <span class="ac-repo-tag">frontend</span>
+      </div>
+      <div class="ac-body">
+        <p>AC1の<code>ja.ts</code>にラベル・ボタン・バリデーションエラー・APIエラー分岐メッセージ（<code>USERNAME_TAKEN</code>/<code>RATE_LIMITED</code>/<code>INVALID_CURRENT_PASSWORD</code>等）を含む全カテゴリを翻訳。既存の全22コンポーネント・15ビュー・228箇所の<code>t()</code>呼び出し箇所はキー構造を変更していないため、コード側の追随修正は不要だった。</p>
+      </div>
+    </div>
+
+    <!-- AC3 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC3</div>
+        <div class="ac-text">日本語ロケールでの数値・日付・通貨フォーマットが適切に表示される</div>
+        <span class="ac-repo-tag">frontend</span>
+      </div>
+      <div class="ac-body">
+        <p><strong>Q-1確定（最小スコープ）</strong>: 通貨は全画面で既にインラインIntlオプション（<code>n(price, {style:'currency', currency:'USD'})</code>）を使用しており、locale切替で自動的に整形が追従するため<code>numberFormats</code>の名前付き設定は追加しなかった（冗長）。日付のみ<code>datetimeFormats.short</code>（en/ja）を新規設定し、これまで素のISO文字列表示だった注文履歴・注文詳細の日付を整形表示に変更した。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/i18n/index.ts</span>
+            <span class="diff-stat">+18 / -3</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">7</span><span class="line-prefix"> </span><span>const i18n = createI18n({</span></div>
+            <div class="code-line line-ctx"><span class="line-num">8</span><span class="line-prefix"> </span><span>  legacy: false,</span></div>
+            <div class="code-line line-del"><span class="line-num">9</span><span class="line-prefix">-</span><span>  locale: 'en',</span></div>
+            <div class="code-line line-add"><span class="line-num">9</span><span class="line-prefix">+</span><span>  locale: loadLanguage(),</span></div>
+            <div class="code-line line-del"><span class="line-num">11</span><span class="line-prefix">-</span><span>  messages: { en },</span></div>
+            <div class="code-line line-add"><span class="line-num">11</span><span class="line-prefix">+</span><span>  messages: { en, ja },</span></div>
+            <div class="code-line line-add"><span class="line-num">12</span><span class="line-prefix">+</span><span>  datetimeFormats: {</span></div>
+            <div class="code-line line-add"><span class="line-num">13</span><span class="line-prefix">+</span><span>    en: { short: { year: 'numeric', month: 'short', day: '2-digit' } },</span></div>
+            <div class="code-line line-add"><span class="line-num">16</span><span class="line-prefix">+</span><span>    ja: { short: { year: 'numeric', month: 'short', day: 'numeric' } },</span></div>
+            <div class="code-line line-add"><span class="line-num">19</span><span class="line-prefix">+</span><span>  },</span></div>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/views/order/OrderHistoryView.vue / OrderDetailView.vue</span>
+            <span class="diff-stat">+15 / -2</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-del"><span class="line-num">70</span><span class="line-prefix">-</span><span>&lt;td&gt;{{ order.orderDate }}&lt;/td&gt;</span></div>
+            <div class="code-line line-add"><span class="line-num">70</span><span class="line-prefix">+</span><span>&lt;td&gt;{{ formatDate(order.orderDate) }}&lt;/td&gt;</span></div>
+            <div class="code-line line-ctx"><span class="line-num">26</span><span class="line-prefix"> </span><span>function formatDate(isoDate: string): string {</span></div>
+            <div class="code-line line-ctx"><span class="line-num">27</span><span class="line-prefix"> </span><span>  return d(new Date(isoDate), 'short')</span></div>
+            <div class="code-line line-ctx"><span class="line-num">28</span><span class="line-prefix"> </span><span>}</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC4 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC4</div>
+        <div class="ac-text">m_code由来の区分値表示は日本語表示される</div>
+        <span class="ac-repo-tag">frontend</span>
+      </div>
+      <div class="ac-body">
+        <p>在庫ステータス等のm_code区分値は<code>utils/stockBadge.ts</code>が<code>catalog.stockStatus.*</code>i18nキーへルーティングする既存実装だったため、<code>ja.ts</code>への値追加のみで自動的に日本語化された（<code>display_name_ja</code>機構をfrontend側で新設する必要はない・計画フェーズでスコープ確定済み）。</p>
+      </div>
+    </div>
+
+    <!-- AC5 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC5</div>
+        <div class="ac-text">言語切替（ヘッダー言語切替UI＋profile.langpref）で日英が切り替わり、未翻訳キーの英語フォールバックが壊れない</div>
+        <span class="ac-repo-tag">frontend</span>
+      </div>
+      <div class="ac-body">
+        <p>#36で新設した<code>SettingsDropdown</code>を再利用し、ヘッダーにEnglish/日本語の2択ドロップダウンを追加した。<code>fallbackLocale: 'en'</code>により未翻訳キーは自動的に英語へフォールバックする（本実装では<code>ja.ts</code>のshapeを<code>en.ts</code>と完全一致させているため、実運用上未翻訳キーは発生しない設計）。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/components/AppHeader.vue</span>
+            <span class="diff-stat">+16 / -1</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">31</span><span class="line-prefix">+</span><span>const languageOptions = computed(() => [</span></div>
+            <div class="code-line line-add"><span class="line-num">32</span><span class="line-prefix">+</span><span>  { value: 'en', label: t('app.header.settings.language.options.en') },</span></div>
+            <div class="code-line line-add"><span class="line-num">33</span><span class="line-prefix">+</span><span>  { value: 'ja', label: t('app.header.settings.language.options.ja') },</span></div>
+            <div class="code-line line-add"><span class="line-num">34</span><span class="line-prefix">+</span><span>])</span></div>
+            <div class="code-line line-add"><span class="line-num">94</span><span class="line-prefix">+</span><span>&lt;SettingsDropdown :label="t('app.header.settings.language.label')"</span></div>
+            <div class="code-line line-add"><span class="line-num">95</span><span class="line-prefix">+</span><span>  :options="languageOptions" :model-value="preferencesStore.language"</span></div>
+            <div class="code-line line-add"><span class="line-num">96</span><span class="line-prefix">+</span><span>  @update:model-value="handleLanguageChange" /&gt;</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>#36と同じ<code>SettingsDropdown</code>を再利用したことで、open/close・click-outside・aria/keyboardの実装を重複させずに済んだ（1回の共通部品化が両Issueに効いた）。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AC6 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC6</div>
+        <div class="ac-text">主要画面で日本語表示を検証（文言はみ出し・レイアウト崩れがない）＝全15画面QA</div>
+        <span class="ac-repo-tag">frontend</span>
+      </div>
+      <div class="ac-body">
+        <p>ja.tsとen.tsのキー構造(shape)一致はVitestで自動検証済みだが、実際のブラウザでの<strong>文言はみ出し・レイアウト崩れの目視確認は未実施</strong>（下記「実機目視が必要な項目」参照）。</p>
+      </div>
+    </div>
+
+    <!-- AC7 -->
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC7（追加・Q2）</div>
+        <div class="ac-text">再水和時にDBの言語嗜好を適用する（/api/auth/me拡張で取得・DB権威・跨デバイス追従）</div>
+        <span class="ac-repo-tag">frontend</span>
+        <span class="ac-repo-tag">backend</span>
+      </div>
+      <div class="ac-body">
+        <p>backend側の対応は#36の実装（<code>AuthController.LoginResponse</code>拡張・<code>AccountApplicationService#getPreferences</code>）が<code>languagePreference</code>も同時に返す設計だったため、<strong>#25専用のbackend変更は不要</strong>（1回のDTO拡張で#36/#25の両方をまかなう。バックエンドコミットは#36主・#25 Related）。frontend側は<code>usePreferencesStore#hydrateFromDb</code>がDB値（'english'/'japanese'）をcanonical値（'en'/'ja'）へ変換して適用する。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Real device verification (highlighted for user) -->
+  <section>
+    <h2>実機目視が必要な項目（Vitestで拾えないため要ユーザー確認）</h2>
+    <div class="device-verify-box">
+      <div class="label">🖥️ ブラウザでの視覚確認をお願いします</div>
+      <ul class="device-verify-list">
+        <li class="device-verify-item">
+          <div class="device-verify-num">1</div>
+          <div class="device-verify-content">
+            <strong>ヘッダーの言語ドロップダウンで日本語⇄英語を切り替えたとき、画面全体が違和感なく切り替わること</strong>
+            <span>切替時にちらつき・古い言語の文言が一瞬残る等が無いか確認</span>
+          </div>
+        </li>
+        <li class="device-verify-item">
+          <div class="device-verify-num">2</div>
+          <div class="device-verify-content">
+            <strong>日本語表示で長い文言がボタン・ラベル・カードからはみ出していないこと</strong>
+            <span>特にチェックアウトの住所ラベル・アカウント設定・エラーメッセージ等、日本語の方が英語より長くなりがちな箇所を重点確認</span>
+          </div>
+        </li>
+        <li class="device-verify-item">
+          <div class="device-verify-num">3</div>
+          <div class="device-verify-content">
+            <strong>注文履歴・注文詳細の日付が日本語ロケールで自然な形式で表示されること</strong>
+            <span>datetimeFormats.short適用後の見た目確認（例: 2026年8月18日 のような形式になっているか）</span>
+          </div>
+        </li>
+        <li class="device-verify-item">
+          <div class="device-verify-num">4</div>
+          <div class="device-verify-content">
+            <strong>ログイン中に別デバイスで言語を変更すると、再ログイン後に新しい端末側にも反映されること</strong>
+            <span>DB権威の再水和（/me経由・AC7）が正しく機能しているかの跨デバイス確認</span>
+          </div>
+        </li>
+      </ul>
+    </div>
+    <div class="problem-box" style="background:#f9fafb; border-left-color:#9ca3af; margin-top:12px;">
+      <div class="label" style="color:#4b5563;">AC6 全15画面チェックリスト（参考）</div>
+      <div class="screen-checklist">
+        <div class="screen-item">Home</div>
+        <div class="screen-item">Catalog（一覧）</div>
+        <div class="screen-item">Catalog（商品一覧）</div>
+        <div class="screen-item">Item Detail</div>
+        <div class="screen-item">Search Result</div>
+        <div class="screen-item">Cart</div>
+        <div class="screen-item">Checkout（Cart Step）</div>
+        <div class="screen-item">Checkout（Address Step）</div>
+        <div class="screen-item">Checkout（Confirm Step）</div>
+        <div class="screen-item">Checkout Complete</div>
+        <div class="screen-item">Signon</div>
+        <div class="screen-item">Register</div>
+        <div class="screen-item">Account Edit</div>
+        <div class="screen-item">Password Change</div>
+        <div class="screen-item">Order History / Detail</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Verify -->
+  <section>
+    <h2>その他の動作確認ポイント</h2>
+    <ul class="verify-list">
+      <li class="verify-item">
+        <div class="verify-num">1</div>
+        <div class="verify-content">
+          <strong>未ログインでもヘッダーの言語ドロップダウンが表示・操作できること</strong>
+          <span>English/日本語の2択・選択が即座に画面へ反映される</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">2</div>
+        <div class="verify-content">
+          <strong>AccountEditの言語selectとヘッダーの言語ドロップダウンで選択が食い違わないこと</strong>
+          <span>#36 Q2で確立した単一ソース設計の対称性確認</span>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- Scope -->
+  <section>
+    <h2>改修スコープ確認</h2>
+    <table class="scope-table">
+      <tr>
+        <th>リポジトリ</th>
+        <th>ファイル</th>
+        <th>変更</th>
+        <th>内容</th>
+      </tr>
+      <tr>
+        <td>frontend</td>
+        <td><code>src/i18n/locales/ja.ts</code></td>
+        <td><span class="tag-new">新規</span></td>
+        <td>全画面日本語翻訳（en.tsと完全shape一致）</td>
+      </tr>
+      <tr>
+        <td>frontend</td>
+        <td><code>src/i18n/index.ts</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>messagesへja追加・datetimeFormats新設・localStorageからのlocale seed</td>
+      </tr>
+      <tr>
+        <td>frontend</td>
+        <td><code>AppHeader.vue</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>言語切替ドロップダウン追加（#36のSettingsDropdown再利用）</td>
+      </tr>
+      <tr>
+        <td>frontend</td>
+        <td><code>OrderHistoryView.vue</code> / <code>OrderDetailView.vue</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>注文日付をd()整形表示へ変更</td>
+      </tr>
+      <tr>
+        <td>backend</td>
+        <td><code>AuthController.LoginResponse</code></td>
+        <td><span class="tag-unchanged">#25専用変更なし</span></td>
+        <td>#36の拡張がlanguagePreferenceも同時カバー（Related）</td>
+      </tr>
+      <tr>
+        <td>frontend</td>
+        <td>通貨表示（各画面のformatPrice）</td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td>既存インラインIntlオプションでlocale連動済み（numberFormats追加は見送り）</td>
+      </tr>
+      <tr>
+        <td>frontend/database</td>
+        <td>m_code / display_name_ja機構</td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td>catalog.stockStatus.*経由で自動日本語化のため新設不要</td>
+      </tr>
+    </table>
+  </section>
+
+</div>
+</body>
+</html>

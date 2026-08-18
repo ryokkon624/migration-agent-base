@@ -431,4 +431,73 @@ const ws = new WebSocket(tab.webSocketDebuggerUrl)
 > 技法として即時反映。ログイン→保護ルートへのハード直リンク/リロード→リンククリックまで、実ブラウザの
 > V8エンジン上で検証できた。
 
+### 共通レイアウトへ新規のインタラクティブ要素を追加する際はfind('button')/find('form')衝突を確認する（2回ルール昇格）
+
+`AppHeader.vue`/`AppLayout.vue`等の共通レイアウトコンポーネントへ新規の`<button>`/`<form>`を追加すると、
+そのレイアウトを使う**既存View群のテストが汎用セレクタ（`wrapper.find('button')`/`wrapper.find('form')`）で
+意図しない要素にヒットする**ことがある（DOM順序上、新しく追加した要素が対象Viewの要素より先に現れる場合に
+発生）。新規のフォーム・ボタン等を共通レイアウトへ追加する際は、そのレイアウトを使う既存View群のテストで
+汎用セレクタが使われていないか確認し、見つかった場合は対象View固有のクラス名でセレクタを明示化する。
+
+```ts
+// NG: 複数のbuttonが存在する画面で意図しない要素にヒットしうる
+const button = wrapper.find('button')
+
+// OK: View固有のクラス名でスコープを明示する
+const button = wrapper.find('button.item-detail-view__add-to-cart')
+```
+
+```vue
+<!-- 対象コンポーネント側にも明示クラスを付与しておく -->
+<button type="button" class="jps-btn jps-btn-primary item-detail-view__add-to-cart">
+  {{ t('catalog.item.addToCart') }}
+</button>
+```
+
+> **背景（2回ルールによる昇格）**: Sprint7（#2）でヘッダに検索用`<form class="jps-search">`を追加した際、
+> `SignonView.spec.ts`の`wrapper.find('form')`が検索フォームにヒットし誤動作した（`form.signon__form`で
+> 解消）のが初出。Sprint19（#36）で、`AppHeader.vue`にテーマ設定ドロップダウンのtriggerボタンを追加した際、
+> `ItemDetailView.spec.ts`の`wrapper.find('button')`が新しいtriggerボタンにヒットし、Add to Cartボタンの
+> クリック・disabled判定テストが複数誤動作した（`item-detail-view__add-to-cart`で解消）のが2回目の発生。
+> 新規のインタラクティブ要素を共通レイアウトへ追加する作業の**チェックリスト項目**として昇格した。
+
+### 複数の横断設定値を扱う共有Piniaストアはapply primitiveを個別化し、FOUC対策は必要な項目にのみ適用する
+
+テーマ・言語のように「同じ永続化・DB権威再水和の仕組みを共有するが、適用先（DOM操作 / リアクティブ参照）が
+異なる」複数の設定値を扱う場合、**永続化・DB同期のロジックは1本の共有Pinia storeに集約**しつつ、
+**各値をどう画面へ適用するか（apply primitive）は値ごとに個別の関数として分離**する。
+
+```ts
+// stores/preferences.ts: 共有部分(state/localStorage/hydrateFromDb)は1本、適用は値ごとに分離
+function applyColorScheme(value: ColorScheme): void {
+  document.documentElement.classList.remove('dark', 'light') // DOM操作
+  if (value === 'light' || value === 'dark') document.documentElement.classList.add(value)
+}
+function applyLanguage(value: Language): void {
+  i18n.global.locale.value = value // vue-i18nのリアクティブ参照
+}
+```
+
+**FOUC（Flash of Unstyled/Unlocalized Content）対策も値ごとに要否が異なる**。CSSクラス切替のように
+「初回描画が終わってから適用すると一瞬デフォルト状態が見える」項目は`index.html`の同期インラインhead
+scriptで初回描画前に適用する。一方、`createI18n()`の`locale`オプション自体をlocalStorageからseedできる
+項目（i18nのlocaleのように、値がテキスト描画に反映されるのがVueマウント後のみ）はhead script無しでも
+ちらつきが起きないため、モジュール初期化時のseedのみで足りる。
+
+```ts
+// i18n/index.ts: createI18n時にlocalStorageからseed（head script不要）
+const i18n = createI18n({ locale: loadLanguage(), messages: { en, ja }, ... })
+```
+
+新規の共通dropdown/menu部品（open/close・click-outside・aria/keyboard対応）を設計する際は、選択肢
+（`{value, label}[]`）とmodelValueを受け取る汎用propsにし、複数の設定項目（テーマ・言語等）で同一部品を
+再利用する。挙動はVitestで直接検証する（`attachTo: document.body`でmountしdocumentへの実クリック/keydown
+イベントでclick-outside・Escapeを検証できる）。
+
+> **背景（Sprint19 #36/#25、初出だが「知らないと書けない参照知識・実装パターン」の2回ルール例外として
+> 即時反映）**: テーマ（`.dark`/`.light`クラス切替・FOUC対策あり）と言語（`i18n.global.locale`・FOUC対策
+> 不要）を`usePreferencesStore`（単一ソース）に共存させた際に確立した設計。新規共通部品`SettingsDropdown.vue`
+> はテーマ3択・言語2択の両方でそのまま再利用できた。詳細は`memory/dev/long_term.md`「習得したこと」
+> （jpetstore-frontend）参照。
+
 ---

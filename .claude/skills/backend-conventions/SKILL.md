@@ -922,3 +922,36 @@ public record PasswordChangeRequest(@NotBlank String currentPassword, @StrongPas
 > `@StrongPassword`を付与し、DTOごとの重複実装を回避した。ステータス分離は計画フェーズのユーザー確認
 > （現在PW誤り=422／`httpClient.ts`のsilent refresh誤発火とCSRF 403との衝突回避）で確定した。詳細な
 > 設計判断は`memory/dev/long_term.md`「習得したこと」（jpetstore-backend）参照。
+
+### login()実行中は`CurrentUserProvider`が使えない（stateless JWTの制約・userId明示引数のread method）
+
+`CurrentUserProvider`はJWT認証フィルタがSecurityContextへ設定した認証プリンシパルを読む前提の部品のため、
+**`/api/auth/login`のリクエスト処理中（認証成功直後・まだレスポンスを返す前）は使えない**（JWTフィルタは
+次リクエスト以降でしかSecurityContextを設定しない）。login()実行中にログイン成功ユーザー自身のデータを
+読みたい場合は、`CurrentUserProvider`に依存する既存のread method（例: `getMyContact()`）とは別に、
+**`Long userId`を明示的に受け取るオーバーロード**（例: `getPreferences(Long userId)`）を用意し、
+`login()`が返した`AuthenticatedUser.userId()`をそのまま渡す。
+
+```java
+// AccountApplicationService: 通常のread系(currentUserProvider由来)とlogin時用(userId引数)を両方持つ
+@Transactional(readOnly = true)
+public AccountContact getMyContact() {
+  Long userId = currentUserProvider.requireCurrentUser().userId(); // /api/account/me等
+  ...
+}
+
+@Transactional(readOnly = true)
+public UserPreferences getPreferences(Long userId) {  // /api/auth/login・/api/auth/me両方から呼べる
+  return accountRepository.findPreferencesByUserId(userId).orElseGet(...);
+}
+```
+
+**複数エンドポイントが同一の応答DTO（record）を共有している場合、その1箇所を拡張するだけで全エンドポイント
+に効く。** `AuthController.LoginResponse`は`/api/auth/login`と`/api/auth/me`が共有するrecordのため、
+1回のフィールド追加で両エンドポイントへ同時に反映できる（呼び出し側ごとに個別DTOを作らない）。
+
+> **背景（Sprint19 #36/#25）**: ヘッダーのテーマ/言語設定をDB権威で再水和する機能で、login()直後に
+> 自分自身のm_profile値を読む必要があったが、`CurrentUserProvider`はstateless JWTの制約で使えなかった。
+> `getPreferences(Long userId)`という明示引数版のread methodを新設し、login()は返却値の`userId()`を、
+> me()は`currentUserProvider`由来のuserIdを、それぞれ渡す設計で解決した。詳細は`memory/dev/long_term.md`
+> 「習得したこと」（jpetstore-backend）参照。

@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint 19 Review — #35 frontend の EOL/CRLF ノイズ恒久対策（.gitattributes 導入）</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #f8f7f5; }
+
+  .page { max-width: 860px; margin: 0 auto; padding: 48px 24px; }
+
+  .sprint-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin-bottom: 8px; }
+  h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px; }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+  .badge-sprint { background: #e8f0fe; color: #1a56db; }
+  .badge-issue { background: #f0fdf4; color: #166534; }
+  .badge-refactor { background: #fdf4ff; color: #7e22ce; }
+  .badge-frontend { background: #fff7ed; color: #c2410c; }
+
+  section { margin-bottom: 40px; }
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #888; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e5e5e5; }
+
+  .problem-box { background: #fff8f0; border-left: 3px solid #f59e0b; border-radius: 0 8px 8px 0; padding: 16px 20px; margin-bottom: 16px; }
+  .problem-box .label { font-size: 11px; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .problem-box p { color: #451a03; font-size: 13px; }
+
+  .arch-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: center; margin-bottom: 8px; }
+  .arch-box { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; }
+  .arch-box .arch-title { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .arch-box.before { border-color: #fca5a5; }
+  .arch-box.after { border-color: #86efac; }
+  .arch-arrow { font-size: 20px; color: #888; text-align: center; }
+  .flow-item { font-size: 12px; color: #374151; padding: 3px 0; display: flex; align-items: flex-start; gap: 6px; }
+  .flow-item .dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .dot-red { background: #ef4444; }
+  .dot-green { background: #22c55e; }
+
+  .ac-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+  .ac-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid #f0f0f0; }
+  .ac-check { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .ac-check.done { background: #dcfce7; color: #166534; }
+  .ac-num { font-size: 11px; font-weight: 700; color: #888; }
+  .ac-text { font-size: 13px; font-weight: 600; color: #1a1a1a; flex: 1; }
+  .ac-body { padding: 16px 18px; }
+  .ac-body p { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+
+  .file-change { margin-bottom: 16px; }
+  .file-name { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; background: #f3f4f6; color: #374151; padding: 5px 10px; border-radius: 4px 4px 0 0; border: 1px solid #e5e5e5; border-bottom: none; display: flex; justify-content: space-between; }
+  .diff-stat { color: #888; }
+  .code-block { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.7; background: #1e1e2e; color: #cdd6f4; padding: 14px 16px; border-radius: 0 0 6px 6px; overflow-x: auto; }
+  .code-line { display: flex; }
+  .line-num { color: #45475a; min-width: 28px; user-select: none; }
+  .line-add { background: rgba(166, 227, 161, 0.12); color: #a6e3a1; }
+  .line-del { background: rgba(243, 139, 168, 0.12); color: #f38ba8; }
+  .line-ctx { color: #cdd6f4; }
+  .line-prefix { min-width: 14px; }
+
+  .annotation { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-size: 12px; color: #78350f; display: flex; gap: 8px; }
+  .annotation-icon { font-size: 14px; flex-shrink: 0; }
+
+  .verify-list { list-style: none; }
+  .verify-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; }
+  .verify-item:last-child { border-bottom: none; }
+  .verify-num { width: 22px; height: 22px; background: #e8f0fe; color: #1a56db; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .verify-content { flex: 1; }
+  .verify-content strong { font-size: 13px; color: #1a1a1a; display: block; margin-bottom: 3px; }
+  .verify-content span { font-size: 12px; color: #6b7280; }
+
+  .scope-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .scope-table th { text-align: left; padding: 8px 12px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .scope-table td { padding: 10px 12px; border: 1px solid #e5e5e5; color: #374151; vertical-align: top; }
+  .scope-table tr:hover td { background: #f9fafb; }
+  .tag-changed { font-size: 11px; font-weight: 600; background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 3px; }
+  .tag-unchanged { font-size: 11px; font-weight: 600; background: #f3f4f6; color: #6b7280; padding: 2px 6px; border-radius: 3px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="sprint-label">Sprint 19 Review</div>
+  <h1>#35 — frontend の EOL/CRLF ノイズ恒久対策<br>（.gitattributes 導入）</h1>
+  <div class="meta">
+    <span class="badge badge-sprint">Sprint 19</span>
+    <span class="badge badge-issue">#35</span>
+    <span class="badge badge-refactor">refactor / chore</span>
+    <span class="badge badge-frontend">frontend</span>
+  </div>
+
+  <!-- Problem -->
+  <section>
+    <h2>なぜこの改修が必要だったか</h2>
+    <div class="problem-box">
+      <div class="label">問題（Sprint 14/15/17/18 で4回連続再発）</div>
+      <p>Windows環境（<code>core.autocrlf=true</code>既定）と Prettier のLF出力の組み合わせにより、<code>npm run format</code> 実行後に working-tree の大量ファイルが EOL（LF↔CRLF）差分だけで <code>git status</code> に <code>M</code> 表示される現象が繰り返し発生していた。実内容差分はゼロだが、DEVは毎回「実差分のみ選択add」でコミット対象を絞る運用でしのいでおり、誤コミット・main同期失敗のリスクが残っていた。</p>
+    </div>
+    <div class="arch-grid">
+      <div class="arch-box before">
+        <div class="arch-title">改修前</div>
+        <div class="flow-item"><span class="dot dot-red"></span><code>.gitattributes</code>/<code>.editorconfig</code>とも不在</div>
+        <div class="flow-item"><span class="dot dot-red"></span>EOL方針は各開発者のgit全体設定(<code>core.autocrlf</code>)に依存</div>
+        <div class="flow-item"><span class="dot dot-red"></span><code>npm run format</code>実行 → Prettierが一部ファイルをLFで書き込み</div>
+        <div class="flow-item"><span class="dot dot-red"></span><code>git status</code>に無関係な大量ファイルが<code>M</code>表示（EOLノイズ）</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-box after">
+        <div class="arch-title">改修後</div>
+        <div class="flow-item"><span class="dot dot-green"></span><code>.gitattributes</code>に<code>* text=auto eol=lf</code>を明記</div>
+        <div class="flow-item"><span class="dot dot-green"></span>EOL方針をリポジトリ側で固定（開発者の全体設定に依存しない）</div>
+        <div class="flow-item"><span class="dot dot-green"></span><code>git add --renormalize .</code>で既存ファイルを一括LF化（差分ゼロを確認済み）</div>
+        <div class="flow-item"><span class="dot dot-green"></span>以降の<code>npm run format</code>実行でEOLのみの<code>M</code>ノイズが出ない</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AC breakdown -->
+  <section>
+    <h2>AC別 実装内容</h2>
+
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC1</div>
+        <div class="ac-text">.gitattributes を追加し、テキストファイルのEOLをLFに正規化する設定を入れる</div>
+      </div>
+      <div class="ac-body">
+        <p>リポジトリ直下に<code>.gitattributes</code>を新規追加し、全テキストファイルのEOLをLFに固定する。既存の<code>.editorconfig</code>は不在・Prettier(<code>.prettierrc.json</code>)は<code>endOfLine</code>未設定=既定LFのため、この設定と整合する。</p>
+        <div class="file-change">
+          <div class="file-name">
+            <span>.gitattributes（新規）</span>
+            <span class="diff-stat">+1</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">1</span><span class="line-prefix">+</span><span>* text=auto eol=lf</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>拡張子別の個別指定は行わず、リポジトリ全体を単一ルールで統一した（frontend専用リポジトリで対象ファイル種別が限定的なため過剰設計を避けた）。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC2</div>
+        <div class="ac-text">git add --renormalize . 実行後、npm run format を実行してもEOLのみのMノイズが出ない</div>
+      </div>
+      <div class="ac-body">
+        <p><code>.gitattributes</code>追加後に<code>git add --renormalize .</code>を実行したところ、renormalize対象は0件だった（<code>core.autocrlf=true</code>が既に全ファイルをLFでインデックスに格納していたため）。以降の実装コミット（#37/#36/#25）でも<code>npm run format</code>実行後の差分確認で、意図した変更ファイルのみが<code>git diff --stat</code>に現れることを継続的に確認した。</p>
+        <div class="annotation">
+          <span class="annotation-icon">💡</span>
+          <span>過去の再発は「<code>git status</code>には出るが<code>git diff</code>には出ない」EOLのみの差分だった。本コミット以降、<code>git status</code>に紐づく一部ファイルの表示ゆらぎ自体は環境要因で残存し得るが、<code>git diff --stat</code>で実差分を正確に切り分けられる状態を維持しており、選択addの運用は継続している。</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC3</div>
+        <div class="ac-text">既存のVitest・npm run build・vue-tscが回帰しない</div>
+      </div>
+      <div class="ac-body">
+        <p>本コミット単体はEOL設定ファイルの追加のみでソースコードに変更はないため、既存テスト・ビルド・型チェックへの影響なし。以降のSprint 19実装（#37/#36/#25）を含む最終状態でVitest 267件・<code>vue-tsc --build</code>・<code>npm run build</code>が全green。</p>
+      </div>
+    </div>
+
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC-neg1</div>
+        <div class="ac-text">一括正規化コミットが実コードの意味的差分を含まない（EOL変更のみ）</div>
+      </div>
+      <div class="ac-body">
+        <p><code>git show --stat</code>で確認した通り、変更ファイルは<code>.gitattributes</code>の新規追加1件のみ（+1行）。renormalize対象が0件だったため、既存ソースファイルへの一括書き換えコミット自体が発生していない（意味的差分ゼロを最も厳密な形で満たす）。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Verify -->
+  <section>
+    <h2>動作確認ポイント（ユーザー確認用）</h2>
+    <ul class="verify-list">
+      <li class="verify-item">
+        <div class="verify-num">1</div>
+        <div class="verify-content">
+          <strong>今後 npm run format を実行しても、無関係なファイルが git status に大量に M 表示されないこと</strong>
+          <span>これまでSprint 14/15/17/18で毎回発生していた現象が、本Issue以降のコミット（#37/#36/#25）で実際に発生していないことを確認済み</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">2</div>
+        <div class="verify-content">
+          <strong>アプリの見た目・動作に変化がないこと</strong>
+          <span>本Issueはgit設定ファイルの追加のみで、画面・機能への影響は一切ない</span>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- Scope -->
+  <section>
+    <h2>改修スコープ確認</h2>
+    <table class="scope-table">
+      <tr>
+        <th>ファイル</th>
+        <th>変更</th>
+        <th>内容</th>
+      </tr>
+      <tr>
+        <td><code>.gitattributes</code></td>
+        <td><span class="tag-changed">新規追加</span></td>
+        <td><code>* text=auto eol=lf</code> のみ（1行）</td>
+      </tr>
+      <tr>
+        <td>既存ソースファイル全般</td>
+        <td><span class="tag-unchanged">変更なし</span></td>
+        <td>renormalize対象0件（既に全ファイルLFでインデックス済みだったため）</td>
+      </tr>
+      <tr>
+        <td><code>.editorconfig</code></td>
+        <td><span class="tag-unchanged">新設せず</span></td>
+        <td>スコープ外（.gitattributesのみで対応。将来検討事項として残置）</td>
+      </tr>
+    </table>
+  </section>
+
+</div>
+</body>
+</html>
