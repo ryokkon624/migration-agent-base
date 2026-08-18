@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint 18 Review — #31 Null type safety 警告（ストリームのメソッド参照）を解消する</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #f8f7f5; }
+
+  .page { max-width: 860px; margin: 0 auto; padding: 48px 24px; }
+
+  .sprint-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin-bottom: 8px; }
+  h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px; }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+  .badge-sprint { background: #e8f0fe; color: #1a56db; }
+  .badge-issue { background: #f0fdf4; color: #166534; }
+  .badge-refactor { background: #fdf4ff; color: #7e22ce; }
+  .badge-repo { background: #eff6ff; color: #1e40af; }
+
+  section { margin-bottom: 40px; }
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #888; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e5e5e5; }
+
+  .problem-box { background: #fff8f0; border-left: 3px solid #f59e0b; border-radius: 0 8px 8px 0; padding: 16px 20px; margin-bottom: 16px; }
+  .problem-box .label { font-size: 11px; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .problem-box p { color: #451a03; font-size: 13px; }
+
+  .warn-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 12px; }
+  .warn-table th { padding: 7px 12px; background: white; border: 1px solid #fcd34d; font-size: 11px; font-weight: 700; color: #92400e; text-transform: uppercase; letter-spacing: 0.05em; }
+  .warn-table td { padding: 8px 12px; border: 1px solid #fcd34d; color: #451a03; }
+  .warn-table .code { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; }
+
+  .ac-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+  .ac-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid #f0f0f0; }
+  .ac-check { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .ac-check.done { background: #dcfce7; color: #166534; }
+  .ac-check.partial { background: #fef3c7; color: #92400e; }
+  .ac-num { font-size: 11px; font-weight: 700; color: #888; }
+  .ac-text { font-size: 13px; font-weight: 600; color: #1a1a1a; flex: 1; }
+  .ac-body { padding: 16px 18px; }
+  .ac-body p { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+
+  .file-change { margin-bottom: 16px; }
+  .file-name { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; background: #f3f4f6; color: #374151; padding: 5px 10px; border-radius: 4px 4px 0 0; border: 1px solid #e5e5e5; border-bottom: none; display: flex; justify-content: space-between; }
+  .diff-stat { color: #888; }
+  .code-block { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.7; background: #1e1e2e; color: #cdd6f4; padding: 14px 16px; border-radius: 0 0 6px 6px; overflow-x: auto; }
+  .code-line { display: flex; }
+  .line-num { color: #45475a; min-width: 28px; user-select: none; }
+  .line-add { background: rgba(166, 227, 161, 0.12); color: #a6e3a1; }
+  .line-del { background: rgba(243, 139, 168, 0.12); color: #f38ba8; }
+  .line-ctx { color: #cdd6f4; }
+  .line-prefix { min-width: 14px; }
+
+  .annotation { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-size: 12px; color: #78350f; display: flex; gap: 8px; }
+  .annotation-icon { font-size: 14px; flex-shrink: 0; }
+
+  .caveat-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 12px 16px; font-size: 12px; color: #1e40af; display: flex; gap: 8px; }
+  .caveat-icon { font-size: 14px; flex-shrink: 0; }
+
+  .verify-list { list-style: none; }
+  .verify-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; }
+  .verify-item:last-child { border-bottom: none; }
+  .verify-num { width: 22px; height: 22px; background: #e8f0fe; color: #1a56db; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .verify-content { flex: 1; }
+  .verify-content strong { font-size: 13px; color: #1a1a1a; display: block; margin-bottom: 3px; }
+  .verify-content span { font-size: 12px; color: #6b7280; }
+
+  .scope-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .scope-table th { text-align: left; padding: 8px 12px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .scope-table td { padding: 10px 12px; border: 1px solid #e5e5e5; color: #374151; vertical-align: top; }
+  .scope-table tr:hover td { background: #f9fafb; }
+  .tag-changed { font-size: 11px; font-weight: 600; background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 3px; }
+
+  .gate-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .gate-box { background: white; border: 1px solid #86efac; border-radius: 8px; padding: 14px 16px; text-align: center; }
+  .gate-box .label { font-size: 11px; color: #888; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+  .gate-box .result { font-size: 15px; font-weight: 700; color: #166534; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="sprint-label">Sprint 18 Review</div>
+  <h1>#31 — Null type safety 警告（ストリームのメソッド参照）を<br>解消する</h1>
+  <div class="meta">
+    <span class="badge badge-sprint">Sprint 18</span>
+    <span class="badge badge-issue">#31</span>
+    <span class="badge badge-refactor">refactor</span>
+    <span class="badge badge-repo">backend</span>
+  </div>
+
+  <!-- Problem -->
+  <section>
+    <h2>なぜこの改修が必要だったか</h2>
+    <div class="problem-box">
+      <div class="label">問題</div>
+      <p>IDE（VS Code / Eclipse JDT）が、4ファイル・計6件のストリーム処理におけるメソッド参照（<code>BiFunction</code>/<code>Function</code>）に対して "Null type safety" 警告を出していた。Gradleビルド自体は失敗しない（本repoのGradle lintはspotlessのみ・null解析ツール未導入）が、JDK標準の関数型インターフェイスに対するメソッド参照でJDTの型推論制約に起因するfalse-positive寄りの警告で、実装中の警告ノイズになっていた。</p>
+    </div>
+    <table class="warn-table">
+      <tr>
+        <th>#</th>
+        <th>ファイル</th>
+        <th>対象</th>
+      </tr>
+      <tr>
+        <td>1</td>
+        <td class="code">CartApplicationService.java:154</td>
+        <td class="code">Map.merge(..., CartApplicationService::addSaturating)（BiFunction・2件）</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td class="code">OrderApplicationService.java:172</td>
+        <td class="code">reduce(BigDecimal.ZERO, BigDecimal::add)（1件）</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td class="code">Cart.java:53</td>
+        <td class="code">map(CartItem::lineTotal) + reduce(BigDecimal.ZERO, BigDecimal::add)（2件）</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td class="code">MyBatisCartRepository.java:75</td>
+        <td class="code">toMap(StockAvailability::itemId, Function.identity())（1件）</td>
+      </tr>
+    </table>
+  </section>
+
+  <!-- AC breakdown -->
+  <section>
+    <h2>AC別 実装内容</h2>
+
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check partial">!</div>
+        <div class="ac-num">AC1</div>
+        <div class="ac-text">上表4ファイル・6件の"Null type safety"警告が、IDE（VS Code Problems パネル / Eclipse JDT診断）で解消されていること</div>
+      </div>
+      <div class="ac-body">
+        <p>対象6件のメソッド参照を全てラムダ式へ書き換えた（1案確定・グローバルなnull解析無効化はしない）。</p>
+        <div class="caveat-box">
+          <span class="caveat-icon">ℹ️</span>
+          <span>本ACはVS Code Problems パネル / Eclipse JDT診断というIDE側の警告表示に依存するため、CLIのみで完結する実装環境では直接確認できない。最終確認はユーザー/レビューでのIDE上の目視確認に委ねる（SM承認済みの方針）。</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC2</div>
+        <div class="ac-text">挙動不変であること（既存のSpockテストが全てGREEN。特にCart小計計算・merge数量合算・Order合計計算のロジックが変わらないこと）</div>
+      </div>
+      <div class="ac-body">
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../application/service/CartApplicationService.java</span>
+            <span class="diff-stat">+2 / -1</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">152</span><span class="line-prefix"> </span><span>for (CartLine clientLine : clientLines) {</span></div>
+            <div class="code-line line-add"><span class="line-num">153</span><span class="line-prefix">+</span><span>  // #31: メソッド参照(::addSaturating)はJDTのnull型推論でfalse-positiveの</span></div>
+            <div class="code-line line-add"><span class="line-num">154</span><span class="line-prefix">+</span><span>  // Null type safety警告を出すため、ラムダ化して解消する（挙動は不変）。</span></div>
+            <div class="code-line line-del"><span class="line-num">153</span><span class="line-prefix">-</span><span>  coalesced.merge(clientLine.itemId(), clientLine.quantity(), CartApplicationService::addSaturating);</span></div>
+            <div class="code-line line-add"><span class="line-num">155</span><span class="line-prefix">+</span><span>  coalesced.merge(clientLine.itemId(), clientLine.quantity(), (a, b) -&gt; addSaturating(a, b));</span></div>
+            <div class="code-line line-ctx"><span class="line-num">156</span><span class="line-prefix"> </span><span>}</span></div>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../application/service/OrderApplicationService.java</span>
+            <span class="diff-stat">+3 / -1</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">169</span><span class="line-prefix"> </span><span>private BigDecimal calculateTotal(List&lt;CartItem&gt; cartItems) {</span></div>
+            <div class="code-line line-add"><span class="line-num">170</span><span class="line-prefix">+</span><span>  // #31: メソッド参照(BigDecimal::add)はJDTのNull type safety警告の</span></div>
+            <div class="code-line line-add"><span class="line-num">171</span><span class="line-prefix">+</span><span>  // false-positive源のためラムダ化して解消する（挙動は不変）。</span></div>
+            <div class="code-line line-ctx"><span class="line-num">173</span><span class="line-prefix"> </span><span>  .map(item -&gt; item.listPrice().multiply(BigDecimal.valueOf(item.quantity())))</span></div>
+            <div class="code-line line-del"><span class="line-num">172</span><span class="line-prefix">-</span><span>  .reduce(BigDecimal.ZERO, BigDecimal::add);</span></div>
+            <div class="code-line line-add"><span class="line-num">174</span><span class="line-prefix">+</span><span>  .reduce(BigDecimal.ZERO, (a, b) -&gt; a.add(b));</span></div>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../domain/cart/Cart.java</span>
+            <span class="diff-stat">+3 / -1</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-add"><span class="line-num">53</span><span class="line-prefix">+</span><span>// #31: メソッド参照(CartItem::lineTotal・BigDecimal::add)はJDTのNull type safety</span></div>
+            <div class="code-line line-add"><span class="line-num">54</span><span class="line-prefix">+</span><span>// 警告のfalse-positive源のためラムダ化して解消する（挙動は不変）。</span></div>
+            <div class="code-line line-del"><span class="line-num">53</span><span class="line-prefix">-</span><span>return items.stream().map(CartItem::lineTotal).reduce(BigDecimal.ZERO, BigDecimal::add);</span></div>
+            <div class="code-line line-add"><span class="line-num">55</span><span class="line-prefix">+</span><span>return items.stream().map(item -&gt; item.lineTotal()).reduce(BigDecimal.ZERO, (a, b) -&gt; a.add(b));</span></div>
+          </div>
+        </div>
+        <div class="file-change">
+          <div class="file-name">
+            <span>src/main/java/.../infrastructure/mybatis/cart/MyBatisCartRepository.java</span>
+            <span class="diff-stat">+3 / -2</span>
+          </div>
+          <div class="code-block">
+            <div class="code-line line-ctx"><span class="line-num">74</span><span class="line-prefix"> </span><span>return cartCustomMapper.selectItemsForCart(itemIds, cartId).stream()</span></div>
+            <div class="code-line line-ctx"><span class="line-num">75</span><span class="line-prefix"> </span><span>  .map(CartConverter::toStockAvailability)</span></div>
+            <div class="code-line line-del"><span class="line-num">75</span><span class="line-prefix">-</span><span>  .collect(Collectors.toMap(StockAvailability::itemId, Function.identity()));</span></div>
+            <div class="code-line line-add"><span class="line-num">76</span><span class="line-prefix">+</span><span>  .collect(Collectors.toMap(stock -&gt; stock.itemId(), stock -&gt; stock));</span></div>
+          </div>
+          <div class="annotation">
+            <span class="annotation-icon">💡</span>
+            <span>未使用となった<code>import java.util.function.Function;</code>も併せて除去した。<code>CartConverter::toStockAvailability</code>は対象6件に含まれないため変更していない。</span>
+          </div>
+        </div>
+        <p>Cart小計計算（<code>CartSpec</code>）・merge数量合算（<code>CartApplicationServiceSpec</code>）・Order合計計算（<code>OrderApplicationServiceSpec</code>）・findStocks（<code>MyBatisCartRepositorySpec</code>）の既存Spockが回帰ガードとして機能し、全てGREEN。純リファクタのため新規テストは追加していない。</p>
+      </div>
+    </div>
+
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC3</div>
+        <div class="ac-text">./gradlew spotlessApply 実行後に差分が出ず、./gradlew build が成功すること</div>
+      </div>
+      <div class="ac-body"><code>spotlessApply</code>実行後に<code>spotlessCheck</code>を含む<code>./gradlew build</code>が成功（差分なし）。</div>
+    </div>
+
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC4</div>
+        <div class="ac-text">null解析をグローバルに無効化して警告を隠す対処は採らないこと</div>
+      </div>
+      <div class="ac-body"><code>java.compile.nullAnalysis.mode</code>等のグローバル無効化設定は一切変更していない。警告源であるメソッド参照そのものをラムダ化することで解消した（将来の実null不整合を検出する能力を維持）。</div>
+    </div>
+  </section>
+
+  <!-- Gate -->
+  <section>
+    <h2>検証ゲート</h2>
+    <div class="gate-grid">
+      <div class="gate-box">
+        <div class="label">./gradlew test</div>
+        <div class="result">✓ GREEN</div>
+      </div>
+      <div class="gate-box">
+        <div class="label">./gradlew integrationTest</div>
+        <div class="result">✓ GREEN</div>
+      </div>
+      <div class="gate-box">
+        <div class="label">./gradlew build（spotlessCheck含む）</div>
+        <div class="result">✓ GREEN</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Verify -->
+  <section>
+    <h2>動作確認ポイント（ユーザー確認用）</h2>
+    <ul class="verify-list">
+      <li class="verify-item">
+        <div class="verify-num">1</div>
+        <div class="verify-content">
+          <strong>VS Code（redhat.java拡張）で該当4ファイルを開き、Problemsパネルに"Null type safety"警告が出ていないこと</strong>
+          <span>CartApplicationService.java / OrderApplicationService.java / Cart.java / MyBatisCartRepository.java の該当箇所を確認</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">2</div>
+        <div class="verify-content">
+          <strong>カート・注文の金額計算がこれまで通り正しく動作すること</strong>
+          <span>カート小計・数量マージ・注文合計金額が変更前と同じ結果になるか確認（挙動不変・AC2）</span>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- Scope -->
+  <section>
+    <h2>改修スコープ確認</h2>
+    <table class="scope-table">
+      <tr>
+        <th>ファイル</th>
+        <th>変更</th>
+        <th>内容</th>
+      </tr>
+      <tr>
+        <td><code>CartApplicationService.java</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>merge()内のBiFunctionメソッド参照2件をラムダ化</td>
+      </tr>
+      <tr>
+        <td><code>OrderApplicationService.java</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>calculateTotal()内のreduceメソッド参照1件をラムダ化</td>
+      </tr>
+      <tr>
+        <td><code>Cart.java</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>subtotal()内のmap/reduceメソッド参照2件をラムダ化</td>
+      </tr>
+      <tr>
+        <td><code>MyBatisCartRepository.java</code></td>
+        <td><span class="tag-changed">変更あり</span></td>
+        <td>findStocks()内のtoMapメソッド参照1件をラムダ化・未使用import除去</td>
+      </tr>
+    </table>
+  </section>
+
+</div>
+</body>
+</html>
