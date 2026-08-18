@@ -11,6 +11,19 @@
   3観点レビュー指摘0件だった。要因は下記「横断（database＋backend＋frontend）」参照。
 - Sprint18（#26・依存版currency棚卸し。mysql-connector-jのCVE-2023-22102対応更新）も3観点レビュー指摘0件
   だった。
+- [Sprint Review指摘・ユーザー実機観測] **NOT NULL DEFAULT付きで新規列を追加した場合でも、依存する
+  dev-seedフィクスチャ（`flyway/sql-test/R__*.sql`）のINSERT列リストを明示更新すべき、という指摘を
+  受けた。ただしDEVが実機で再現を試みても失敗を再現できなかった。** `V00_000_013`で
+  `m_profile.color_scheme_preference`をNOT NULL DEFAULT 'system'で追加した際、既存の`R__test_user.sql`の
+  m_profile INSERT（列リスト省略・DEFAULT依存）は据え置いた。ユーザーがローカルdevスタックでseed投入の
+  失敗を観測したと報告されたが、DEVが`dev-jpetstore-db`コンテナに対し`flywayClean→flywayMigrate→
+  seedDevData`をdocumented flow通りに2回（通常実行・完全クリーンからの再実行）実施したところ、いずれも
+  BUILD SUCCESSFUL・seed投入成功で、報告された失敗を再現できなかった（他に紛らわしいMySQLコンテナも
+  存在しなかった）。依頼どおり修正（列リスト＋値を明示し暗黙DEFAULT依存を排除）は適用し、修正後の実機
+  再確認・Spockテストは全green。**真因が特定できていないため、次に同種の指摘・再発が起きた場合は
+  本エントリを参照し2回目として2回ルール昇格を検討すること**（backend-conventionsの「新規エンドポイント等
+  での実機起動確認」ルールと同種の教訓になりうるが、今回は再現できなかった1件のみのため見送った）。
+  発生スプリント: Sprint19（#36、Sprint Review指摘対応・⑦b。初出のため2回ルールに従い本セクション止まり）
 
 ### jpetstore-backend
 Sprint2（#23）・Sprint3（#18/#19）・Sprint4（#21/#20）・Sprint6（#1）・Sprint7（#2/#3）・Sprint9（#5/#6）・
@@ -435,7 +448,11 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   共通レイアウト（`AppHeader`/`AppLayout`等）へ新規のフォーム・ボタン等を追加する際は、そのレイアウトを
   使う既存View群のテストで`find('form')`/`find('button')`のような汎用セレクタが使われていないか
   確認すること。
-  発生スプリント: Sprint7（#2、ヘッダ検索バー追加時に発覚）
+  発生スプリント: Sprint7（#2、ヘッダ検索バー追加時に発覚）→ **Sprint19（#36）で2回目発生**（`AppHeader.vue`
+  にテーマ設定ドロップダウンのtriggerボタンを追加したところ、`ItemDetailView.spec.ts`の
+  `wrapper.find('button')`が新しいtriggerボタンにヒットし、Add to Cartボタンのdisabled判定・クリック
+  テストが複数誤動作した。`item-detail-view__add-to-cart`のようにView固有クラスでセレクタを明示化して
+  解消。**2回ルールにより`frontend-conventions`§7へ昇格した**（詳細は「Skills更新履歴」）。
 - **`npm run format`（Prettier）実行時、意図せず編集していない多数のファイルがLF→CRLFへ改行コード変換
   されノイズとして`git status`に出現する。** backendの`V00_000_001`/`V00_000_002`マイグレーションファイルで
   確認済みの既知パターンと同種。`git diff --stat`（既定の`core.autocrlf=true`設定下）は改行コードのみの
@@ -796,6 +813,18 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   据え、警告消失の最終確認はレビュー/ユーザーのIDE目視に委ねる設計にした。今後同種の"Null type safety"
   警告に遭遇した場合の第一選択肢として記録する（発生頻度が読めないため今回はSkill未反映）。
   発生スプリント: Sprint18（#31）
+- **stateless JWTの制約下でlogin()実行中に自分自身のDBデータを読みたい場合、`CurrentUserProvider`依存の
+  read methodとは別に`Long userId`を明示的に受け取るオーバーロードを用意し、login()が返した
+  `AuthenticatedUser.userId()`をそのまま渡す設計が機能した。** `AccountApplicationService.getPreferences
+  (Long userId)`を新設し、`/api/auth/login`（login()実行中はJWTフィルタ未通過のためSecurityContext未
+  populated＝`currentUserProvider`不可）は返却userIdを、`/api/auth/me`（既存の認証済みリクエスト）は
+  `currentUserProvider.requireCurrentUser().userId()`を、それぞれ渡す形で両エンドポイントを同一メソッドで
+  まかなえた。**加えて、`/api/auth/login`と`/api/auth/me`が共有する応答DTO（`AuthController.LoginResponse`
+  record）を1箇所拡張するだけで両エンドポイントに新フィールド（テーマ/言語設定）が反映される**ことも
+  確認できた（呼び出し側ごとに個別DTOを作る必要がない）。今後「ログイン直後に本人データを読んで応答へ
+  含めたい」Story全般で再利用できる設計（`backend-conventions`§9へ即時反映。詳細は「Skills更新履歴」）。
+  発生スプリント: Sprint19（#36/#25。初出だが「知らないと書けない参照知識・実装パターン」の2回ルール例外
+  として即時反映）
 
 ### jpetstore-frontend
 - **backendのSpring Security 7 CSRF設定（非XOR `CsrfTokenRequestAttributeHandler`・consume-then-
@@ -894,6 +923,20 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   `git stash`往復で実施）。SPA保護ルートの実機到達性検証（PO傾向メモで指摘済みの弱点）に直接効く技法のため
   `frontend-conventions`§7へ即時反映した（詳細は「Skills更新履歴」）。
   発生スプリント: Sprint18（#33、初出。Chrome/Node実行環境が前提）
+- **テーマ・言語のように「永続化・DB権威再水和の仕組みは共有するが、画面への適用先（DOM操作 vs vue-i18nの
+  リアクティブ参照）が異なる」複数の横断設定値は、共有Pinia store（`usePreferencesStore`）へ集約しつつ、
+  各値の適用（apply primitive）だけを個別関数に分離する設計が機能した。** `applyColorScheme`（`<html>`の
+  `.dark`/`.light`クラス切替）と`applyLanguage`（`i18n.global.locale.value`代入）を分離し、共有部分
+  （state・localStorage 2キー・`hydrateFromDb`によるDB同期）は1本にまとめた。**FOUC対策の要否も値ごとに
+  非対称**であることを確認した: CSSクラス切替（初回描画前に適用しないと一瞬デフォルト状態が見える）は
+  `index.html`の同期インラインhead scriptが必要だが、`createI18n()`の`locale`オプション自体をlocalStorage
+  からseedできる項目（テキスト描画がVueマウント後にしか起きない）はhead script無しでもちらつかない。
+  加えて、新規共通dropdown/menu部品（`SettingsDropdown.vue`・open/close・click-outside・aria/keyboard
+  対応）を`{value,label}[]`＋`modelValue`の汎用propsで設計したことで、テーマ3択・言語2択の両方でそのまま
+  再利用できた。今後複数の横断設定値を扱う機能を追加する際の設計型として`frontend-conventions`§7へ即時
+  反映した（詳細は「Skills更新履歴」）。
+  発生スプリント: Sprint19（#36/#25。初出だが「知らないと書けない参照知識・実装パターン」の2回ルール例外
+  として即時反映）
 
 ### 横断（database＋backend＋frontend）
 - **区分値をm_codeに新規登録する際の3-repo横断フロー**を在庫ステータスで実地確認した:
@@ -1293,14 +1336,42 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   「繰り返し指摘されるパターン」の該当リポジトリ冒頭に記録した。
 - `#skills-changelog` へ `[DEV]` で投稿済み。
 
+### Sprint 19（#36/#25/#37/#35・共有preferences設定基盤＋日本語ローカライズ完全実装・cross-repo 3-repo）
+
+- **`backend-conventions`**: `## 9. jpetstore-backend 固有の注意事項` に「login()実行中は`CurrentUserProvider`
+  が使えない（stateless JWTの制約・userId明示引数のread method）」を新設した。**初出だが「知らないと書けない
+  参照知識・実装パターン」の2回ルール例外として即時反映**: 再発防止のためのチェックリスト項目ではなく、
+  login()実行中に本人データを読む必要がある今後のStory（本人向け初期表示値のログイン応答同梱等）が踏襲
+  できる具体的な設計パターン（`getPreferences(Long userId)`型のオーバーロード・共有DTO1箇所拡張で複数
+  エンドポイントに効かせる設計）のため。
+- **`frontend-conventions`**: `## 7. jpetstore-frontend 固有の注意事項` に以下2点を追記した:
+  1. **2回ルールによる昇格**: 共通レイアウト（`AppHeader`/`AppLayout`）へ新規のインタラクティブ要素を
+     追加する際の`find('button')`/`find('form')`衝突。Sprint7（#2、検索フォーム追加時）が初出、Sprint19
+     （#36、テーマ設定ドロップダウンのtriggerボタン追加時に`ItemDetailView.spec.ts`で再発）で2回目の
+     発生と判断し、「新規のインタラクティブ要素を共通レイアウトへ追加する際は既存View群のテストで汎用
+     セレクタが使われていないか確認する」をチェックリスト項目として§7へ昇格した。
+  2. **初出だが「知らないと書けない参照知識・実装パターン」の2回ルール例外として即時反映**: 複数の
+     横断設定値（テーマ・言語）を扱う共有Piniaストアの設計パターン（apply primitiveの個別化・FOUC対策の
+     値ごとの非対称・汎用dropdown/menu部品の設計）。今後複数の横断設定値を扱う機能全般で再利用が見込まれる。
+- **Skillへ反映しなかったもの（2回ルールに従いlong_term.md止まり）**: Sprint Review指摘（NOT NULL DEFAULT
+  列追加時のdev-seedフィクスチャ明示更新・ローカルdevスタックでのseed投入実機確認）は、真因が実機で
+  再現できなかった1件のみのため、`backend-conventions`/`rules/database.md`/`developer-workflow`のDoDへの
+  昇格は見送り、`memory/dev/long_term.md`「繰り返し指摘されるパターン」（jpetstore-database）に初出として
+  記録するに留めた（次回同種発生時に2回目として再評価する）。
+- 3reviewer・SM独立verificationとも指摘0件（tier分離19連続クリーン）は、チェックリスト項目ではなく
+  プロセス上の教訓のためSkillには反映せず`memory/dev/long_term.md`「繰り返し指摘されるパターン」の該当
+  リポジトリ冒頭に記録した。
+- `#skills-changelog` へ `[DEV]` で投稿済み。
+
 ## 卒業済みルール
 
 （該当なし。棚卸し対象となるルールが直近15スプリント基準に達していない。
-  jpetstore-backendはSprint2・3・4・6・7・8・9・10・11・12・13・14・15・16・17・18の16スプリント、
-  jpetstore-databaseはSprint1・3・6・14・16・18の6スプリント、jpetstore-frontendはSprint5・6・7・8・10・
-  11・14・15・16・17・18の11スプリントのみのため、いずれも対象外。§9/§7昇格済みルールの昇格後経過
-  スプリント数（直近15スプリント基準の分子）は、catch-all例外横取り（Sprint7昇格）が11スプリント
-  （Sprint8〜18）・Spockの`given:`裸stub×`then:`引数一致（Sprint12昇格）が6スプリント（Sprint13〜18）・
-  DB-backedレート制限（Sprint16昇格）が2スプリント（Sprint17〜18）・frontend CRLFノイズ選択add
-  （Sprint18昇格）が0スプリント（昇格直後）で、いずれも15スプリントに満たない。
-  Sprint4〜Sprint17 Retroに続きSprint18 Retroでも棚卸しを実施したが同様の理由で卒業候補なし）
+  jpetstore-backendはSprint2・3・4・6・7・8・9・10・11・12・13・14・15・16・17・18・19の17スプリント、
+  jpetstore-databaseはSprint1・3・6・14・16・18・19の7スプリント、jpetstore-frontendはSprint5・6・7・8・
+  10・11・14・15・16・17・18・19の12スプリントのみのため、いずれも対象外。§9/§7昇格済みルールの昇格後
+  経過スプリント数（直近15スプリント基準の分子）は、catch-all例外横取り（Sprint7昇格）が12スプリント
+  （Sprint8〜19）・Spockの`given:`裸stub×`then:`引数一致（Sprint12昇格）が7スプリント（Sprint13〜19）・
+  DB-backedレート制限（Sprint16昇格）が3スプリント（Sprint17〜19）・frontend CRLFノイズ選択add
+  （Sprint18昇格）が1スプリント（Sprint19）・frontend共通レイアウトへの新規要素追加時のfind('button')/
+  find('form')衝突確認（Sprint19昇格）が0スプリント（昇格直後）で、いずれも15スプリントに満たない。
+  Sprint4〜Sprint18 Retroに続きSprint19 Retroでも棚卸しを実施したが同様の理由で卒業候補なし）

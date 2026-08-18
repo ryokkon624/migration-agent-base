@@ -1,20 +1,19 @@
 # SM 短期記憶（今スプリント）
 
-Sprint 18（#33/#34 保護ルート到達性 bug 修正・#27/#31/#26 tech-debt 焼却＝8SP・3-repo）完了。Retro 済み。次スプリント開始時にリセット済み。
+Sprint 19（#36 テーマ切替/#25 日本語ローカライズ完全実装/#37 トークンスロット撤去/#35 .gitattributes・3-repo・実効13-15SP）完了。Retro 済み。次スプリント開始時にリセット済み。
 
-- 実装: frontend `fix/33-auth-guard-reachability`（#33/#34/#27）・backend `refactor/31-null-type-safety`（#31）・database `refactor/26-dependency-currency`（#26）。3観点＋SM verification 全クリーン（11回目相当）・Sprint Review 指摘ゼロ・tier分離18連続。PR: frontend #11(closes #33/#34/#27)・backend #18(closes #31)・database #8(closes #26)→ **全マージ済**（#33/#34/#27/#31/#26 closed(completed) 確認済）。local main 3 repo 同期済（frontend 04bef1a・backend d9a4623・database 641afc5）。
-- 委譲論点: Q1 #34 導線配置=案A-1（ユーザー承認）・Q2 #33 catch-all フェイルセーフ維持・Q3 #31 ラムダ化1案・Q4 #26 EOL/重大CVEのみ更新。
-- SM verification: #31 4ファイル等価ラムダ変換で挙動不変・純増ゼロ／#33 順序変更（router install を再水和 await 後へ）で認可バイパスなし／#26 mysql-connector-j 8.0.33→26.7.0（CVE-2023-22102 対応）・他5依存据え置き。
-- #33 は headless Chrome(CDP)で実機検証（DEV）・#31 AC1 は IDE(JDT)診断依存で ◐（ユーザー VS Code 確認）。
+- 実装: 3-repo `feature/36-user-preferences-i18n`（frontend #12 closes #36/#25/#37/#35・backend #19・database #9）→全マージ済。3観点+SM verification 全クリーン12回目相当・tier分離19連続・Sprint Review 指摘1件（⑦b で R__test_user.sql seed 修正〔`color_scheme_preference='system'` 明示追加〕・真因は実機非再現だが安全側修正でユーザー了承クローズ）。local main 3repo 同期済（frontend 70ef75c・backend 1aa2a92・database a4e7e5a）。#36/#25/#37/#35 クローズ確認・open は #32 のみ。
+- 委譲論点: 横断 Q1=#25完全実装/Q2=/api/auth/me拡張/Q3=FOUC head script ＋ DEV recon 由来 Q-1=フォーマット最小-正/Q-2=AccountEdit パリティ。共有 `usePreferencesStore`（Pinia単一ソース）に集約・apply primitive 非対称（テーマ=htmlクラス/言語=locale・FOUC はテーマ専用）。backend 拡張=AuthController.LoginResponse（/me+/login 共有・A1）・login は getPreferences(Long userId)（A2）。
 
 ## 要フォロー（次回）
-- (1) **teammate 完了確認（idle ≠ 完了）**＝今回も idle 通知後に成果物を直接確認（memory/スレッド/branch）してから前進を徹底（DEV 計画/実装/Retro・reviewer 3体・PO で実践）。継続。
-- (2) **frontend EOL(CRLF) ノイズ**（Sprint14/15/17/18 で4回連続再発）: **恒久対策 `.gitattributes` を #35 起票済（Draft）**。次スプリントで Ready 昇格・実装されれば解消見込み。それまでは DEV 選択 add・SM は `git checkout -f main` で対処。
-- (3) **curl の破壊的/書込系操作（merge PUT 等）が実行環境の分類器にブロックされることがある**（Sprint18 初出・Sprint17 の token URL push ブロックに続く）→ PR マージは `mcp__github__merge_pull_request`、Issue 作成/取得は MCP github ツールで代替可（GraphQL Projects 操作は curl POST で通った）。次回再発で scrum-master-workflow ⑥ へ昇格判定。
-- (4) git token URL 埋め込みは分類器ブロック→ `git push/fetch/pull origin`（token URL なし・credential helper 経由）が有効（Sprint17/18 で定着）。
+- (1) teammate 完了は idle≠完了。成果物直接確認（memory/スレッド/branch）。**★副作用を伴う最終化（Discord投稿/コミット等）の未反映 nudge は「既に完了済みなら再実行せず Message ID を返答して（重複投稿しないで）」の冪等指示にする**（Sprint19 で idle 直後 stale read の nudge が二重投稿を招いた＝反映遅延4回目・次回再発で scrum-master-workflow 冒頭 idle 注記へ昇格判定）。
+- (2) frontend EOL(CRLF) ノイズ → #35 `.gitattributes`（`* text=auto eol=lf`）で恒久対策**実装・マージ済**。次スプリント以降に再発しないか観測（再発ゼロなら要フォロー(2)クローズ）。
+- (3) curl 破壊系（merge PUT 等）が分類器ブロック → PR マージは `mcp__github__merge_pull_request`（Sprint19 で全3PR マージ成功）、Issue操作は MCP github、Projects は GraphQL curl POST（通る）。
+- (4) git push/fetch/pull は `origin`（credential helper・token URL は分類器ブロック）。**frontend push が2分でタイムアウトすることあり**（Sprint19・個別 push＋長めタイムアウト〔300s〕で解消）。
+- (5) DEV(dev-s19-impl) が Sprint Review HTML 生成時に mcp__github__* 不可で curl フォールバック使用と報告（SM は MCP 使用可）。次回 reviewer/DEV の github MCP 可否に留意。
 
 ## 次スプリント候補
-- 機能面 Epic（E1-E4）は完了。残 Open は deferred（#25 i18n・#32 メール検証・いずれも NotReady）／新規 Draft（#35 .gitattributes 恒久対策）。Sprint 19 対象は Planning 時に GitHub Projects の Sprint フィールドで特定する。
+- open Issue は #32（メール検証・NotReady/deferred）のみ。機能面 Epic（E1-E4）完了。Sprint 20 対象は Planning 時に Projects の Sprint フィールドで特定。
 
-## agent-base 成果物（step 12・実施中）
-- 対象: backlog/sprint_18/（sprint_backlog.md・review-#33/#34/#27/#31/#26.html）／memory/{sm,dev,po}/{short,long}.md／.claude/skills/frontend-conventions（DEV §7 更新）。ブランチ `docs/sprint-18-reachability-techdebt`・`Related: #33,#34,#27,#31,#26`（closes にしない）。
+## agent-base 成果物（step12・実施中）
+- 対象: backlog/sprint_19/（sprint_backlog.md・review-{36,25,37,35}.html）・memory/{sm,dev,po}/{short,long}.md・.claude/skills/{backend,frontend}-conventions・spec/intended-diff-ledger.md。ブランチ `docs/sprint-19-preferences-i18n`・`Related: #36/#25/#37/#35`（closes にしない）。
