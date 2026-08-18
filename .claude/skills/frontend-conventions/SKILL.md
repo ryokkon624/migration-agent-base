@@ -384,4 +384,51 @@ onMounted(async () => {
 > **背景（Sprint 10 #7）**: AC-neg1（空カート進入不可）で採用。`isEmpty`getterを`cart.spec.ts`で固定し、
 > `CheckoutView.vue`自体は無テストのままACの正しさを担保した。
 
+### コミット前は選択addを徹底する（`npm run format`のCRLFノイズ対策・2回ルール昇格）
+
+`npm run format`（Prettier）はワーキングツリー全体を走査するため、**今回編集していないファイルの
+改行コード（LF→CRLF）まで意図せず書き換え**、`git status`に無関係な差分として大量出現することがある。
+format実行後は必ず以下の手順でコミット対象を絞ること。
+
+```bash
+# 既定の core.autocrlf=true 設定では、改行コードのみの差分は自動的に正規化されて
+# diffstatに出てこない。これで「本当に内容が変わったファイル」だけを特定できる。
+git diff --stat
+git add <実際に変更したファイルのみ>
+```
+
+`git add -A` / `git add .` は使わない。`git status`に大量のファイルが並んでいても、`git diff --stat`の
+出力に無いファイルは改行コードのみの差分（内容差分ゼロ）なので、addせず放置してよい。
+
+> **背景（Sprint 14・15・17・18で4回連続発生）**: 恒久対策（`.gitattributes`による改行コード正規化の
+> 強制）は別途Issue化を検討中。本項目はそれまでの運用面の緩和策として、コミット前チェックの必須手順に
+> 昇格した。
+
+### jsdom/Vitestで再現できないブラウザ固有挙動は、headless Chrome + 生CDPで実機検証する
+
+Vue Routerのinstall時初期ナビゲーションの順序問題（#33）のように、**jsdom/Vitestでは完全に再現できない
+実ブラウザ固有の挙動**を検証する必要がある場合、Playwright/Puppeteer等のパッケージインストールなしで、
+headless ChromeをChrome DevTools Protocol（CDP）経由で直接操作できる。
+
+```bash
+# 1. headless Chromeをリモートデバッグポート付きで起動
+chrome.exe --headless=new --remote-debugging-port=9333 --user-data-dir=<tmp-profile-dir>
+```
+
+```js
+// 2. Node.js 22+ のネイティブ WebSocket でCDPに直接接続する（追加パッケージ不要）
+const tab = await (await fetch('http://127.0.0.1:9333/json/new?about:blank', { method: 'PUT' })).json()
+const ws = new WebSocket(tab.webSocketDebuggerUrl)
+// Page.enable / Runtime.enable / Network.enable → Page.navigate + Page.loadEventFired待ち →
+// Runtime.evaluate(awaitPromise: true) でDOM操作（フォーム入力・click・location確認）まで行える
+```
+
+**検証の妥当性は「修正前のコードに戻して同じ手順を実行し、Issue記載の再現手順どおりにバグが再現すること」
+を先に確認してから「修正後は解消すること」を確認する2段構えで担保する**（`git stash`で一時的に元へ戻す）。
+これにより、テスト自体が意図通りバグを検出できることを裏取りしてから回帰ガードとして採用できる。
+
+> **背景（Sprint 18 #33）**: PO傾向メモ「SPA保護ルートの実機到達性がAC/受入検証から漏れやすい」に対応する
+> 技法として即時反映。ログイン→保護ルートへのハード直リンク/リロード→リンククリックまで、実ブラウザの
+> V8エンジン上で検証できた。
+
 ---

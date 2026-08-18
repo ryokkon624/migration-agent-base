@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint 18 Review — #33 保護ルートのリロード/直リンクでログイン済みでもサインオンに飛ばされる</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #f8f7f5; }
+  .page { max-width: 860px; margin: 0 auto; padding: 48px 24px; }
+
+  .sprint-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin-bottom: 8px; }
+  h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px; }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+  .badge-sprint { background: #e8f0fe; color: #1a56db; }
+  .badge-issue { background: #fef2f2; color: #991b1b; }
+  .badge-bug { background: #fef2f2; color: #b91c1c; }
+  .badge-repo { background: #f0fdf4; color: #166534; }
+
+  section { margin-bottom: 40px; }
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #888; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e5e5e5; }
+
+  /* 発生事象 */
+  .symptom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .symptom-box { background: white; border: 1px solid #e5e5e5; border-radius: 10px; padding: 20px; }
+  .symptom-box .sym-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; }
+  .sym-label-bad { color: #b91c1c; }
+  .sym-label-good { color: #166534; }
+  .mock-card { background: #f9fafb; border: 1px solid #e5e5e5; border-radius: 8px; padding: 0; font-size: 13px; overflow: hidden; }
+  .mock-urlbar { background: #e5e7eb; padding: 6px 10px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; color: #374151; border-bottom: 1px solid #d1d5db; }
+  .mock-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: white; border-bottom: 1px solid #e5e5e5; font-size: 11px; }
+  .mock-header-nav { color: #6b7280; }
+  .mock-header-account { font-weight: 700; }
+  .mock-body { padding: 16px 12px; text-align: center; }
+  .mock-body-bad { color: #b91c1c; font-weight: 700; }
+  .mock-body-good { color: #166534; font-weight: 700; }
+  .mock-body-sub { color: #6b7280; font-size: 11px; margin-top: 6px; font-weight: 400; }
+
+  /* 原因分析 */
+  .cause-box { background: white; border: 1px solid #fca5a5; border-radius: 10px; overflow: hidden; margin-bottom: 16px; }
+  .cause-header { background: #fef2f2; padding: 12px 18px; display: flex; align-items: center; gap: 8px; }
+  .cause-header .icon { font-size: 16px; }
+  .cause-header .title { font-size: 13px; font-weight: 700; color: #991b1b; }
+  .cause-body { padding: 16px 18px; }
+  .cause-body p { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+
+  .mismatch-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 12px; }
+  .mismatch-table th { padding: 7px 12px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .mismatch-table td { padding: 8px 12px; border: 1px solid #e5e5e5; }
+  .mismatch-table .code { font-family: 'SF Mono', 'Fira Code', monospace; }
+  .mismatch-table .mismatch { background: #fef2f2; }
+  .mismatch-table .match { background: #f0fdf4; }
+  .arrow-cell { text-align: center; color: #ef4444; font-weight: 700; }
+
+  /* Code blocks */
+  .file-change { margin-bottom: 16px; }
+  .file-name { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; background: #f3f4f6; color: #374151; padding: 5px 10px; border-radius: 4px 4px 0 0; border: 1px solid #e5e5e5; border-bottom: none; display: flex; justify-content: space-between; }
+  .diff-stat { color: #888; }
+  .code-block { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.7; background: #1e1e2e; color: #cdd6f4; padding: 14px 16px; border-radius: 0 0 6px 6px; overflow-x: auto; }
+  .code-line { display: flex; }
+  .line-num { color: #45475a; min-width: 28px; user-select: none; }
+  .line-add { background: rgba(166, 227, 161, 0.12); color: #a6e3a1; }
+  .line-del { background: rgba(243, 139, 168, 0.12); color: #f38ba8; }
+  .line-ctx { color: #cdd6f4; }
+  .line-prefix { min-width: 14px; }
+  .annotation { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-size: 12px; color: #78350f; display: flex; gap: 8px; }
+  .annotation-icon { font-size: 14px; flex-shrink: 0; }
+
+  /* AC cards */
+  .ac-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
+  .ac-header { display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-bottom: 1px solid #f0f0f0; }
+  .ac-check { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .ac-check.done { background: #dcfce7; color: #166534; }
+  .ac-num { font-size: 11px; font-weight: 700; color: #888; }
+  .ac-text { font-size: 13px; font-weight: 600; flex: 1; }
+  .ac-body { padding: 14px 18px; font-size: 13px; color: #4b5563; }
+
+  /* Verify */
+  .verify-list { list-style: none; }
+  .verify-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; }
+  .verify-item:last-child { border-bottom: none; }
+  .verify-num { width: 22px; height: 22px; background: #e8f0fe; color: #1a56db; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .verify-content { flex: 1; }
+  .verify-content strong { font-size: 13px; color: #1a1a1a; display: block; margin-bottom: 3px; }
+  .verify-content span { font-size: 12px; color: #6b7280; }
+
+  /* Regression */
+  .regression-box { background: white; border: 1px solid #e5e5e5; border-radius: 10px; padding: 16px 18px; }
+  .regression-box p { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+  .test-item { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f5f5f5; font-size: 13px; align-items: flex-start; }
+  .test-item:last-child { border-bottom: none; }
+  .test-icon { color: #22c55e; font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+  .test-name { color: #374151; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; }
+
+  /* Real-browser verification box */
+  .verify-real-box { background: #f0fdf4; border: 1px solid #86efac; border-radius: 10px; padding: 16px 18px; margin-top: 12px; }
+  .verify-real-box .vr-title { font-size: 12px; font-weight: 700; color: #166534; margin-bottom: 10px; }
+  .vr-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .vr-table th { text-align: left; padding: 6px 10px; background: white; border: 1px solid #d1fae5; font-size: 10px; font-weight: 700; color: #166534; text-transform: uppercase; letter-spacing: 0.04em; }
+  .vr-table td { padding: 7px 10px; border: 1px solid #d1fae5; color: #14532d; }
+  .vr-fail { color: #b91c1c; font-weight: 700; }
+  .vr-pass { color: #166534; font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="sprint-label">Sprint 18 Review · Bug Fix</div>
+  <h1>#33 — 保護ルートのリロード/直リンクで<br>ログイン済みでもサインオンに飛ばされる</h1>
+  <div class="meta">
+    <span class="badge badge-sprint">Sprint 18</span>
+    <span class="badge badge-issue">#33</span>
+    <span class="badge badge-bug">bug</span>
+    <span class="badge badge-repo">frontend</span>
+  </div>
+
+  <!-- 発生事象 -->
+  <section>
+    <h2>発生事象</h2>
+    <div class="symptom-grid">
+      <div class="symptom-box">
+        <div class="sym-label sym-label-bad">修正前（バグあり）</div>
+        <div class="mock-card">
+          <div class="mock-urlbar">https://localhost:5173/account/orders （直リンク/リロード）</div>
+          <div class="mock-header">
+            <span class="mock-header-nav">Home Catalog Cart</span>
+            <span class="mock-header-account">Hi, demo_user</span>
+          </div>
+          <div class="mock-body">
+            <div class="mock-body-bad">→ /signon?redirect=/account/orders へリダイレクト</div>
+            <div class="mock-body-sub">ヘッダーは認証済み表示のまま、なぜかサインオン画面に飛ばされる</div>
+          </div>
+        </div>
+      </div>
+      <div class="symptom-box">
+        <div class="sym-label sym-label-good">修正後（正常）</div>
+        <div class="mock-card">
+          <div class="mock-urlbar">https://localhost:5173/account/orders （直リンク/リロード）</div>
+          <div class="mock-header">
+            <span class="mock-header-nav">Home Catalog Cart</span>
+            <span class="mock-header-account">Hi, demo_user</span>
+          </div>
+          <div class="mock-body">
+            <div class="mock-body-good">→ Order History 画面がそのまま表示される</div>
+            <div class="mock-body-sub">リダイレクトは発生せず、注文履歴が表示される</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 原因分析 -->
+  <section>
+    <h2>原因分析</h2>
+    <div class="cause-box">
+      <div class="cause-header">
+        <span class="icon">🔍</span>
+        <span class="title">router install が「再水和(rehydration)完了」より先に実行されていた</span>
+      </div>
+      <div class="cause-body">
+        <p><code>main.ts</code> の <code>bootstrap()</code> は、Cookie は有効でも Pinia の認証state はリロードで揮発するため、<code>/api/auth/me</code> を呼んで再水和してから画面を描画する設計だった。しかし <code>app.use(router)</code>（router install）が再水和の <code>await</code> より<strong>前</strong>に実行されていたため、vue-router が install 時に開始する初期ナビゲーションで <code>authGuard</code> が <code>isAuthenticated=false</code> のまま評価され、有効なセッションでも signon へ誤誘導していた。</p>
+        <table class="mismatch-table">
+          <tr>
+            <th>処理順</th>
+            <th>修正前の実行順序（誤り）</th>
+            <th></th>
+            <th>修正後の実行順序（正しい）</th>
+          </tr>
+          <tr>
+            <td>1</td>
+            <td class="code mismatch">app.use(router) ※初期ナビ開始</td>
+            <td class="arrow-cell">≠</td>
+            <td class="code match">await 再水和(/api/auth/me)</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td class="code mismatch">await 再水和(/api/auth/me)</td>
+            <td class="arrow-cell">≠</td>
+            <td class="code match">app.use(router) ※初期ナビ開始</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td class="code">app.mount('#app')</td>
+            <td class="arrow-cell">=</td>
+            <td class="code">app.mount('#app')</td>
+          </tr>
+        </table>
+        <p>コード上のコメント（「マウント前に /api/auth/me で再水和してから描画する（ガード誤判定防止）」）は当初からその意図で書かれていたが、<code>app.use(router)</code> の位置がこの意図に反していたため実際には効いていなかった。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 改修内容 -->
+  <section>
+    <h2>改修内容</h2>
+    <div class="file-change">
+      <div class="file-name">
+        <span>src/main.ts</span>
+        <span class="diff-stat">+6 / -1</span>
+      </div>
+      <div class="code-block">
+        <div class="code-line line-ctx"><span class="line-num">13</span><span class="line-prefix"> </span><span>  app.use(createPinia())</span></div>
+        <div class="code-line line-ctx"><span class="line-num">14</span><span class="line-prefix"> </span><span>  app.use(i18n)</span></div>
+        <div class="code-line line-del"><span class="line-num">15</span><span class="line-prefix">-</span><span>  app.use(router)</span></div>
+        <div class="code-line line-ctx"><span class="line-num"> </span><span class="line-prefix"> </span><span>  // ...(コメント省略)...</span></div>
+        <div class="code-line line-ctx"><span class="line-num">22</span><span class="line-prefix"> </span><span>  await Promise.all([primeCsrfToken(), useAuthStore().fetchCurrentUser()])</span></div>
+        <div class="code-line line-add"><span class="line-num">24</span><span class="line-prefix">+</span><span>  // #33: app.use(router)はここまで遅延させる。vue-routerはinstall時に初期ナビゲーションを</span></div>
+        <div class="code-line line-add"><span class="line-num">25</span><span class="line-prefix">+</span><span>  // 開始しauthGuardを評価するため、再水和(fetchCurrentUser)完了より前にinstallすると</span></div>
+        <div class="code-line line-add"><span class="line-num">26</span><span class="line-prefix">+</span><span>  // isAuthenticated=falseのまま保護ルートが誤ってsignonへ誘導される(リロード/直リンクで再現)。</span></div>
+        <div class="code-line line-add"><span class="line-num">27</span><span class="line-prefix">+</span><span>  app.use(router)</span></div>
+        <div class="code-line line-ctx"><span class="line-num">29</span><span class="line-prefix"> </span><span>  app.mount('#app')</span></div>
+      </div>
+      <div class="annotation">
+        <span class="annotation-icon">💡</span>
+        <span><code>pinia</code>/<code>i18n</code>の install は再水和の <code>useAuthStore()</code> 呼び出しより前に必要なため現行位置のまま維持し、<code>router</code> のみ再水和 await の後ろへ移動した。</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- AC確認 -->
+  <section>
+    <h2>AC確認</h2>
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC1</div>
+        <div class="ac-text">有効なJWTセッションがある状態で保護ルートをリロード/直リンク/ディープリンクしても、signonに飛ばされず当該ページが表示される</div>
+      </div>
+      <div class="ac-body">router installを再水和awaitの後へ移動し解消。実機（headless Chrome）で <code>/account/orders</code> への直リンク・リロードいずれも正しく表示されることを確認。</div>
+    </div>
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC2</div>
+        <div class="ac-text">未認証（Cookie無効/期限切れ）の場合は従来どおりsignonへ誘導し、redirectで元URLに復帰する（回帰なし）</div>
+      </div>
+      <div class="ac-body">既存の<code>authGuard</code>ロジックは無変更。実機でCookie削除後に <code>/account/orders</code> へ直リンクし、<code>/signon?redirect=/account/orders</code> へ正しく誘導されることを確認（回帰なし）。</div>
+    </div>
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC-neg1</div>
+        <div class="ac-text">GET /api/auth/me が200を返す状態で保護ルートを直リンクしても、signonへのリダイレクトが発生しない</div>
+      </div>
+      <div class="ac-body">router installを遅延させたことで、authGuard評価時点では既に <code>/me</code> のレスポンスがstateへ反映済みになる。実機検証で確認済み。</div>
+    </div>
+    <div class="ac-card">
+      <div class="ac-header">
+        <div class="ac-check done">✓</div>
+        <div class="ac-num">AC3</div>
+        <div class="ac-text">既存のVitest（authGuard・SignonViewのredirect復帰）が回帰しない</div>
+      </div>
+      <div class="ac-body"><code>authGuard.spec.ts</code>（4件）・<code>SignonView.spec.ts</code>（4件）とも修正後もGREEN。</div>
+    </div>
+  </section>
+
+  <!-- 動作確認 -->
+  <section>
+    <h2>動作確認ポイント（ユーザー確認用）</h2>
+    <ul class="verify-list">
+      <li class="verify-item">
+        <div class="verify-num">1</div>
+        <div class="verify-content">
+          <strong>demo_userでログイン後、ブラウザのアドレスバーで /account/orders を直接開く（または F5 でリロード）</strong>
+          <span>signon画面に飛ばされず、注文履歴がそのまま表示されるか確認</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">2</div>
+        <div class="verify-content">
+          <strong>同様に /account・/checkout・/account/password 等の保護ルートでもリロードを試す</strong>
+          <span>すべて同じ根本原因（router install順序）のため、いずれも直リンク/リロードで正しく表示されるか確認</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">3</div>
+        <div class="verify-content">
+          <strong>ログアウト状態で /account/orders を直接開く</strong>
+          <span>signonへ誘導され、ログイン後に元のURLへ復帰することを確認（デグレ確認・AC2）</span>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- 再発防止 -->
+  <section>
+    <h2>再発防止</h2>
+    <div class="regression-box">
+      <p>ブート順序（router installと再水和の前後関係）は jsdom/Vitest だけでは実ブラウザの初期ナビゲーション挙動を完全再現できないため、2段構えで検証した。</p>
+      <div class="test-item">
+        <span class="test-icon">✓</span>
+        <div>
+          <div class="test-name">src/__tests__/main.spec.ts（新規）</div>
+          <div style="font-size:12px;color:#6b7280;margin-top:2px;">vueのcreateAppをモックし、「app.use(router)がCSRF prime/再水和(fetchCurrentUser)完了より後に実行される」というソースコード構造上の順序契約をVitestで固定。修正前のコードに対して実行するとこのテストがREDになることを確認済み（回帰ガードとして機能する）。</div>
+        </div>
+      </div>
+      <div class="test-item">
+        <span class="test-icon">✓</span>
+        <div>
+          <div class="test-name">headless Chrome実機検証（CDP/WebSocket）</div>
+          <div style="font-size:12px;color:#6b7280;margin-top:2px;">Vitest/jsdomでは再現しきれない実ブラウザでのVue Router install挙動を、headless ChromeをCDP経由で直接操作して検証した。</div>
+        </div>
+      </div>
+      <div class="verify-real-box">
+        <div class="vr-title">実機検証結果（headless Chrome・demo_userでログイン後）</div>
+        <table class="vr-table">
+          <tr>
+            <th>シナリオ</th>
+            <th>修正前</th>
+            <th>修正後</th>
+          </tr>
+          <tr>
+            <td>ログイン後 /account/orders へ直リンク</td>
+            <td class="vr-fail">/signon へリダイレクト（バグ再現）</td>
+            <td class="vr-pass">/account/orders がそのまま表示</td>
+          </tr>
+          <tr>
+            <td>/account/orders でリロード</td>
+            <td class="vr-fail">/signon へリダイレクト（バグ再現）</td>
+            <td class="vr-pass">/account/orders がそのまま表示</td>
+          </tr>
+          <tr>
+            <td>未認証で /account/orders へ直リンク</td>
+            <td class="vr-pass">/signon?redirect=... へ誘導</td>
+            <td class="vr-pass">/signon?redirect=... へ誘導（回帰なし）</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>

@@ -9,6 +9,8 @@
   発生スプリント: Sprint1（#22）
 - Sprint6（#1・カタログseed新規投入。本プロジェクト初のフルスタックドメイン機能・3-repo cross-repo）も
   3観点レビュー指摘0件だった。要因は下記「横断（database＋backend＋frontend）」参照。
+- Sprint18（#26・依存版currency棚卸し。mysql-connector-jのCVE-2023-22102対応更新）も3観点レビュー指摘0件
+  だった。
 
 ### jpetstore-backend
 Sprint2（#23）・Sprint3（#18/#19）・Sprint4（#21/#20）・Sprint6（#1）・Sprint7（#2/#3）・Sprint9（#5/#6）・
@@ -24,7 +26,8 @@ N+1バッチ化retrofit）も3観点とも指摘0件かつSM独立verification�
 E4ユーザー登録＋アカウント編集・version楽観ロック初実装。Sprint16 Retro時点ではPRマージ前で未確定のため
 本行への反映を次回Retroへ持ち越していた）も3観点とも指摘0件かつSM verificationでも指摘0件でクリーン、
 Sprint17（#15/#16/#17・E4アカウントセキュリティ完結＝PW変更再認証・CSRF・入力検証）も3観点とも指摘0件
-かつSM verificationでも指摘0件でクリーン＝tier分離17連続）。
+かつSM verificationでも指摘0件でクリーン、Sprint18（#31・null type safety警告のラムダ化。既存Spockを
+回帰ガードに使う純リファクタ）も3観点とも指摘0件でクリーン＝tier分離18連続）。
 以下の発見はいずれもDEV自身がTDD・実機検証中に見つけたもので初出＝1回目のため、2回ルールに従い本セクション
 ではなく「習得したこと」「技術的なハマりポイント」に記録する。ただし一部は参照知識/実装パターンとして
 初出からSkillへ即時反映した（詳細は「Skills更新履歴」）。
@@ -153,6 +156,10 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
 - Sprint10（#7・チェックアウト・ウィザード。cross-repo backend従／frontend主）も3観点とも指摘0件・
   手戻りゼロで完走した。Sprint5の2件（上記）は依然2回目の再発が無いため、本セクションでの待機を継続する。
   要因は下記「横断（database＋backend＋frontend）」参照。
+- Sprint18（#33/#34/#27・保護ルート認証ガードのレース修正/ナビ導線追加/tsconfig baseUrl削除）も3観点とも
+  指摘0件でクリーン。Sprint5の2件（上記）は依然2回目の再発が無いため待機を継続する（別パターンである
+  `npm run format`CRLFノイズ＝下記「技術的なハマりポイント」参照はSprint14/15/17/18の4回連続発生で
+  本Retroにて`frontend-conventions`§7へ昇格済み）。
 
 ### 横断（database＋backend＋frontend）
 - **Sprint6（#1）は3観点レビュー（規約/セキュリティ/パフォーマンス）が3-repoすべてで指摘0件だった。**
@@ -430,12 +437,15 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   確認すること。
   発生スプリント: Sprint7（#2、ヘッダ検索バー追加時に発覚）
 - **`npm run format`（Prettier）実行時、意図せず編集していない多数のファイルがLF→CRLFへ改行コード変換
-  されノイズとして`git status`に出現した。** backendの`V00_000_001`/`V00_000_002`マイグレーションファイルで
-  確認済みの既知パターンと同種だが、frontendでの発生は本スプリントが初めてだった。`git diff --stat`で
-  実際に意図した差分があるファイルのみを特定し、それらのみを`git add`する選択addで、無関係な改行コード
-  変更を誤ってコミットすることを回避した。
-  発生スプリント: Sprint17（#15/#16/#17、コミット前の`git status`確認時に発覚。初出のため2回ルールに
-  従い本Skillには未反映）
+  されノイズとして`git status`に出現する。** backendの`V00_000_001`/`V00_000_002`マイグレーションファイルで
+  確認済みの既知パターンと同種。`git diff --stat`（既定の`core.autocrlf=true`設定下）は改行コードのみの
+  差分を自動的に正規化して除外するため、実際に意図した差分があるファイルのみを正しく特定できる。この
+  結果に基づき該当ファイルのみを`git add`する選択addで、無関係な改行コード変更を誤ってコミットすることを
+  回避する。
+  発生スプリント: Sprint14→Sprint15→Sprint17→**Sprint18（#33/#34/#27、`npm run format`実行で52ファイルに
+  再発）で4回連続発生**のため2回ルールにより`frontend-conventions`§7へ昇格した（詳細は「Skills更新履歴」）。
+  恒久対策（`.gitattributes`導入）はSM側で別Issue化を検討中のため、本Skill昇格は「選択addの徹底」という
+  運用面の緩和策にとどめている。
 
 ## 習得したこと
 
@@ -456,6 +466,18 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   同一ALTER文にまとめることでどちらのリスクも避けられる。索引テストは複合索引の存在と単一列索引の
   消滅の両方をアサートして置換の完全性を担保した（`information_schema.STATISTICS`）。
   発生スプリント: Sprint14（#9、`V00_000_011__add_t_order_user_order_index.sql`）
+- **依存の版currency（EOL/重大CVE）棚卸しは、モデルの学習知識に頼らず`curl`でMaven Central metadata
+  （`repo1.maven.org/.../maven-metadata.xml`で`<latest>`/`<versions>`を確認）と
+  [OSV.dev](https://osv.dev) API（`POST https://api.osv.dev/v1/query`に`{"package":{"name","ecosystem":
+  "Maven"},"version"}`を渡す）を直接クエリすることで、当日時点の実データに基づいて確定できる。**
+  `mysql-connector-j:8.0.33`についてOSV.devが実在の重大CVE（CVE-2023-22102・HIGH・GHSA-m6vm-37g8-gqvh）を
+  返したことで「学習知識では『やや古い』としか言えない依存」が「fixed-in版が明確な確定的な更新トリガ」に
+  変わった。現行最新版がMaven Central上に本当に存在するかは`curl -o /dev/null -w "%{http_code}"`でPOM URLを
+  直接叩いて200を確認してから採用する（バージョン番号の記憶違いによる存在しないバージョン指定を防ぐ）。
+  この技法は`jpetstore-database`に限らずGradle/Mavenエコシステムの依存を持つ`jpetstore-backend`でも
+  そのまま使える汎用技法だが、E6棚卸し系Issue自体の発生頻度が低い（database実装スプリントは本Story含め
+  6スプリントのみ）ため、今回はSkillへの新規反映は見送りlong_term.mdでの技法記録にとどめた。
+  発生スプリント: Sprint18（#26、初出。ネットワークアクセス可能な実行環境が前提）
 
 ### jpetstore-backend
 - **Spring Boot 4.1 が自動構成する `ObjectMapper` は Jackson 3系（`tools.jackson.databind.ObjectMapper`）。**
@@ -763,6 +785,17 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   Storyでも、専用の発行ロジックを新設せずこのメソッドへ委譲できないかまず検討する価値がある。既存メソッドの
   新規コンテキストでの再利用でありパターン自体は既存のため`backend-conventions`は変更していない。
   発生スプリント: Sprint17（#15、計画フェーズのユーザー確認事項Q3で確定）
+- **Eclipse JDT（VS Code redhat.java拡張）の"Null type safety"警告は、JDK標準関数型インターフェース
+  （`Function`/`BiFunction`等）へのメソッド参照（`Type::method`）に対してfalse-positive寄りに出やすく、
+  同じ処理をラムダ式（`(a, b) -> a.method(b)`）へ書き換えるだけで警告が解消できる（挙動・パフォーマンスとも
+  実質差なし）。** `Gradle`自体はこの種のnull解析ツールを導入していないためビルドは通り続け、CI/ビルドを
+  止めない**IDE専用の診断**である点に注意（`./gradlew compileJava`が greenでもIDE上は警告が出続ける）。
+  対処の選択肢（ラムダ化／局所`@SuppressWarnings("null")`／nullnessアノテーション付与／診断severity調整）の
+  うち、既存の関数シグネチャ・呼び出し側を一切変えずに済む「ラムダ化」が最も低リスクな第一候補になる。
+  IDE警告の消失自体はCLIから検証できないため、AC化する際は「挙動不変（既存テストGREEN）」を必須ゲートに
+  据え、警告消失の最終確認はレビュー/ユーザーのIDE目視に委ねる設計にした。今後同種の"Null type safety"
+  警告に遭遇した場合の第一選択肢として記録する（発生頻度が読めないため今回はSkill未反映）。
+  発生スプリント: Sprint18（#31）
 
 ### jpetstore-frontend
 - **backendのSpring Security 7 CSRF設定（非XOR `CsrfTokenRequestAttributeHandler`・consume-then-
@@ -848,6 +881,19 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   再読込を促す・その他エラーとは文言も遷移も異なる）に応じてパターンの中身（フラグの分割粒度）を調整した
   判断であり、新しいSkillパターンではないため`frontend-conventions`は変更していない。
   発生スプリント: Sprint16（#14）
+- **専用のブラウザ自動化ツールが実行環境に無い場合でも、headless Chrome（`chrome.exe --headless=new
+  --remote-debugging-port=N --user-data-dir=<tmp>`）とNode.js 22+のネイティブ`WebSocket`グローバルだけで、
+  Chrome DevTools Protocol（CDP）を直接叩く最小限のE2E検証ハーネスを自作できる。**
+  `http://127.0.0.1:<port>/json/new`でタブを開き、返る`webSocketDebuggerUrl`へ接続、`Page.enable`/
+  `Runtime.enable`/`Network.enable`した上で`Page.navigate`＋`Page.loadEventFired`待ち・`Runtime.evaluate`
+  （`awaitPromise: true`でDOM操作を待機）でフォーム入力・クリック・`window.location`確認まで行える。
+  jsdom/Vitestでは再現できない実ブラウザ固有の挙動（Vue Routerのinstall時初期ナビゲーション順序＝#33等）を、
+  外部パッケージのインストール（Playwright/Puppeteer等のダウンロード）なしで検証できる。**検証の妥当性は
+  「修正前のコードに戻して同じ手順を実行し、Issueの再現手順どおりにバグが再現すること」を確認してから
+  「修正後は解消すること」を確認する2段構えで担保した**（テスト対象コードを一時的に元に戻す
+  `git stash`往復で実施）。SPA保護ルートの実機到達性検証（PO傾向メモで指摘済みの弱点）に直接効く技法のため
+  `frontend-conventions`§7へ即時反映した（詳細は「Skills更新履歴」）。
+  発生スプリント: Sprint18（#33、初出。Chrome/Node実行環境が前提）
 
 ### 横断（database＋backend＋frontend）
 - **区分値をm_codeに新規登録する際の3-repo横断フロー**を在庫ステータスで実地確認した:
@@ -1223,13 +1269,38 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   冒頭）に記録した（あわせてSprint16分の反映持ち越しも本Retroで解消した）。
 - `#skills-changelog` へ `[DEV]` で投稿済み。
 
+### Sprint 18（#33/#34/#27・#31・#26・出荷済み保護ルート機能の実機到達性回復＋低リスク技術的負債の焼却）
+
+- **`frontend-conventions`**: `## 7. jpetstore-frontend 固有の注意事項` に以下2点を追記した:
+  1. **2回ルールによる昇格**: `npm run format`（Prettier）実行時のCRLF/EOLノイズ。Sprint14→15→17で
+     3回発生していたにもかかわらず、各Retro時点では「初出」として個別にlong_term.md止まりの扱いに
+     なっていた（Sprint17 Retro時点の記録誤り）。Sprint18で4回目の発生が確認されたことを機に本Retroで
+     経緯を訂正し、`git diff --stat`（既定の`core.autocrlf=true`）による選択addの徹底をコミット前チェック
+     項目として`frontend-conventions`§7へ昇格した。恒久対策（`.gitattributes`）はSM側で別Issue化を検討中。
+  2. **初出だが「知らないと書けない参照知識・実装パターン」の2回ルール例外として即時反映**: headless
+     Chrome＋Node.jsネイティブ`WebSocket`によるCDP直叩き実機検証技法（#33）。PO傾向メモ「SPA保護ルートの
+     実機到達性がAC/受入検証から漏れやすい」に直接対応する技法であり、追加パッケージ導入なしで再現可能な
+     ため、今後の類似検証（ブラウザ専用挙動・ハードナビゲーション系AC）で再利用が見込まれる。
+- **`backend-conventions`/データベース関連へ反映しなかったもの**: 以下2件はいずれも発生頻度が読めない
+  一回性の高いタスク種別のため、今回はSkillに反映せず`memory/dev/long_term.md`「習得したこと」に技法として
+  記録するに留めた:
+  - #31: JDT "Null type safety"警告（メソッド参照のfalse-positive）はラムダ化で解消できるという知見
+    （backend）。
+  - #26: 依存の版currency棚卸しをOSV.dev + Maven Central metadataの実データクエリで確定する技法
+    （database。E6/foundation系Issueの発生頻度自体が低いため）。
+- 3reviewer指摘0件（tier分離18連続クリーン。frontend/database側の初回クリーンスプリントも各セクションに
+  追記）は、チェックリスト項目ではなくプロセス上の教訓のためSkillには反映せず`memory/dev/long_term.md`
+  「繰り返し指摘されるパターン」の該当リポジトリ冒頭に記録した。
+- `#skills-changelog` へ `[DEV]` で投稿済み。
+
 ## 卒業済みルール
 
 （該当なし。棚卸し対象となるルールが直近15スプリント基準に達していない。
-  jpetstore-backendはSprint2・3・4・6・7・8・9・10・11・12・13・14・15・16・17の15スプリントのみ、
-  jpetstore-databaseはSprint1・3・6・14・16の5スプリントのみ、jpetstore-frontendはSprint5・6・7・8・10・
-  11・14・15・16・17の10スプリントのみのため、いずれも対象外。§9昇格済みルールの昇格後経過スプリント数
-  （直近15スプリント基準の分子）は、catch-all例外横取り（Sprint7昇格）が10スプリント（Sprint8〜17）・
-  Spockの`given:`裸stub×`then:`引数一致（Sprint12昇格）が5スプリント（Sprint13〜17）・DB-backedレート
-  制限（Sprint16昇格）が1スプリント（Sprint17）で、いずれも15スプリントに満たない。
-  Sprint4〜Sprint16 Retroに続きSprint17 Retroでも棚卸しを実施したが同様の理由で卒業候補なし）
+  jpetstore-backendはSprint2・3・4・6・7・8・9・10・11・12・13・14・15・16・17・18の16スプリント、
+  jpetstore-databaseはSprint1・3・6・14・16・18の6スプリント、jpetstore-frontendはSprint5・6・7・8・10・
+  11・14・15・16・17・18の11スプリントのみのため、いずれも対象外。§9/§7昇格済みルールの昇格後経過
+  スプリント数（直近15スプリント基準の分子）は、catch-all例外横取り（Sprint7昇格）が11スプリント
+  （Sprint8〜18）・Spockの`given:`裸stub×`then:`引数一致（Sprint12昇格）が6スプリント（Sprint13〜18）・
+  DB-backedレート制限（Sprint16昇格）が2スプリント（Sprint17〜18）・frontend CRLFノイズ選択add
+  （Sprint18昇格）が0スプリント（昇格直後）で、いずれも15スプリントに満たない。
+  Sprint4〜Sprint17 Retroに続きSprint18 Retroでも棚卸しを実施したが同様の理由で卒業候補なし）
