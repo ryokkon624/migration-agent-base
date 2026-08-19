@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint 20 Review — #41 ログイン/登録のレート制限TOCTOU</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #f8f7f5; }
+  .page { max-width: 900px; margin: 0 auto; padding: 48px 24px; }
+
+  .sprint-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin-bottom: 8px; }
+  h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px; }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+  .badge-sprint { background: #e8f0fe; color: #1a56db; }
+  .badge-issue { background: #fef2f2; color: #991b1b; }
+  .badge-bug { background: #fef2f2; color: #b91c1c; }
+  .badge-security { background: #fdf4ff; color: #86198f; }
+  .badge-medium { background: #fff7ed; color: #c2410c; }
+
+  section { margin-bottom: 40px; }
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #888; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e5e5e5; }
+
+  .symptom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .symptom-box { background: white; border: 1px solid #e5e5e5; border-radius: 10px; padding: 20px; }
+  .symptom-box .sym-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; }
+  .sym-label-bad { color: #b91c1c; }
+  .sym-label-good { color: #166534; }
+  .poc-terminal { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; background: #1e1e2e; color: #cdd6f4; border-radius: 8px; padding: 12px 14px; line-height: 1.7; }
+  .poc-line { display: block; white-space: pre-wrap; word-break: break-all; }
+  .poc-req { color: #89b4fa; }
+  .poc-status-bad { color: #f38ba8; font-weight: 700; }
+  .poc-status-good { color: #a6e3a1; font-weight: 700; }
+  .poc-note { color: #a6adc8; }
+  .poc-caption { font-size: 12px; color: #6b7280; margin-top: 10px; }
+
+  .cause-box { background: white; border: 1px solid #fca5a5; border-radius: 10px; overflow: hidden; margin-bottom: 16px; }
+  .cause-header { background: #fef2f2; padding: 12px 18px; display: flex; align-items: center; gap: 8px; }
+  .cause-header .icon { font-size: 16px; }
+  .cause-header .title { font-size: 13px; font-weight: 700; color: #991b1b; }
+  .cause-body { padding: 16px 18px; }
+  .cause-body p { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+
+  .timing-diagram { background: #f9fafb; border: 1px solid #e5e5e5; border-radius: 8px; padding: 14px 16px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11.5px; color: #374151; overflow-x: auto; }
+  .timing-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; white-space: nowrap; }
+  .timing-label { min-width: 70px; color: #6b7280; }
+  .timing-seg { padding: 2px 8px; border-radius: 4px; }
+  .timing-select { background: #dbeafe; color: #1e40af; }
+  .timing-bcrypt { background: #fef3c7; color: #92400e; }
+  .timing-update { background: #fee2e2; color: #991b1b; }
+
+  .file-change { margin-bottom: 16px; }
+  .file-name { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; background: #f3f4f6; color: #374151; padding: 5px 10px; border-radius: 4px 4px 0 0; border: 1px solid #e5e5e5; border-bottom: none; display: flex; justify-content: space-between; }
+  .diff-stat { color: #888; }
+  .code-block { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.7; background: #1e1e2e; color: #cdd6f4; padding: 14px 16px; border-radius: 0 0 6px 6px; overflow-x: auto; }
+  .code-line { display: flex; }
+  .line-num { color: #45475a; min-width: 28px; user-select: none; }
+  .line-add { background: rgba(166, 227, 161, 0.12); color: #a6e3a1; }
+  .line-del { background: rgba(243, 139, 168, 0.12); color: #f38ba8; }
+  .line-ctx { color: #cdd6f4; }
+  .line-prefix { min-width: 14px; }
+  .annotation { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-size: 12px; color: #78350f; display: flex; gap: 8px; }
+  .annotation-icon { font-size: 14px; flex-shrink: 0; }
+
+  .note-box { background: white; border: 1px solid #e5e5e5; border-radius: 10px; padding: 16px 18px; margin-bottom: 12px; }
+  .note-box .note-title { font-size: 12px; font-weight: 700; color: #1a1a1a; margin-bottom: 6px; }
+  .note-box p { font-size: 13px; color: #4b5563; }
+  .tradeoff-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 16px 18px; margin-bottom: 12px; }
+  .tradeoff-box .note-title { font-size: 12px; font-weight: 700; color: #92400e; margin-bottom: 6px; }
+  .tradeoff-box p { font-size: 13px; color: #78350f; }
+  .tradeoff-box .sub { font-size: 12px; color: #92400e; margin-top: 8px; padding-left: 12px; border-left: 2px solid #fbbf24; }
+
+  .ac-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
+  .ac-header { display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-bottom: 1px solid #f0f0f0; }
+  .ac-check { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .ac-check.done { background: #dcfce7; color: #166534; }
+  .ac-num { font-size: 11px; font-weight: 700; color: #888; }
+  .ac-text { font-size: 13px; font-weight: 600; flex: 1; }
+  .ac-body { padding: 14px 18px; font-size: 13px; color: #4b5563; }
+
+  .verify-list { list-style: none; }
+  .verify-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; }
+  .verify-item:last-child { border-bottom: none; }
+  .verify-num { width: 22px; height: 22px; background: #e8f0fe; color: #1a56db; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .verify-content { flex: 1; }
+  .verify-content strong { font-size: 13px; color: #1a1a1a; display: block; margin-bottom: 3px; }
+  .verify-content span { font-size: 12px; color: #6b7280; }
+
+  .regression-box { background: white; border: 1px solid #e5e5e5; border-radius: 10px; padding: 16px 18px; }
+  .regression-box p { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+  .mapping-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .mapping-table th { padding: 7px 10px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 10.5px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; text-align: left; }
+  .mapping-table td { padding: 8px 10px; border: 1px solid #e5e5e5; vertical-align: top; }
+  .mapping-table .code { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11.5px; color: #374151; }
+  .mapping-table .findingkey { font-family: 'SF Mono', 'Fira Code', monospace; font-weight: 700; color: #991b1b; }
+
+  .perf-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 16px 18px; margin-bottom: 12px; }
+  .perf-box .note-title { font-size: 12px; font-weight: 700; color: #1e40af; margin-bottom: 6px; }
+  .perf-box p { font-size: 13px; color: #1e3a8a; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="sprint-label">Sprint 20 Review · Security Bug Fix</div>
+  <h1>#41 — ログイン/登録のレート制限がcheck-then-actで<br>並行バーストにより回避できる（TOCTOU）</h1>
+  <div class="meta">
+    <span class="badge badge-sprint">Sprint 20</span>
+    <span class="badge badge-issue">#41</span>
+    <span class="badge badge-bug">bug</span>
+    <span class="badge badge-security">security</span>
+    <span class="badge badge-medium">Medium (L3 N4 + §3残件1)</span>
+  </div>
+
+  <!-- 発生事象 -->
+  <section>
+    <h2>発生事象（コード解析でCONFIRMED・ライブPoCはSECが稼働機保護のため自粛）</h2>
+    <p style="font-size:13px; color:#4b5563; margin-bottom:16px;">
+      ログイン／登録のロックアウトが <b>check-then-act</b>（相互排他なし）だった。<code style="font-family:'SF Mono',monospace; background:#f3f4f6; padding:1px 5px; border-radius:3px;">AuthApplicationService.login</code>
+      は <code>@Transactional</code> ですら無く、「ロック判定（SELECT）→ 資格情報照合（bcrypt・数十〜百ms）→ 失敗計数（UPDATE）」の間に排他が無い。
+      並行バーストでは N 本のリクエストが<b>全員ロック判定を通過してから</b>bcrypt照合に到達でき、<b>1ロック窓（5回/15分）に対し実効でTomcatスレッド数規模の推測が成立</b>していた。
+    </p>
+    <div class="timing-diagram" style="margin-bottom:16px;">
+      <div class="timing-row"><span class="timing-label">修正前:</span>
+        <span class="timing-seg timing-select">①ロック判定(SELECT)</span> → <span class="timing-seg timing-bcrypt">②bcrypt照合(数十〜百ms・排他なし)</span> → <span class="timing-seg timing-update">③失敗計数(UPDATE)</span>
+      </div>
+      <div class="timing-row" style="color:#991b1b;">↑ 並行N本が全員①を通過してから②に到達できる（穴）</div>
+    </div>
+    <div class="symptom-grid">
+      <div class="symptom-box">
+        <div class="sym-label sym-label-bad">修正前（バグあり・コード解析でCONFIRMED）</div>
+        <div class="poc-terminal">
+<span class="poc-line poc-req">20並列で同一usernameへ誤パスワードのログインを同時送出</span>
+<span class="poc-line poc-status-bad">← 想定: authenticate()到達が20回近くまで伸びる</span>
+<span class="poc-line poc-note">   閾値5を大きく超過（TOCTOUの穴）</span>
+<span class="poc-line">&nbsp;</span>
+<span class="poc-line poc-note">※ SECは稼働機への並列auth大量送信(ブルートフォース様)を</span>
+<span class="poc-line poc-note">  避けライブPoCを自粛（L3 §3 残件1・permission-gated）</span>
+        </div>
+      </div>
+      <div class="symptom-box">
+        <div class="sym-label sym-label-good">修正後（Testcontainers実DBで実証）</div>
+        <div class="poc-terminal">
+<span class="poc-line poc-req">20並列で同一usernameへ誤パスワードのログインを同時送出</span>
+<span class="poc-line poc-status-good">← failed_attempt_count が5(閾値)で頭打ち</span>
+<span class="poc-line poc-note">   InnoDB行ロックで同一usernameへのUPDATEが直列化</span>
+<span class="poc-line">&nbsp;</span>
+<span class="poc-line poc-req">20並列で同一client_ipへの登録試行を同時送出</span>
+<span class="poc-line poc-status-good">← attempt_count が5(閾値)で頭打ち</span>
+        </div>
+        <div class="poc-caption">新設 <code style="font-family:'SF Mono',monospace;">RateLimitBurstConcurrencySpec</code>（IT・実DB＋20スレッド並列）で実証</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ライブPoC自粛→テスト資産化の明示 -->
+  <section>
+    <h2>SECが自粛したライブPoCを、回帰テストとして資産化</h2>
+    <div class="cause-box" style="border-color:#93c5fd;">
+      <div class="cause-header" style="background:#eff6ff;">
+        <span class="icon">🧪</span>
+        <span class="title" style="color:#1e40af;">L3 §3 残件1の代替実証</span>
+      </div>
+      <div class="cause-body">
+        <p>SECは「20並列失敗ログイン→<code>t_login_attempt.failed_attempt_count</code>が閾値5を大きく超過」というライブPoCで実証可能としていたが、
+          <b>稼働機への並列auth大量送信＝ブルートフォース様の負荷になるため、実施を自粛した（L3 §3 残件1・permission-gated）</b>。
+          本Issueでは、この未実施PoCを<b>Testcontainers実DB + ExecutorService(20スレッド) + CountDownLatchによる統合テスト
+          （<code>RateLimitBurstConcurrencySpec</code>）として資産化</b>することで代替実証した（Sprint11/16で確立した並行制御テスト技法の再利用）。
+          稼働機に負荷をかけることなく、修正前は容易にRED（頭打ちしない）・修正後はGREEN（頭打ちする）になることを確認済み。
+          これにより<b>L3 §3 残件1が閉じた</b>。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 原因分析 -->
+  <section>
+    <h2>原因分析</h2>
+    <div class="cause-box">
+      <div class="cause-header">
+        <span class="icon">🔍</span>
+        <span class="title">ロック判定と失敗計数が別クエリに分離（check-then-act）</span>
+      </div>
+      <div class="cause-body">
+        <p><code>AuthApplicationService.java:65-79</code>（修正前）は <code>assertNotLocked</code>（SELECT）→ <code>authenticate</code>（bcrypt）→
+          catch内で<code>recordFailure</code>（UPDATE）の順。カウンタ自体のUPDATEは単文アトミックだったが、<b>穴はゲート側</b>（判定と計数の間にbcryptを挟む構造）。
+          登録側 <code>RegistrationApplicationService.register</code> も同型（<code>assertNotRateLimited</code> → 本処理 → <code>finally recordAttempt</code>）だった。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 改修内容 -->
+  <section>
+    <h2>改修内容</h2>
+
+    <div class="file-change">
+      <div class="file-name">
+        <span>src/main/java/.../infrastructure/mybatis/custom/mapper/LoginAttemptCustomMapper.java</span>
+        <span class="diff-stat">ensureRow + acquireSlot へ再構成</span>
+      </div>
+      <div class="code-block">
+        <div class="code-line line-del"><span class="line-num">-</span><span class="line-prefix">-</span><span>@Select int countActiveLock(username)   // 判定のみ</span></div>
+        <div class="code-line line-del"><span class="line-num">-</span><span class="line-prefix">-</span><span>@Insert int recordFailure(...)          // 計数のみ・判定と分離</span></div>
+        <div class="code-line line-add"><span class="line-num">+</span><span class="line-prefix">+</span><span>@Insert int ensureRow(username, program)  // (1) 行の存在保証(no-op ODKU)</span></div>
+        <div class="code-line line-add"><span class="line-num">+</span><span class="line-prefix">+</span><span>@Update int acquireSlot(...)</span></div>
+        <div class="code-line line-add"><span class="line-num">+</span><span class="line-prefix">+</span><span>  // UPDATE t_login_attempt SET failed_attempt_count = IF(...), lock_until = IF(...)</span></div>
+        <div class="code-line line-add"><span class="line-num">+</span><span class="line-prefix">+</span><span>  //  WHERE username = ? AND (lock_until IS NULL OR lock_until &lt;= NOW(6))</span></div>
+        <div class="code-line line-add"><span class="line-num">+</span><span class="line-prefix">+</span><span>  // → (2) 判定＋計数を単一UPDATEに統合。affected==0ならロック中として短絡</span></div>
+      </div>
+      <div class="annotation">
+        <span class="annotation-icon">💡</span>
+        <span>SET句は旧<code>recordFailure</code>を<b>一字も変えず</b>移植（MySQLのSET句左→右評価に依存した閾値判定ロジックを壊さないため。過去にIT発覚した「1回分ずれる」不具合の再発防止＝AC4）。WHERE句にロック判定を追加しただけ。InnoDBの行ロックにより同一usernameへのUPDATEが直列化される。</span>
+      </div>
+    </div>
+
+    <div class="file-change">
+      <div class="file-name">
+        <span>src/main/java/.../infrastructure/security/LoginAttemptService.java</span>
+        <span class="diff-stat">assertNotLocked + recordFailure → acquireAttemptSlotOrThrow へ統合</span>
+      </div>
+      <div class="code-block">
+        <div class="code-line line-del"><span class="line-num">-</span><span class="line-prefix">-</span><span>public void assertNotLocked(String username) {</span></div>
+        <div class="code-line line-del"><span class="line-num">-</span><span class="line-prefix">-</span><span>  if (mapper.countActiveLock(username) &gt; 0) { throw new BadCredentialsException(...); }</span></div>
+        <div class="code-line line-del"><span class="line-num">-</span><span class="line-prefix">-</span><span>}</span></div>
+        <div class="code-line line-del"><span class="line-num">-</span><span class="line-prefix">-</span><span>public void recordFailure(String username) { mapper.recordFailure(...); }</span></div>
+        <div class="code-line line-add"><span class="line-num">65</span><span class="line-prefix">+</span><span>@Transactional(propagation = Propagation.REQUIRES_NEW)</span></div>
+        <div class="code-line line-add"><span class="line-num">66</span><span class="line-prefix">+</span><span>public void acquireAttemptSlotOrThrow(String username) {</span></div>
+        <div class="code-line line-add"><span class="line-num">67</span><span class="line-prefix">+</span><span>  mapper.ensureRow(username, currentProgram());</span></div>
+        <div class="code-line line-add"><span class="line-num">69</span><span class="line-prefix">+</span><span>  int affected = mapper.acquireSlot(username, maxAttempts, lockDurationSeconds, program);</span></div>
+        <div class="code-line line-add"><span class="line-num">74</span><span class="line-prefix">+</span><span>  if (affected == 0) { throw new BadCredentialsException("Account is temporarily locked"); }</span></div>
+        <div class="code-line line-add"><span class="line-num">77</span><span class="line-prefix">+</span><span>}</span></div>
+      </div>
+      <div class="annotation">
+        <span class="annotation-icon">💡</span>
+        <span>旧4メソッド（assertNotLocked/recordFailure/assertNotRateLimited/recordAttempt）はデッドコードで残さず削除。<code>@Transactional(REQUIRES_NEW)</code>はレビュー指摘対応で追加（下記参照）。</span>
+      </div>
+    </div>
+
+    <div class="file-change">
+      <div class="file-name">
+        <span>src/main/java/.../application/service/AuthApplicationService.java</span>
+        <span class="diff-stat">login()の呼び出し構造を単純化</span>
+      </div>
+      <div class="code-block">
+        <div class="code-line line-ctx"><span class="line-num">64</span><span class="line-prefix"> </span><span>public AuthenticatedUser login(String username, String rawPassword, ...) {</span></div>
+        <div class="code-line line-del"><span class="line-num">-</span><span class="line-prefix">-</span><span>  loginAttemptService.assertNotLocked(username);</span></div>
+        <div class="code-line line-del"><span class="line-num">-</span><span class="line-prefix">-</span><span>  try { authResult = authenticationManager.authenticate(...); }</span></div>
+        <div class="code-line line-del"><span class="line-num">-</span><span class="line-prefix">-</span><span>  catch (AuthenticationException e) { loginAttemptService.recordFailure(username); throw e; }</span></div>
+        <div class="code-line line-add"><span class="line-num">66</span><span class="line-prefix">+</span><span>  loginAttemptService.acquireAttemptSlotOrThrow(username);   // 照合前にスロット確保</span></div>
+        <div class="code-line line-add"><span class="line-num">68</span><span class="line-prefix">+</span><span>  Authentication authResult = authenticationManager.authenticate(...);</span></div>
+        <div class="code-line line-ctx"><span class="line-num">71</span><span class="line-prefix"> </span><span>  loginAttemptService.recordSuccess(username);</span></div>
+      </div>
+      <div class="annotation">
+        <span class="annotation-icon">💡</span>
+        <span>authenticate()失敗時の追加の計数呼び出しは不要になった（枠確保の時点で既に消費済みのため）。同様の統合を登録側（RegistrationApplicationService）にも適用（AC2）。</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 実装メモ -->
+  <section>
+    <h2>実装メモ（仕様外の判断・変更・妥協点）</h2>
+
+    <div class="tradeoff-box">
+      <div class="note-title">受容したトレードオフ（S1）: 成功ログインも枠を消費する</div>
+      <p>「照合前」にスロットを確保する方式のため、<b>成功ログインも枠を消費する</b>（失敗だけを数えていた旧設計との違い）。bcrypt照合を行ロック内に抱えない
+        （username単位で全ログインが直列化する新たなDoS面を作らないための設計判断）代償として、<b>同一usernameへのmax-attempts+1本以上の「同時成功」ログインでは
+        最後の1本が一過性の誤401になり得る</b>。</p>
+      <div class="sub">→ <code>recordSuccess</code>のDELETEにより次リクエストで即座に自己回復するため実害は極小。javadocに明記済み。
+        <code>RateLimitBurstConcurrencySpec</code>に「同一usernameへの5並列の“成功”ログインが全て200を返す」テストを追加し、誤ロックが起きないことを実証。</div>
+    </div>
+    <div class="note-box">
+      <div class="note-title">登録側テストのHikariCP接続池上限を50へ引き上げ（テスト専用）</div>
+      <p>登録側<code>RegisterAttemptService#acquireAttemptSlotOrThrow</code>は<code>REQUIRES_NEW</code>のため主トランザクションとは別にもう1本DB接続を要する。
+        20並列だと最大40本同時に必要となり既定のHikariCP pool(10)を使い切って<code>TimeoutException</code>になることを実測。本spec専用に<code>@DynamicPropertySource</code>で
+        pool上限を50へ引き上げて解消した（本番のpoolサイジング自体は本Sprintのスコープ外）。</p>
+    </div>
+    <div class="note-box">
+      <div class="note-title">登録側バーストテストのパスワードを意図的に不一致な強力な文字列に変更</div>
+      <p>当初は短い文字列を使っていたが<code>@StrongPassword</code>のBean Validationに先に弾かれ、枠確保の並列制御自体に到達しない状態で
+        「レート制限が効いていない」ように誤って見えることが判明した（RED確認中に発見）。強度基準を満たしつつ互いに不一致な文字列へ変更し、
+        Service層のpassword不一致（400）に到達させることで枠確保の並列制御のみを対象化した。</p>
+    </div>
+  </section>
+
+  <!-- レビュー指摘対応 -->
+  <section>
+    <h2>レビュー指摘対応（performance・非ブロッキング1件）</h2>
+    <div class="perf-box">
+      <div class="note-title">LoginAttemptServiceの非対称是正（同型サービスとの整合）</div>
+      <p><code>LoginAttemptService.acquireAttemptSlotOrThrow</code>が同型の<code>RegisterAttemptService</code>/<code>AuditWriteQuotaService</code>と異なり
+        <code>@Transactional(REQUIRES_NEW)</code>を欠き、<code>ensureRow</code>/<code>acquireSlot</code>が個別autocommitでコミット2回発生していた（performance-reviewer指摘）。
+        REQUIRES_NEW付与で是正。bcryptがreturn後に実行される点（「行ロック内にbcryptを抱えない」設計意図の非毀損）とロールバック安全性の不変条件
+        （枠確保成功後は例外を投げない＝レート制限バイパス防止）をjavadocに明記した。デルタ再レビューはクリーン。</p>
+    </div>
+  </section>
+
+  <!-- AC確認 -->
+  <section>
+    <h2>AC確認</h2>
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC1</div><div class="ac-text">ログインのロック判定と失敗計数を単一のアトミックな操作に統合</div></div>
+      <div class="ac-body">条件付きUPDATE（acquireSlot）で実装。authenticate()到達回数がmax-attempts近傍で頭打ちになる。</div>
+    </div>
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC2</div><div class="ac-text">登録側にも同じ方式を適用</div></div>
+      <div class="ac-body">RegistrationApplicationService.register・clientIpキー・t_register_attempt。</div>
+    </div>
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC3</div><div class="ac-text">既存の列挙耐性を維持</div></div>
+      <div class="ac-body">枠切れ時も誤資格と同一のBadCredentialsException。既存LoginLockoutSpec（無改変）でロック時応答の完全一致・非実在usernameも対称であることを確認。</div>
+    </div>
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC4</div><div class="ac-text">既存のロック窓リセット意味論を保つ</div></div>
+      <div class="ac-body">SET句左→右評価への依存を一字も変えず移植。既存LoginLockoutSpec/RegistrationControllerSpecが無改変green。</div>
+    </div>
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC-neg1</div><div class="ac-text">20並列失敗ログインでauthenticate()到達が閾値近傍で頭打ち</div></div>
+      <div class="ac-body">RateLimitBurstConcurrencySpecで実証（L3 §3残件1の代替実証）。</div>
+    </div>
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC-neg2</div><div class="ac-text">登録側も並列バーストで頭打ち</div></div>
+      <div class="ac-body">同Specで実証。</div>
+    </div>
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC-neg3</div><div class="ac-text">単一スレッドでの既存挙動が変わらない</div></div>
+      <div class="ac-body">白箱Spec4本（LoginAttemptServiceSpec/RegisterAttemptServiceSpec/AuthApplicationServiceSpec/RegistrationApplicationServiceSpec）はAPI変更に伴い追随改修。振る舞いIT（LoginLockoutSpec 5本・RegistrationControllerSpecのレート制限2本）は無改変green＝実質的な受入条件。</div>
+    </div>
+  </section>
+
+  <!-- 動作確認ポイント -->
+  <section>
+    <h2>動作確認ポイント（ユーザー確認用）</h2>
+    <ul class="verify-list">
+      <li class="verify-item">
+        <div class="verify-num">1</div>
+        <div class="verify-content">
+          <strong>普段のログイン・新規登録が今まで通り成功すること</strong>
+          <span>正しいID/パスワードでのログイン、通常の新規登録フローが問題なく完了することを確認</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">2</div>
+        <div class="verify-content">
+          <strong>パスワードを複数回間違えるとロックされ、既定の待機後に再ログインできること</strong>
+          <span>ロックアウトの発動・解除タイミングが従来と変わらないことを確認（今回は「並行アクセス時の実効性」を強化しただけで、通常の単発操作の見え方は変わらない）</span>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- 再発防止 -->
+  <section>
+    <h2>再発防止（L3 finding → 回帰テスト 対応表）</h2>
+    <div class="regression-box">
+      <p>SECがコード解析でCONFIRMEDとし、稼働機保護のためライブPoCを自粛した所見（N4・L3§3残件1）を、CIで恒常的に守れる回帰テストへ変換した。</p>
+      <table class="mapping-table">
+        <tr><th>L3</th><th>Issue/AC</th><th>テストクラス</th><th>概要</th></tr>
+        <tr><td class="findingkey">N4 ＋ §3残件1</td><td>AC1/AC-neg1</td><td class="code">RateLimitBurstConcurrencySpec（新規IT）</td><td>20並列失敗ログインで failed_attempt_count が5で頭打ち</td></tr>
+        <tr><td class="findingkey">N4 登録側</td><td>AC2/AC-neg2</td><td class="code">同上</td><td>20並列登録で attempt_count が5で頭打ち</td></tr>
+        <tr><td class="findingkey">S1</td><td>—</td><td class="code">同上</td><td>5並列の「成功」ログインが全て200（誤ロックしない）</td></tr>
+        <tr><td class="findingkey">N4 列挙耐性</td><td>AC3</td><td class="code">LoginLockoutSpec（既存・無改変）</td><td>ロック時応答の完全一致／非実在usernameも対称</td></tr>
+        <tr><td class="findingkey">N4 窓リセット</td><td>AC4/AC-neg3</td><td class="code">LoginLockoutSpec/RegistrationControllerSpec（既存・無改変）</td><td>窓リセット・ロック解除・成功リセット・別IP分離</td></tr>
+      </table>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>

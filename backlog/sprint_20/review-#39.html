@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint 20 Review — #39 過大長URIで認可失敗監査が消える（監査抑止）</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #f8f7f5; }
+  .page { max-width: 900px; margin: 0 auto; padding: 48px 24px; }
+
+  .sprint-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin-bottom: 8px; }
+  h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px; }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+  .badge-sprint { background: #e8f0fe; color: #1a56db; }
+  .badge-issue { background: #fef2f2; color: #991b1b; }
+  .badge-bug { background: #fef2f2; color: #b91c1c; }
+  .badge-security { background: #fdf4ff; color: #86198f; }
+  .badge-medium { background: #fff7ed; color: #c2410c; }
+  .badge-crossrepo { background: #eef2ff; color: #4338ca; }
+
+  section { margin-bottom: 40px; }
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #888; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e5e5e5; }
+
+  .symptom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .symptom-box { background: white; border: 1px solid #e5e5e5; border-radius: 10px; padding: 20px; }
+  .symptom-box .sym-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; }
+  .sym-label-bad { color: #b91c1c; }
+  .sym-label-good { color: #166534; }
+  .poc-terminal { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; background: #1e1e2e; color: #cdd6f4; border-radius: 8px; padding: 12px 14px; line-height: 1.7; }
+  .poc-line { display: block; white-space: pre-wrap; word-break: break-all; }
+  .poc-req { color: #89b4fa; }
+  .poc-status-bad { color: #f38ba8; font-weight: 700; }
+  .poc-status-good { color: #a6e3a1; font-weight: 700; }
+  .poc-note { color: #a6adc8; }
+  .poc-caption { font-size: 12px; color: #6b7280; margin-top: 10px; }
+
+  .cause-box { background: white; border: 1px solid #fca5a5; border-radius: 10px; overflow: hidden; margin-bottom: 16px; }
+  .cause-header { background: #fef2f2; padding: 12px 18px; display: flex; align-items: center; gap: 8px; }
+  .cause-header .icon { font-size: 16px; }
+  .cause-header .title { font-size: 13px; font-weight: 700; color: #991b1b; }
+  .cause-body { padding: 16px 18px; }
+  .cause-body p { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+
+  .mismatch-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 4px; }
+  .mismatch-table th { padding: 7px 12px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .mismatch-table td { padding: 8px 12px; border: 1px solid #e5e5e5; }
+  .mismatch-table .code { font-family: 'SF Mono', 'Fira Code', monospace; }
+  .mismatch-table .mismatch { background: #fef2f2; }
+  .mismatch-table .match { background: #f0fdf4; }
+
+  .file-change { margin-bottom: 16px; }
+  .file-name { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; background: #f3f4f6; color: #374151; padding: 5px 10px; border-radius: 4px 4px 0 0; border: 1px solid #e5e5e5; border-bottom: none; display: flex; justify-content: space-between; }
+  .diff-stat { color: #888; }
+  .code-block { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.7; background: #1e1e2e; color: #cdd6f4; padding: 14px 16px; border-radius: 0 0 6px 6px; overflow-x: auto; }
+  .code-line { display: flex; }
+  .line-num { color: #45475a; min-width: 28px; user-select: none; }
+  .line-add { background: rgba(166, 227, 161, 0.12); color: #a6e3a1; }
+  .line-del { background: rgba(243, 139, 168, 0.12); color: #f38ba8; }
+  .line-ctx { color: #cdd6f4; }
+  .line-prefix { min-width: 14px; }
+  .annotation { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-size: 12px; color: #78350f; display: flex; gap: 8px; }
+  .annotation-icon { font-size: 14px; flex-shrink: 0; }
+
+  .note-box { background: white; border: 1px solid #e5e5e5; border-radius: 10px; padding: 16px 18px; margin-bottom: 12px; }
+  .note-box .note-title { font-size: 12px; font-weight: 700; color: #1a1a1a; margin-bottom: 6px; }
+  .note-box p { font-size: 13px; color: #4b5563; }
+  .tradeoff-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 16px 18px; margin-bottom: 12px; }
+  .tradeoff-box .note-title { font-size: 12px; font-weight: 700; color: #92400e; margin-bottom: 6px; }
+  .tradeoff-box p { font-size: 13px; color: #78350f; }
+
+  .ac-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
+  .ac-header { display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-bottom: 1px solid #f0f0f0; }
+  .ac-check { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .ac-check.done { background: #dcfce7; color: #166534; }
+  .ac-num { font-size: 11px; font-weight: 700; color: #888; }
+  .ac-text { font-size: 13px; font-weight: 600; flex: 1; }
+  .ac-body { padding: 14px 18px; font-size: 13px; color: #4b5563; }
+
+  .verify-list { list-style: none; }
+  .verify-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; }
+  .verify-item:last-child { border-bottom: none; }
+  .verify-num { width: 22px; height: 22px; background: #e8f0fe; color: #1a56db; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .verify-content { flex: 1; }
+  .verify-content strong { font-size: 13px; color: #1a1a1a; display: block; margin-bottom: 3px; }
+  .verify-content span { font-size: 12px; color: #6b7280; }
+
+  .regression-box { background: white; border: 1px solid #e5e5e5; border-radius: 10px; padding: 16px 18px; }
+  .regression-box p { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+  .mapping-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .mapping-table th { padding: 7px 10px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 10.5px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; text-align: left; }
+  .mapping-table td { padding: 8px 10px; border: 1px solid #e5e5e5; vertical-align: top; }
+  .mapping-table .code { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11.5px; color: #374151; }
+  .mapping-table .findingkey { font-family: 'SF Mono', 'Fira Code', monospace; font-weight: 700; color: #991b1b; }
+
+  /* レビュー経緯タイムライン */
+  .timeline { background: white; border: 1px solid #e5e5e5; border-radius: 10px; padding: 4px 18px; }
+  .tl-item { display: flex; gap: 14px; padding: 14px 0; border-bottom: 1px solid #f0f0f0; }
+  .tl-item:last-child { border-bottom: none; }
+  .tl-dot { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0; margin-top: 1px; }
+  .tl-dot.pass { background: #dcfce7; color: #166534; }
+  .tl-dot.find { background: #fee2e2; color: #991b1b; }
+  .tl-dot.fix { background: #fef3c7; color: #92400e; }
+  .tl-content strong { font-size: 13px; color: #1a1a1a; display: block; margin-bottom: 3px; }
+  .tl-content p { font-size: 12.5px; color: #4b5563; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="sprint-label">Sprint 20 Review · Security Bug Fix</div>
+  <h1>#39 — 過大長URIで認可失敗の監査記録が消え、<br>403が401に化ける（監査抑止）</h1>
+  <div class="meta">
+    <span class="badge badge-sprint">Sprint 20</span>
+    <span class="badge badge-issue">#39</span>
+    <span class="badge badge-bug">bug</span>
+    <span class="badge badge-security">security</span>
+    <span class="badge badge-medium">Medium (L3 N2 + N14)</span>
+    <span class="badge badge-crossrepo">cross-repo: backend + database</span>
+  </div>
+
+  <!-- 発生事象 -->
+  <section>
+    <h2>発生事象（SEC ライブPoC実測）</h2>
+    <p style="font-size:13px; color:#4b5563; margin-bottom:16px;">
+      <code style="font-family:'SF Mono',monospace; background:#f3f4f6; padding:1px 5px; border-radius:3px;">AuditLogRecorder</code> が
+      認可失敗のURIを長さ検証なしで <code style="font-family:'SF Mono',monospace; background:#f3f4f6; padding:1px 5px; border-radius:3px;">t_audit_log.action VARCHAR(100)</code> へINSERTしていた。
+      URIが<b>101文字以上</b>だと <code>Data too long</code> でINSERTが例外→<b>セキュリティハンドラ内から例外送出</b>→<code>/error</code>への
+      ERRORディスパッチ（JWTフィルタ非適用）に落ちる。結果、<b>403が401に化け、「誰が・何をしたか」の監査行が消える</b>。
+      認証済み攻撃者はURIを伸ばすだけで自分の認可失敗の痕跡を任意に消せた。
+    </p>
+    <div class="symptom-grid">
+      <div class="symptom-box">
+        <div class="sym-label sym-label-bad">修正前（バグあり）</div>
+        <div class="poc-terminal">
+<span class="poc-line poc-req">$ curl (demo_userで) /api/orders/909090909  (21字)</span>
+<span class="poc-line poc-status-good">← 403 Forbidden</span>
+<span class="poc-line poc-note">   監査: actor=demo_user, action=/api/orders/909090909, DENIED（正常）</span>
+<span class="poc-line">&nbsp;</span>
+<span class="poc-line poc-req">$ curl (demo_userで) /api/orders/&lt;81個の0&gt;909090909  (102字)</span>
+<span class="poc-line poc-status-bad">← 401 Unauthorized</span>
+<span class="poc-line poc-note">   監査: actor=NULL, action=/error, DENIED（誰が/何をが両方消失）</span>
+        </div>
+        <div class="poc-caption">境界は列幅(100)と厳密一致。orderIdはLongなので先頭ゼロ埋めでURI長を自由に伸ばせる。未認証でも成立</div>
+      </div>
+      <div class="symptom-box">
+        <div class="sym-label sym-label-good">修正後（正常）</div>
+        <div class="poc-terminal">
+<span class="poc-line poc-req">$ curl (認証済みで) 200文字級URIの他人注文を参照</span>
+<span class="poc-line poc-status-good">← 403 Forbidden（維持）</span>
+<span class="poc-line poc-note">   監査: actor=demo_user, action=&lt;先頭100文字&gt;, DENIED（残る）</span>
+<span class="poc-line">&nbsp;</span>
+<span class="poc-line poc-req">$ 未認証リクエストを quota上限超えて連続送出</span>
+<span class="poc-line poc-status-good">← t_audit_log行数が上限で頭打ち</span>
+<span class="poc-line poc-note">   抑止事実は suppressed_count + WARNログに残る（黙って消えない）</span>
+        </div>
+        <div class="poc-caption">新設 <code style="font-family:'SF Mono',monospace;">AuditSuppressionL3RegressionSpec</code>（IT）で固定</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 原因分析 -->
+  <section>
+    <h2>原因分析</h2>
+    <div class="cause-box">
+      <div class="cause-header">
+        <span class="icon">🔍</span>
+        <span class="title">列幅検証なしINSERT ＋ 例外の無保護伝播 ＋ 未認証writeへの上限なし</span>
+      </div>
+      <div class="cause-body">
+        <p>本件は3つの根本原因が連鎖していた（うち N14 は独立所見だがPO判断により本Issueへ併合）。</p>
+        <table class="mismatch-table">
+          <tr><th>根本原因</th><th>該当箇所（修正前）</th></tr>
+          <tr><td class="mismatch">action を列幅内へ切り詰めずINSERT</td><td class="code">AuditLogRecorder.java:49-60,84-104</td></tr>
+          <tr><td class="mismatch">INSERT失敗が呼び出し元（セキュリティハンドラ）へ無保護で伝播</td><td class="code">同上（try/catch無し）</td></tr>
+          <tr><td class="mismatch">未認証write（N14）にレート制限が無く監査表フラッドが成立</td><td class="code">AuditingAuthenticationEntryPoint</td></tr>
+        </table>
+        <p style="margin-top:8px;">呼び出し側3箇所（<code>AuditingAccessDeniedHandler.java:39-40</code> / <code>AuditingAuthenticationEntryPoint.java:40-41</code> /
+          <code>GlobalExceptionHandler.java:106,113</code>）が生URIを無検証で渡していた。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 改修内容 -->
+  <section>
+    <h2>改修内容</h2>
+
+    <div class="file-change">
+      <div class="file-name">
+        <span>src/main/java/.../infrastructure/audit/AuditLogRecorder.java</span>
+        <span class="diff-stat">+58 / -5（累計）</span>
+      </div>
+      <div class="code-block">
+        <div class="code-line line-ctx"><span class="line-num">46</span><span class="line-prefix"> </span><span>  private static final int ACTION_MAX_LENGTH = 100;       // AC1</span></div>
+        <div class="code-line line-ctx"><span class="line-num">47</span><span class="line-prefix"> </span><span>  private static final int TARGET_TYPE_MAX_LENGTH = 50;   // 意図的な防御多層化</span></div>
+        <div class="code-line line-ctx"><span class="line-num">48</span><span class="line-prefix"> </span><span>  private static final int TARGET_ID_MAX_LENGTH = 50;     // 意図的な防御多層化</span></div>
+        <div class="code-line line-ctx"><span class="line-num">49</span><span class="line-prefix"> </span><span>  private static final int ACTOR_USERNAME_MAX_LENGTH = 80;// 意図的な防御多層化</span></div>
+        <div class="code-line line-ctx"><span class="line-num">79</span><span class="line-prefix"> </span><span>  public void recordAuthzFailure(String action, String reason, HttpServletRequest request) {</span></div>
+        <div class="code-line line-add"><span class="line-num">79</span><span class="line-prefix">+</span><span>    if (actor == null && clientIp != null && !isWithinQuota(clientIp)) {</span></div>
+        <div class="code-line line-add"><span class="line-num">80</span><span class="line-prefix">+</span><span>      return; // 抑止(suppressed_count+WARNログを記録済み・黙って消えない) — AC3</span></div>
+        <div class="code-line line-add"><span class="line-num">81</span><span class="line-prefix">+</span><span>    }</span></div>
+        <div class="code-line line-ctx"><span class="line-num">161</span><span class="line-prefix"> </span><span>    try {</span></div>
+        <div class="code-line line-ctx"><span class="line-num">162</span><span class="line-prefix"> </span><span>      mapper.insert(entity);   // entity側は既にtruncate済み(AC1)</span></div>
+        <div class="code-line line-add"><span class="line-num">163</span><span class="line-prefix">+</span><span>    } catch (RuntimeException e) {</span></div>
+        <div class="code-line line-add"><span class="line-num">166</span><span class="line-prefix">+</span><span>      log.error("Failed to record audit log (...)", ..., e);  // AC2: best-effort・握り潰さずERROR</span></div>
+        <div class="code-line line-add"><span class="line-num">173</span><span class="line-prefix">+</span><span>    }</span></div>
+        <div class="code-line line-add"><span class="line-num">177</span><span class="line-prefix">+</span><span>  private static String truncate(String value, int maxLength) { ... } // AC1: 先頭側保持</span></div>
+      </div>
+      <div class="annotation">
+        <span class="annotation-icon">💡</span>
+        <span>AC1は<code>action</code>のみ要求だが、<code>target_type</code>/<code>target_id</code>/<code>actor_username</code>の3列も同じ経路でINSERT失敗しうるため、意図的な防御多層化として一緒にtruncate対象にした。</span>
+      </div>
+    </div>
+
+    <div class="file-change">
+      <div class="file-name">
+        <span>src/main/java/.../infrastructure/security/AuditWriteQuotaService.java（新規）</span>
+        <span class="diff-stat">+69</span>
+      </div>
+      <div class="code-block">
+        <div class="code-line line-ctx"><span class="line-num">46</span><span class="line-prefix"> </span><span>  @Transactional(propagation = Propagation.REQUIRES_NEW)</span></div>
+        <div class="code-line line-ctx"><span class="line-num">47</span><span class="line-prefix"> </span><span>  public boolean tryAcquire(String clientIp) {</span></div>
+        <div class="code-line line-ctx"><span class="line-num">49</span><span class="line-prefix"> </span><span>    mapper.ensureRow(clientIp, program);   // (1) 行の存在保証（no-opのODKU）</span></div>
+        <div class="code-line line-ctx"><span class="line-num">51</span><span class="line-prefix"> </span><span>    int affected = mapper.tryAcquire(clientIp, maxWrites, windowSeconds, program);</span></div>
+        <div class="code-line line-ctx"><span class="line-num">53</span><span class="line-prefix"> </span><span>    if (affected == 0) {   // (2) 条件付きUPDATEのaffected rowsで枠確保可否を判定</span></div>
+        <div class="code-line line-ctx"><span class="line-num">54</span><span class="line-prefix"> </span><span>      mapper.recordSuppressed(clientIp, program);  // (3) 抑止時のみ suppressed_count++ + WARN</span></div>
+        <div class="code-line line-ctx"><span class="line-num">60</span><span class="line-prefix"> </span><span>      return false;</span></div>
+        <div class="code-line line-ctx"><span class="line-num">62</span><span class="line-prefix"> </span><span>  }</span></div>
+      </div>
+      <div class="annotation">
+        <span class="annotation-icon">💡</span>
+        <span>t_login_attempt/t_register_attemptと同一イディオム。確定値は<code>max-writes: 100</code> / <code>window: PT1M</code>（application.ymlでenv上書き可）。<b>未認証（actor==null）限定</b>で、認証済み403には掛けない（下記トレードオフ参照）。</span>
+      </div>
+    </div>
+
+    <div class="file-change">
+      <div class="file-name">
+        <span>jpetstore-database/flyway/sql/V00_000_014__create_audit_write_quota.sql（新規）</span>
+        <span class="diff-stat">+39</span>
+      </div>
+      <div class="code-block">
+        <div class="code-line line-ctx"><span class="line-num">24</span><span class="line-prefix"> </span><span>CREATE TABLE t_audit_write_quota (</span></div>
+        <div class="code-line line-add"><span class="line-num">25</span><span class="line-prefix">+</span><span>      client_ip VARCHAR(45) NOT NULL COMMENT '未認証監査write元IP(PK・FK制約なし)'</span></div>
+        <div class="code-line line-add"><span class="line-num">26</span><span class="line-prefix">+</span><span>    , write_count INT NOT NULL DEFAULT 0</span></div>
+        <div class="code-line line-add"><span class="line-num">27</span><span class="line-prefix">+</span><span>    , suppressed_count INT NOT NULL DEFAULT 0 COMMENT '抑止した監査write回数(証跡)'</span></div>
+        <div class="code-line line-add"><span class="line-num">28</span><span class="line-prefix">+</span><span>    , window_started_at DATETIME(6) NULL</span></div>
+        <div class="code-line line-add"><span class="line-num">29</span><span class="line-prefix">+</span><span>    , window_expires_at DATETIME(6) NULL</span></div>
+        <div class="code-line line-ctx"><span class="line-num">38</span><span class="line-prefix"> </span><span>    , PRIMARY KEY (client_ip)</span></div>
+        <div class="code-line line-ctx"><span class="line-num">39</span><span class="line-prefix"> </span><span>) ENGINE = InnoDB ...;</span></div>
+      </div>
+      <div class="annotation">
+        <span class="annotation-icon">💡</span>
+        <span><code>t_register_attempt</code>（Sprint16）をテンプレート化（D7判例）。FK制約なし・version列なし（一過性のセキュリティ運用状態のため）。</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 実装メモ -->
+  <section>
+    <h2>実装メモ（仕様外の判断・変更・妥協点）</h2>
+    <div class="note-box">
+      <div class="note-title">既存ITの偽陰性化回避</div>
+      <p>AC3導入により未認証<code>recordAuthzFailure</code>にquotaゲートが掛かるため、IT間で共有される単一MySQLコンテナ上でカウンタが積み上がると、
+        未認証401の監査行をアサートする既存specが偽陰性化しうる。<code>AuditLogRecorderSpec</code>・<code>OwnershipAuthorizationEndToEndSpec</code>・
+        <code>SecurityEndToEndSpec</code>のsetup()に<code>DELETE FROM t_audit_write_quota</code>を追加して対処した。</p>
+    </div>
+    <div class="note-box">
+      <div class="note-title">マイグレーション数アサーションの更新</div>
+      <p><code>V00_000_014</code>追加に伴い、既存の<code>flyway_schema_history</code>件数アサーション（13→14）を<code>IntegrationTestBaseSmokeSpec</code>で更新した（新規マイグレーション追加時の定型対応）。</p>
+    </div>
+    <div class="tradeoff-box">
+      <div class="note-title">意図的な設計: quotaは未認証（actor==null）限定</div>
+      <p>認証済みの403にはquotaを掛けない。掛けてしまうと、攻撃者が自分の枠を意図的に使い切ることで以降の自身の認可失敗を無記録化でき、
+        <b>本Issueが直している監査抑止（N2）をそのまま再導入してしまう</b>ため。この理由は<code>AuditWriteQuotaService</code>のjavadocに明記し、将来の安易な一般化を防いでいる。</p>
+    </div>
+    <div class="tradeoff-box">
+      <div class="note-title">意図的な設計: truncateの4列拡張（AC1の要求は action のみ）</div>
+      <p><code>target_type</code>/<code>target_id</code>/<code>actor_username</code>の3列も同じ経路でINSERT失敗しうるため、防御多層化として一緒にtruncate対象へ含めた。</p>
+    </div>
+  </section>
+
+  <!-- レビュー経緯 -->
+  <section>
+    <h2>レビュー経緯（透明性のため）</h2>
+    <div class="timeline">
+      <div class="tl-item">
+        <div class="tl-dot pass">✓</div>
+        <div class="tl-content">
+          <strong>3観点レビュー（convention / security / performance）</strong>
+          <p>#39を含むSprint 20全体で、convention・securityは指摘なし。performanceは#41由来の1件のみ（review-#41.html参照）。#39単体での指摘は無し。</p>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot find">!</div>
+        <div class="tl-content">
+          <strong>SM verification（コア精読）で1件の確定所見を検出</strong>
+          <p><code>AuditLogRecorder.recordAuthzFailure</code>の<code>auditWriteQuotaService.tryAcquire</code>呼び出しが、実装当初は例外保護の<b>外</b>にあった。
+            <code>tryAcquire</code>は<code>@Transactional(REQUIRES_NEW)</code>で新規コネクション取得を伴うため、未認証フラッド時（＝まさにquotaが守ろうとしている状況）に
+            コネクションプール枯渇等で例外を投げやすい。これが呼び出し元4経路へ素通りすると、<b>#39が修正対象にしているN2と同一の失敗モード（403/401が化け・監査も残らない）を、
+            トリガを「過大長URI」から「quotaのDBエラー」に変えただけで再現してしまう</b>状態だった。TDDの否定ACテストが「mapper.insertの失敗」しか固定しておらず、
+            実装時のRED→GREENサイクルでは検出できなかった。</p>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot fix">🔧</div>
+        <div class="tl-content">
+          <strong>是正: isWithinQuotaヘルパーへ切り出しfail-open化</strong>
+          <p><code>tryAcquire</code>呼び出しをtry/catchで保護。例外時は<b>fail-open</b>（枠ありとみなして監査INSERTへ進む・ERRORログは残す）とした。
+            fail-closed（例外時にreturn）はquota障害自体が新しい監査抑止経路になるため不採用と判断し、javadocに明記した。</p>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot pass">✓</div>
+        <div class="tl-content">
+          <strong>デルタ再レビュー: 3観点クリーン</strong>
+          <p>是正差分に対する3観点の再レビューは指摘なし。<code>AuditLogRecorderBestEffortSpec</code>に3件のテスト（fail-open伝播なし・insertへ進むこと・ERRORログ）、
+            <code>AuditSuppressionL3RegressionSpec</code>に1件（未認証401のe2eでquota例外時も本来のErrorResponseが返ること）を追加して固定した。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AC確認 -->
+  <section>
+    <h2>AC確認</h2>
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC1</div><div class="ac-text">action を列幅（100文字）以内へ先頭側保持でtruncate</div></div>
+      <div class="ac-body">意図的な防御多層化として target_type/target_id/actor_username も対象化（50/50/80文字）。</div>
+    </div>
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC2</div><div class="ac-text">監査記録の失敗を呼び出し元へ伝播させない（best-effort化）</div></div>
+      <div class="ac-body">insert失敗もquotaチェック失敗（SM verification是正）も両方fail-open・ERRORログ必須で対応。</div>
+    </div>
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC3</div><div class="ac-text">未認証リクエスト由来の監査writeに濫用抑止（N14）</div></div>
+      <div class="ac-body">t_audit_write_quota（max-writes:100/window:PT1M）。抑止事実はsuppressed_count+WARNログで必ず残す。</div>
+    </div>
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC-neg1</div><div class="ac-text">200文字級URIでも403のまま・actorとaction先頭100文字を含む監査行が残る</div></div>
+      <div class="ac-body"><code>AuditSuppressionL3RegressionSpec</code>でL3ライブPoCを回帰テスト化。</div>
+    </div>
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC-neg2</div><div class="ac-text">監査INSERT失敗時も本来のステータス/ErrorResponseで返る</div></div>
+      <div class="ac-body">SM verification是正で quota チェック失敗時のe2eケースも追加。</div>
+    </div>
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC-neg3</div><div class="ac-text">上限を超えて連続送出しても t_audit_log 行数が頭打ち</div></div>
+      <div class="ac-body"><code>AuditWriteQuotaServiceSpec</code>（新規IT）で固定。</div>
+    </div>
+  </section>
+
+  <!-- 動作確認ポイント -->
+  <section>
+    <h2>動作確認ポイント（ユーザー確認用）</h2>
+    <ul class="verify-list">
+      <li class="verify-item">
+        <div class="verify-num">1</div>
+        <div class="verify-content">
+          <strong>通常の操作（正しい注文閲覧・404画面等）は今まで通り動くこと</strong>
+          <span>認可失敗の応答（403/404）が変わらず返ることを確認</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">2</div>
+        <div class="verify-content">
+          <strong>異常に長いURLを直接叩いても、応答やエラーページの挙動が壊れないこと</strong>
+          <span>500エラー画面や見慣れない挙動にならず、通常のエラー応答（403/404相当）になるか確認</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">3</div>
+        <div class="verify-content">
+          <strong>devスタックでのDB反映（新表 t_audit_write_quota）が正常に完了していること</strong>
+          <span>flywayMigrate〜seed投入〜backend起動〜demo_userログインまで一連が通ることを確認済み（DoD4）</span>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- 再発防止 -->
+  <section>
+    <h2>再発防止（L3 finding → 回帰テスト 対応表）</h2>
+    <div class="regression-box">
+      <p>SECが実測したライブPoC（N2）と、コード解析で確認済みだったN14を、CIで恒常的に守れる回帰テストへ変換した。</p>
+      <table class="mapping-table">
+        <tr><th>L3</th><th>Issue/AC</th><th>テストクラス</th><th>概要</th></tr>
+        <tr><td class="findingkey">N2 live PoC(長URI)</td><td>AC1/AC-neg1</td><td class="code">AuditSuppressionL3RegressionSpec（新規IT）</td><td>200文字級URIで403のまま・actor＋action先頭100文字が残る</td></tr>
+        <tr><td class="findingkey">N2 truncate</td><td>AC1</td><td class="code">AuditLogRecorderSpec（既存・追記）</td><td>101文字以上でも先頭側保持でINSERT成功</td></tr>
+        <tr><td class="findingkey">N2 best-effort</td><td>AC2/AC-neg2</td><td class="code">AuditLogRecorderBestEffortSpec（新規unit）</td><td>例外を伝播せずERRORログに残す（quota例外も含む）</td></tr>
+        <tr><td class="findingkey">N2 best-effort e2e</td><td>AC-neg2</td><td class="code">AuditSuppressionL3RegressionSpec</td><td>INSERT/quota失敗でも403/401＋ErrorResponse</td></tr>
+        <tr><td class="findingkey">N14</td><td>AC3/AC-neg3</td><td class="code">AuditWriteQuotaServiceSpec（新規IT）＋上記IT</td><td>未認証AUTHZ_FAILUREが窓内上限で頭打ち・suppressed_count＋WARN</td></tr>
+      </table>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>

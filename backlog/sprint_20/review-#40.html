@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint 20 Review — #40 注文確定の失敗が監査に残らず500になる</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #f8f7f5; }
+  .page { max-width: 900px; margin: 0 auto; padding: 48px 24px; }
+
+  .sprint-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin-bottom: 8px; }
+  h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px; }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+  .badge-sprint { background: #e8f0fe; color: #1a56db; }
+  .badge-issue { background: #fef2f2; color: #991b1b; }
+  .badge-bug { background: #fef2f2; color: #b91c1c; }
+  .badge-security { background: #fdf4ff; color: #86198f; }
+  .badge-medium { background: #fff7ed; color: #c2410c; }
+
+  section { margin-bottom: 40px; }
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #888; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e5e5e5; }
+
+  .symptom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .symptom-box { background: white; border: 1px solid #e5e5e5; border-radius: 10px; padding: 20px; }
+  .symptom-box .sym-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; }
+  .sym-label-bad { color: #b91c1c; }
+  .sym-label-good { color: #166534; }
+  .poc-terminal { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; background: #1e1e2e; color: #cdd6f4; border-radius: 8px; padding: 12px 14px; line-height: 1.7; }
+  .poc-line { display: block; white-space: pre-wrap; word-break: break-all; }
+  .poc-req { color: #89b4fa; }
+  .poc-status-bad { color: #f38ba8; font-weight: 700; }
+  .poc-status-good { color: #a6e3a1; font-weight: 700; }
+  .poc-note { color: #a6adc8; }
+  .poc-caption { font-size: 12px; color: #6b7280; margin-top: 10px; }
+
+  .cause-box { background: white; border: 1px solid #fca5a5; border-radius: 10px; overflow: hidden; margin-bottom: 16px; }
+  .cause-header { background: #fef2f2; padding: 12px 18px; display: flex; align-items: center; gap: 8px; }
+  .cause-header .icon { font-size: 16px; }
+  .cause-header .title { font-size: 13px; font-weight: 700; color: #991b1b; }
+  .cause-body { padding: 16px 18px; }
+  .cause-body p { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+
+  .mismatch-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 4px; }
+  .mismatch-table th { padding: 7px 12px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .mismatch-table td { padding: 8px 12px; border: 1px solid #e5e5e5; }
+  .mismatch-table .code { font-family: 'SF Mono', 'Fira Code', monospace; }
+  .mismatch-table .mismatch { background: #fef2f2; }
+  .mismatch-table .match { background: #f0fdf4; }
+
+  .file-change { margin-bottom: 16px; }
+  .file-name { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; background: #f3f4f6; color: #374151; padding: 5px 10px; border-radius: 4px 4px 0 0; border: 1px solid #e5e5e5; border-bottom: none; display: flex; justify-content: space-between; }
+  .diff-stat { color: #888; }
+  .code-block { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.7; background: #1e1e2e; color: #cdd6f4; padding: 14px 16px; border-radius: 0 0 6px 6px; overflow-x: auto; }
+  .code-line { display: flex; }
+  .line-num { color: #45475a; min-width: 28px; user-select: none; }
+  .line-add { background: rgba(166, 227, 161, 0.12); color: #a6e3a1; }
+  .line-del { background: rgba(243, 139, 168, 0.12); color: #f38ba8; }
+  .line-ctx { color: #cdd6f4; }
+  .line-prefix { min-width: 14px; }
+  .annotation { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-size: 12px; color: #78350f; display: flex; gap: 8px; }
+  .annotation-icon { font-size: 14px; flex-shrink: 0; }
+
+  .note-box { background: white; border: 1px solid #e5e5e5; border-radius: 10px; padding: 16px 18px; margin-bottom: 12px; }
+  .note-box .note-title { font-size: 12px; font-weight: 700; color: #1a1a1a; margin-bottom: 6px; }
+  .note-box p { font-size: 13px; color: #4b5563; }
+  .tradeoff-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 16px 18px; margin-bottom: 12px; }
+  .tradeoff-box .note-title { font-size: 12px; font-weight: 700; color: #92400e; margin-bottom: 6px; }
+  .tradeoff-box p { font-size: 13px; color: #78350f; }
+
+  .ac-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
+  .ac-header { display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-bottom: 1px solid #f0f0f0; }
+  .ac-check { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .ac-check.done { background: #dcfce7; color: #166534; }
+  .ac-num { font-size: 11px; font-weight: 700; color: #888; }
+  .ac-text { font-size: 13px; font-weight: 600; flex: 1; }
+  .ac-body { padding: 14px 18px; font-size: 13px; color: #4b5563; }
+
+  .verify-list { list-style: none; }
+  .verify-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; }
+  .verify-item:last-child { border-bottom: none; }
+  .verify-num { width: 22px; height: 22px; background: #e8f0fe; color: #1a56db; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .verify-content { flex: 1; }
+  .verify-content strong { font-size: 13px; color: #1a1a1a; display: block; margin-bottom: 3px; }
+  .verify-content span { font-size: 12px; color: #6b7280; }
+
+  .regression-box { background: white; border: 1px solid #e5e5e5; border-radius: 10px; padding: 16px 18px; }
+  .regression-box p { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+  .mapping-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .mapping-table th { padding: 7px 10px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 10.5px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; text-align: left; }
+  .mapping-table td { padding: 8px 10px; border: 1px solid #e5e5e5; vertical-align: top; }
+  .mapping-table .code { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11.5px; color: #374151; }
+  .mapping-table .findingkey { font-family: 'SF Mono', 'Fira Code', monospace; font-weight: 700; color: #991b1b; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="sprint-label">Sprint 20 Review · Security Bug Fix</div>
+  <h1>#40 — 注文確定の失敗が監査に残らず500になる<br>（入力制約欠落・ID-22未達）</h1>
+  <div class="meta">
+    <span class="badge badge-sprint">Sprint 20</span>
+    <span class="badge badge-issue">#40</span>
+    <span class="badge badge-bug">bug</span>
+    <span class="badge badge-security">security</span>
+    <span class="badge badge-medium">Medium (L3 N3 + N11)</span>
+  </div>
+
+  <!-- 発生事象 -->
+  <section>
+    <h2>発生事象（SEC/スキャナ実測）</h2>
+    <p style="font-size:13px; color:#4b5563; margin-bottom:16px;">
+      <code style="font-family:'SF Mono',monospace; background:#f3f4f6; padding:1px 5px; border-radius:3px;">OrderApplicationService.placeOrder</code>
+      の <code style="font-family:'SF Mono',monospace; background:#f3f4f6; padding:1px 5px; border-radius:3px;">catch</code> は
+      <code>InsufficientStockException</code> のみを捕捉していた。<b>それ以外の失敗（DB例外等）は ORDER_CREATE の監査行が一切残らない</b>。
+      さらに <code>OrderAddressRequest</code> には <code>@Size</code> が皆無で、<code>PlaceOrderRequest.shipping</code> にも <code>@Valid</code>
+      が付いていなかったため、長すぎる住所や欠落したshipping項目がDB制約違反として500に落ち、監査ゼロのまま消えていた。
+      これは意図差分台帳 <b>ID-22</b>（「注文作成は成功・失敗いずれもORDER_CREATEとして記録」）に正面から反する。
+    </p>
+    <div class="symptom-grid">
+      <div class="symptom-box">
+        <div class="sym-label sym-label-bad">修正前（バグあり）</div>
+        <div class="poc-terminal">
+<span class="poc-line poc-req">$ POST /api/orders  (postalCode: 40文字)</span>
+<span class="poc-line poc-status-bad">← 500 Internal Server Error</span>
+<span class="poc-line poc-note">   t_audit_log: 監査行ゼロ（ORDER_CREATE記録なし）</span>
+<span class="poc-line">&nbsp;</span>
+<span class="poc-line poc-req">$ POST /api/orders  (useSeparateShipping=true, shipping項目が空)</span>
+<span class="poc-line poc-status-bad">← 500 Internal Server Error</span>
+<span class="poc-line poc-note">   @Validがカスケードされずship_address1等のNOT NULL列違反</span>
+        </div>
+        <div class="poc-caption">成功時は正しく記録されることは対照確認済み（在庫不足の失敗監査は既存機能でOK）</div>
+      </div>
+      <div class="symptom-box">
+        <div class="sym-label sym-label-good">修正後（正常）</div>
+        <div class="poc-terminal">
+<span class="poc-line poc-req">$ POST /api/orders  (postalCode: 40文字)</span>
+<span class="poc-line poc-status-good">← 400 Bad Request</span>
+<span class="poc-line poc-note">   入口検証で弾かれる（Bean Validation）</span>
+<span class="poc-line">&nbsp;</span>
+<span class="poc-line poc-req">$ POST /api/orders  (useSeparateShipping=true, shipping項目が空)</span>
+<span class="poc-line poc-status-good">← 400 Bad Request</span>
+<span class="poc-line poc-note">   shippingにも@NotBlank/@Sizeがカスケード</span>
+<span class="poc-line">&nbsp;</span>
+<span class="poc-line poc-req">$ POST /api/orders  (在庫不足以外の想定外の失敗)</span>
+<span class="poc-line poc-status-good">← 500のまま(想定外は500)だがt_audit_logに1行残る</span>
+<span class="poc-line poc-note">   ORDER_CREATE/FAILUREが必ず記録される</span>
+        </div>
+        <div class="poc-caption">新設 <code style="font-family:'SF Mono',monospace;">OrderFailureAuditL3RegressionSpec</code>（IT）で固定</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 原因分析 -->
+  <section>
+    <h2>原因分析</h2>
+    <div class="cause-box">
+      <div class="cause-header">
+        <span class="icon">🔍</span>
+        <span class="title">失敗監査の対象が狭すぎる ＋ 入力検証が同一backend内で非対称</span>
+      </div>
+      <div class="cause-body">
+        <table class="mismatch-table">
+          <tr><th>DTO</th><th>@Size付与状況（修正前）</th></tr>
+          <tr><td>AccountController.java（アカウント編集）</td><td class="match">全項目に付与済み</td></tr>
+          <tr><td>OrderController.java（注文住所）</td><td class="mismatch">皆無</td></tr>
+        </table>
+        <p style="margin-top:8px;">同一backend内で対称であるべき検証パターンが非対称だった。加えて、Bean Validationはネストしたrecordへ
+          <code>@Valid</code> 無しではカスケードしないため、<code>shipping</code> の各項目は <code>@NotBlank</code> すら適用されていなかった
+          （SECの想定に無く、Refinementで新規発見）。<code>DataIntegrityViolationException</code>専用ハンドラが不在で、これらの入口をすり抜けたDB制約違反は
+          catch-allが500に丸めていた。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 改修内容 -->
+  <section>
+    <h2>改修内容</h2>
+
+    <div class="file-change">
+      <div class="file-name">
+        <span>src/main/java/.../application/service/OrderApplicationService.java</span>
+        <span class="diff-stat">+11 / -5</span>
+      </div>
+      <div class="code-block">
+        <div class="code-line line-ctx"><span class="line-num">102</span><span class="line-prefix"> </span><span>  public OrderConfirmation placeOrder(PlaceOrderCommand command) {</span></div>
+        <div class="code-line line-del"><span class="line-num">-</span><span class="line-prefix">-</span><span>    Long cartId = cartRepository.ensureCart(userId);        // (修正前: try の外)</span></div>
+        <div class="code-line line-del"><span class="line-num">-</span><span class="line-prefix">-</span><span>    List&lt;CartItem&gt; cartItems = cartRepository.findByCartId(cartId).items();</span></div>
+        <div class="code-line line-ctx"><span class="line-num">106</span><span class="line-prefix"> </span><span>    try {</span></div>
+        <div class="code-line line-add"><span class="line-num">107</span><span class="line-prefix">+</span><span>      Long cartId = cartRepository.ensureCart(userId);      // try 内へ前倒し(F3)</span></div>
+        <div class="code-line line-add"><span class="line-num">108</span><span class="line-prefix">+</span><span>      List&lt;CartItem&gt; cartItems = cartRepository.findByCartId(cartId).items();</span></div>
+        <div class="code-line line-ctx"><span class="line-num">135</span><span class="line-prefix"> </span><span>    } catch (InsufficientStockException e) {</span></div>
+        <div class="code-line line-ctx"><span class="line-num">136</span><span class="line-prefix"> </span><span>      auditLogRecorder.recordStateChangeIndependently(...RESULT_FAILURE, failureDetail(e));</span></div>
+        <div class="code-line line-ctx"><span class="line-num">138</span><span class="line-prefix"> </span><span>      throw e;</span></div>
+        <div class="code-line line-add"><span class="line-num">139</span><span class="line-prefix">+</span><span>    } catch (RuntimeException e) {</span></div>
+        <div class="code-line line-add"><span class="line-num">142</span><span class="line-prefix">+</span><span>      auditLogRecorder.recordStateChangeIndependently(</span></div>
+        <div class="code-line line-add"><span class="line-num">143</span><span class="line-prefix">+</span><span>          ACTION_ORDER_CREATE, null, null, RESULT_FAILURE, Map.of("reason", "UNEXPECTED_ERROR"));</span></div>
+        <div class="code-line line-add"><span class="line-num">144</span><span class="line-prefix">+</span><span>      throw e;</span></div>
+        <div class="code-line line-ctx"><span class="line-num">145</span><span class="line-prefix"> </span><span>    }</span></div>
+      </div>
+      <div class="annotation">
+        <span class="annotation-icon">💡</span>
+        <span><code>ensureCart</code>/<code>findByCartId</code>もtry内へ含めたのは、これら自体が失敗した場合に監査ゼロで抜けてしまうのを防ぐため（F3）。失敗detailにはDB由来の生メッセージ・例外クラス名を入れない（SBD-10）。既存の在庫不足経路（<code>catch(InsufficientStockException)</code>）は変更なし。</span>
+      </div>
+    </div>
+
+    <div class="file-change">
+      <div class="file-name">
+        <span>src/main/java/.../presentation/rest/OrderController.java</span>
+        <span class="diff-stat">+15 / -9</span>
+      </div>
+      <div class="code-block">
+        <div class="code-line line-ctx"><span class="line-num">88</span><span class="line-prefix"> </span><span>  public record OrderAddressRequest(</span></div>
+        <div class="code-line line-del"><span class="line-num">-</span><span class="line-prefix">-</span><span>      @NotBlank String firstName, @NotBlank String lastName, @NotBlank String address1,</span></div>
+        <div class="code-line line-del"><span class="line-num">-</span><span class="line-prefix">-</span><span>      String address2, @NotBlank String city, @NotBlank String state,</span></div>
+        <div class="code-line line-del"><span class="line-num">-</span><span class="line-prefix">-</span><span>      @NotBlank String postalCode, @NotBlank String country) {</span></div>
+        <div class="code-line line-add"><span class="line-num">89</span><span class="line-prefix">+</span><span>      @NotBlank @Size(max = 80) String firstName,</span></div>
+        <div class="code-line line-add"><span class="line-num">91</span><span class="line-prefix">+</span><span>      @NotBlank @Size(max = 80) String address1,</span></div>
+        <div class="code-line line-add"><span class="line-num">92</span><span class="line-prefix">+</span><span>      @Size(max = 80) String address2,   // NULL許容のため@NotBlankなし</span></div>
+        <div class="code-line line-add"><span class="line-num">95</span><span class="line-prefix">+</span><span>      @NotBlank @Size(max = 20) String postalCode,</span></div>
+        <div class="code-line line-add"><span class="line-num">96</span><span class="line-prefix">+</span><span>      @NotBlank @Size(max = 20) String country) {</span></div>
+        <div class="code-line line-ctx"><span class="line-num">115</span><span class="line-prefix"> </span><span>  public record PlaceOrderRequest(</span></div>
+        <div class="code-line line-ctx"><span class="line-num">116</span><span class="line-prefix"> </span><span>      @NotNull @Valid OrderAddressRequest billing,</span></div>
+        <div class="code-line line-del"><span class="line-num">-</span><span class="line-prefix">-</span><span>      OrderAddressRequest shipping,</span></div>
+        <div class="code-line line-add"><span class="line-num">117</span><span class="line-prefix">+</span><span>      @Valid OrderAddressRequest shipping,   // @NotNullは付けない(既存nullガード維持)</span></div>
+      </div>
+      <div class="annotation">
+        <span class="annotation-icon">💡</span>
+        <span>列幅は firstName/lastName/address1/address2/city/state=80、postalCode/country=20（<code>t_order</code>実測値）。既存 <code>AccountController</code> と同じ粒度。</span>
+      </div>
+    </div>
+
+    <div class="file-change">
+      <div class="file-name">
+        <span>src/main/java/.../presentation/rest/exception/GlobalExceptionHandler.java</span>
+        <span class="diff-stat">+14</span>
+      </div>
+      <div class="code-block">
+        <div class="code-line line-add"><span class="line-num">153</span><span class="line-prefix">+</span><span>  @ExceptionHandler(DataIntegrityViolationException.class)</span></div>
+        <div class="code-line line-add"><span class="line-num">154</span><span class="line-prefix">+</span><span>  public ResponseEntity&lt;ErrorResponse&gt; handleDataIntegrityViolation(</span></div>
+        <div class="code-line line-add"><span class="line-num">155</span><span class="line-prefix">+</span><span>      DataIntegrityViolationException e, HttpServletRequest request) {</span></div>
+        <div class="code-line line-add"><span class="line-num">156</span><span class="line-prefix">+</span><span>    log.warn("Data integrity violation: {}", e.getMessage());   // 生メッセージは内部ログのみ</span></div>
+        <div class="code-line line-add"><span class="line-num">157</span><span class="line-prefix">+</span><span>    return build(HttpStatus.BAD_REQUEST, "BAD_REQUEST", "Invalid request data", request);</span></div>
+        <div class="code-line line-ctx"><span class="line-num">158</span><span class="line-prefix"> </span><span>  }</span></div>
+      </div>
+      <div class="annotation">
+        <span class="annotation-icon">💡</span>
+        <span>AC2/AC3の入口検証をすり抜けた想定外のDB制約違反への防御多層。DB由来の生メッセージは外部へ返さずWARNログのみ（SBD-10）。#42(D)（favoriteCategoryIdの実在検証欠落によるFK違反500）が本ハンドラを再利用する前提（PO判断）。</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 実装メモ -->
+  <section>
+    <h2>実装メモ（仕様外の判断・変更・妥協点）</h2>
+    <div class="note-box">
+      <div class="note-title">OrderFailureAuditL3RegressionSpecの失敗注入方式</div>
+      <p>AC2/AC3導入後、入力検証由来の500経路はBean Validationで400に塞がれるため、「在庫不足以外の想定外の失敗」を実HTTP経由で再現するには
+        疑似的なDB層失敗の注入が必要だった。<code>MockitoSpyBean</code>で<code>OrderRepository#insertHeader</code>を1回だけ失敗させる方式を採用した
+        （在庫減算〔後続処理〕が発生しない実装順序を確認済み）。</p>
+    </div>
+    <div class="tradeoff-box">
+      <div class="note-title">意図的な設計: address2の列幅は80（AccountEditRequestの40とは非対称で正しい）</div>
+      <p><code>OrderAddressRequest.address2</code>の80は<code>t_order</code>由来。<code>AccountEditRequest.address2</code>の40は
+        <code>m_account</code>由来であり、別テーブル由来の正しい非対称（reviewer churn防止のため明示）。</p>
+    </div>
+    <div class="tradeoff-box">
+      <div class="note-title">意図的な設計: DataIntegrityViolationExceptionハンドラは防御多層</div>
+      <p>AC2/AC3の入口検証（@Size/@Valid）が機能する限り、このハンドラの経路（AC-neg1）からは通常到達しない。それでも新設したのは、
+        入口検証をすり抜けた想定外のDB制約違反に対する多層防御のため。<code>GlobalExceptionHandlerSpec</code>の単体テストで独立に固定した
+        （AC-neg1のIT経路では検証不能なため）。</p>
+    </div>
+  </section>
+
+  <!-- AC確認 -->
+  <section>
+    <h2>AC確認</h2>
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC1</div><div class="ac-text">在庫不足以外の失敗でも必ず ORDER_CREATE/FAILURE を記録</div></div>
+      <div class="ac-body">既存の記録方式（recordStateChangeIndependently・REQUIRES_NEW）を踏襲し主トランザクションのロールバックに巻き込まれない。</div>
+    </div>
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC2</div><div class="ac-text">OrderAddressRequest の各項目に t_order の列幅と整合する @Size を付与</div></div>
+      <div class="ac-body">80/20文字。超過長は400に正規化。</div>
+    </div>
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC3</div><div class="ac-text">PlaceOrderRequest.shipping に @Valid を付与</div></div>
+      <div class="ac-body">useSeparateShipping=trueのときshippingにもbillingと同一の検証がカスケード。</div>
+    </div>
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC4</div><div class="ac-text">DataIntegrityViolationException を400へ正規化するハンドラを新設</div></div>
+      <div class="ac-body">DB由来の生メッセージは返さず内部ログWARNのみ。#42(D)が再利用する前提。</div>
+    </div>
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC-neg1</div><div class="ac-text">列幅超過の住所（postalCode 40文字）→400（500ではない）</div></div>
+      <div class="ac-body">L3スキャナ実測PoCの回帰テスト化（OrderControllerSpec追記）。</div>
+    </div>
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC-neg2</div><div class="ac-text">shipping必須項目が空/欠落→400（500ではない）</div></div>
+      <div class="ac-body">OrderControllerSpec追記で固定。</div>
+    </div>
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC-neg3</div><div class="ac-text">在庫不足以外の理由での失敗でも t_audit_log に FAILURE 行が1件残る</div></div>
+      <div class="ac-body">既存の在庫不足・空カート時の失敗監査は挙動不変。OrderFailureAuditL3RegressionSpecで固定。</div>
+    </div>
+  </section>
+
+  <!-- 動作確認ポイント -->
+  <section>
+    <h2>動作確認ポイント（ユーザー確認用）</h2>
+    <ul class="verify-list">
+      <li class="verify-item">
+        <div class="verify-num">1</div>
+        <div class="verify-content">
+          <strong>通常の注文確定フロー（住所入力〜確定）が今まで通り成功すること</strong>
+          <span>チェックアウトウィザードで正しい住所を入力し、注文が成功することを確認</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">2</div>
+        <div class="verify-content">
+          <strong>異常に長い住所や配送先の入力漏れがあった場合、500エラーではなく分かりやすい入力エラーになること</strong>
+          <span>500の白画面ではなく400系のエラー応答になることを確認（フロント未変更のため画面表示は現状のまま）</span>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- 再発防止 -->
+  <section>
+    <h2>再発防止（L3 finding → 回帰テスト 対応表）</h2>
+    <div class="regression-box">
+      <p>SEC/スキャナが実測したPoC（N3・N11）を、CIで恒常的に守れる回帰テストへ変換した。</p>
+      <table class="mapping-table">
+        <tr><th>L3</th><th>Issue/AC</th><th>テストクラス</th><th>概要</th></tr>
+        <tr><td class="findingkey">N3</td><td>AC1/AC-neg3</td><td class="code">OrderFailureAuditL3RegressionSpec（新規IT）</td><td>在庫不足以外の失敗でもORDER_CREATE/FAILUREが1行残る</td></tr>
+        <tr><td class="findingkey">N3 単体</td><td>AC1</td><td class="code">OrderApplicationServiceSpec（既存・追記）</td><td>RuntimeExceptionでも独立監査→再送出／既存経路不変</td></tr>
+        <tr><td class="findingkey">N11</td><td>AC2/AC-neg1</td><td class="code">OrderControllerSpec（既存・追記）</td><td>postalCode 40文字→400</td></tr>
+        <tr><td class="findingkey">N11 shipping</td><td>AC3/AC-neg2</td><td class="code">同上</td><td>useSeparateShipping=true で shipping 空→400</td></tr>
+        <tr><td class="findingkey">N11 DB制約</td><td>AC4</td><td class="code">GlobalExceptionHandlerSpec（既存・追記）</td><td>DataIntegrityViolation→400・生メッセージ非露出（AC-neg1経路からは到達しない防御多層）</td></tr>
+      </table>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>

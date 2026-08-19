@@ -40,8 +40,13 @@ E4ユーザー登録＋アカウント編集・version楽観ロック初実装�
 本行への反映を次回Retroへ持ち越していた）も3観点とも指摘0件かつSM verificationでも指摘0件でクリーン、
 Sprint17（#15/#16/#17・E4アカウントセキュリティ完結＝PW変更再認証・CSRF・入力検証）も3観点とも指摘0件
 かつSM verificationでも指摘0件でクリーン、Sprint18（#31・null type safety警告のラムダ化。既存Spockを
-回帰ガードに使う純リファクタ）も3観点とも指摘0件でクリーン＝tier分離18連続）。
-以下の発見はいずれもDEV自身がTDD・実機検証中に見つけたもので初出＝1回目のため、2回ルールに従い本セクション
+回帰ガードに使う純リファクタ）も3観点とも指摘0件でクリーン、Sprint19（#36/#25・共有preferences設定基盤）
+も3観点・SM verificationとも指摘0件でクリーン＝**tier分離19連続クリーン**が続いていた）。
+**Sprint20（#38/#39/#40/#41・L3セキュリティ回帰Find-and-Fix）でtier分離クリーン記録が19連続で途切れた**
+（performance 1件＋SM verification確定所見1件、計2件。1ラウンドに束ねて対応し往復ゼロで解消。詳細は下記
+「[performance] LoginAttemptServiceのtx伝播属性の兄弟クラス非対称」「[SM verification]
+best-effort保護境界の呼び出し元遡り漏れ」参照。convention・securityの自動reviewerは指摘0件のまま）。
+以下の発見はいずれもDEV自身のTDD・実機検証中またはレビューでの初出＝1回目のため、2回ルールに従い本セクション
 ではなく「習得したこと」「技術的なハマりポイント」に記録する。ただし一部は参照知識/実装パターンとして
 初出からSkillへ即時反映した（詳細は「Skills更新履歴」）。
 
@@ -146,6 +151,56 @@ Sprint4のセキュリティ非ブロッキング2件（`AuthApplicationService.
   従い`backend-conventions`§9へ「セキュリティ関連の試行カウンタ/レート制限はDB-backedを第一候補とする」
   一般ルールとして昇格した（詳細は「Skills更新履歴」）。
   発生スプリント: Sprint4（#20）→ **Sprint16（#13）で2回目発生・2回ルール昇格**
+
+- [パフォーマンス] **同型（同じ「DB-backedカウンタで枠を確保するゲート」パターン）のサービスクラスを
+  新設・改修する際、`@Transactional`の伝播属性（`REQUIRES_NEW`）が兄弟クラス間で非対称になっていた。**
+  `RegisterAttemptService`/`AuditWriteQuotaService`はいずれも`@Transactional(propagation =
+  REQUIRES_NEW)`を付与済みだったが、同一スプリントで新設した`LoginAttemptService
+  .acquireAttemptSlotOrThrow`（#41・check-then-actのTOCTOU是正で新設）だけこれを欠き、`ensureRow`/
+  `acquireSlot`が個別autocommitでコミット2回発生していた（performance-reviewer指摘・SMがCONFIRMED）。
+  `REQUIRES_NEW`付与で是正し、ロールバック安全性の不変条件（枠確保成功後は例外を投げない＝レート制限
+  バイパス防止）をjavadocに明記した。同種のカウンタ系サービス（DB-backedレート制限）を新設・改修する際は、
+  **既存の同型クラスとtx伝播属性が揃っているかを突き合わせる**必要がある（`backend-conventions`§9の
+  DB-backedレート制限節へ、この教訓を踏まえた実装レシピの追記を即時反映済み。詳細は「Skills更新履歴」）。
+  発生スプリント: Sprint20（#41、performance-reviewer/SM指摘。初出のため2回ルールに従い本セクション止まり。
+  ただし実装レシピの明確化自体は既存の§9昇格済みエントリへの追記のため2回ルール対象外で即時反映した）。
+
+- [SM verification・#39 AC2未達] **best-effort化（例外を握り潰し記録処理を継続させる）を要求するACがある
+  場合、TDDの否定ACテストが「主要な失敗注入経路」1つしか固定していないと、同じメソッドが依存する別の
+  外部呼び出しが同じ失敗モードを別トリガで再導入してしまう。** `AuditLogRecorder.recordAuthzFailure`は
+  `mapper.insert`の例外はtry/catchで保護していたが、直前に呼ぶ`auditWriteQuotaService.tryAcquire`
+  （`@Transactional(REQUIRES_NEW)`・新規コネクション取得）の例外は保護境界の外にあり、未認証フラッド時の
+  コネクションプール枯渇等で例外が飛ぶと4経路（`AuditingAccessDeniedHandler`/
+  `AuditingAuthenticationEntryPoint`/`GlobalExceptionHandler`2箇所）へ素通りし、**#39自身が修正対象にして
+  いるN2（監査抑止・403→401化）と同一の失敗モードを、トリガを変えて再現してしまう**状態だった（SMのコア
+  精読で発見。TDDの否定ACテストが`mapper.insert`失敗ケースしか固定しておらず実装時には検出できなかった）。
+  `isWithinQuota`ヘルパーへ切り出しfail-open（例外時は枠ありとみなし記録へ進む・ERRORログは残す）で是正。
+  同種のbest-effort ACを実装・レビューする際は、**「主要な失敗注入経路」だけでなく、同じメソッドが依存する
+  全ての外部呼び出しそれぞれが失敗した場合も網羅する**必要がある。
+  発生スプリント: Sprint20（#39、SM verification指摘。初出のため2回ルールに従い本セクション止まり）。
+
+- [convention・非ブロッキング] **既に`backend-conventions`§9へ昇格済みのルール（Spring AOP自己呼び出しの
+  javadoc注記＝Sprint11昇格）が、新設したまさに同型のクラスへの適用漏れとして再発した。** `LoginAttemptService`
+  （#41で`acquireAttemptSlotOrThrow`に統合）のjavadocにSpring AOP自己呼び出しの注記が無く、同型3クラス
+  （`RegisterAttemptService`/`AuditWriteQuotaService`/是正後の`LoginAttemptService`自身）で不揃いだった
+  （convention reviewerが非ブロッキング指摘として検出・是正済み）。ルール自体は既にSkillに存在するため
+  新規昇格の対象ではないが、**同型クラス群を新設・改修する際は§9の既存チェックリスト項目を能動的に
+  再確認する**必要がある点を実例として記録する（上記の「tx伝播属性の非対称」と根は同じ＝同型クラス間の
+  横断棚卸し漏れ）。
+  発生スプリント: Sprint20（#41、convention reviewer指摘。既存ルールの適用漏れのため新規昇格対象外）。
+
+- [javadocの`{@link}`宙吊り参照] **クラス名変更・API統合でjavadocの`{@link}`参照先が実在しなくなっても
+  コンパイルは通るためCIで検出されない。** 同一スプリント内で2件発生した: #38 `JwtPropertiesSpec`の
+  `{@link SecretFailFastSpec}`（設計段階で実クラス名を`ApplicationBootFailFastSpec`に確定する前の仮称が
+  残存）／#41 `{@link #ensureRow}`（旧`assertNotLocked`等の削除・`acquireAttemptSlotOrThrow`への統合で
+  自クラスに存在しないメソッドを指す形に）。いずれもDEV自身が実装中に気づき是正した（javadocの実クラス名/
+  メソッド名を実在確認して修正）。**同一スプリント内の2件は「異なるレビュー時点で2回」という2回ルールの
+  昇格要件を満たさないと判断し**（Sprint5の正規表現置換ツールの罠と同型の判断＝同一セッション内の複数回は
+  1回目としてカウントする）、`backend-conventions`§9への新規チェックリスト項目追加は見送った。javadoc
+  lint（`-Xdoclint`のビルド時有効化）によるCI検出自体は有効な恒久対策候補だが、「注意すれば防げる系」の
+  チェックリスト項目ではなくビルド設定の変更（SM/インフラ判断）にあたるため、DEV側Skillへは反映せず
+  SMへ申し送り事項として提起する。
+  発生スプリント: Sprint20（#38・#41、DEV自己発見。同一スプリント内2回のため2回ルール未充足と判定）。
 
 ### jpetstore-frontend
 Sprint5（#24）が初のフロントエンド実装スプリント。3観点レビューでパフォーマンス1件・セキュリティ1件の
@@ -414,6 +469,16 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   「PasswordEncoderは...」節（Sprint3・bcrypt関連の参照知識）へ追記した（新規チェックリスト項目ではなく
   同一トピックの既存参照知識セクションへの追記のため2回ルール対象外）。
   発生スプリント: Sprint17（#15、`StrongPasswordValidator`実装時にDEVが自己発見）
+- **`@Transactional(REQUIRES_NEW)`を使う処理を20並列でIT実行すると、1リクエストあたり2本（主tx＋
+  REQUIRES_NEWの別tx）のDB接続を同時に要求するため、既定のHikariCPプール上限（10）では容易に枯渇し
+  `TimeoutException`になる。** `RateLimitBurstConcurrencySpec`の登録側20並列テスト（`RegisterAttemptService`
+  が`REQUIRES_NEW`で枠確保）で発生。テストの並列度そのものは意図どおりだが、プール枯渇は「レート制限が
+  効いている」という意図した振る舞いとは別の偽陽性/偽陰性要因になりうるため、本specにのみ
+  `@DynamicPropertySource`でプール上限を50へ引き上げて解消した（本番プールサイジング自体はスコープ外）。
+  今後`REQUIRES_NEW`を伴う処理の高並列ITを書く際は、並列度×tx本数がHikariCPの既定プール上限を超えないか
+  事前に見積もる必要がある。
+  発生スプリント: Sprint20（#41、`RateLimitBurstConcurrencySpec`実装時。初出のため2回ルールに従い本Skillには
+  未反映）
 
 ### jpetstore-frontend
 - **vue-i18n（v11・Composition API）のメッセージ文字列中の`@`はlinked message構文（`@:key`形式）として
@@ -825,6 +890,47 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   含めたい」Story全般で再利用できる設計（`backend-conventions`§9へ即時反映。詳細は「Skills更新履歴」）。
   発生スプリント: Sprint19（#36/#25。初出だが「知らないと書けない参照知識・実装パターン」の2回ルール例外
   として即時反映）
+- **既存のcheck-then-act（非原子）ゲートを、条件付きUPDATEで原子化する汎用イディオムを確立した。**
+  「(1) no-op `ON DUPLICATE KEY UPDATE`で行の存在を保証する（`ensureRow`）→ (2) 既存のcheck判定式を
+  そのまま`WHERE`句へ移植した条件付き`UPDATE`を発行し、`affected rows`で可否を判定する（`acquireSlot`）」
+  の2文構成にすると、`affected rows==0`の意味が「(1)で行の存在は保証済みのため、条件不一致（枠切れ/
+  ロック中）以外にはなり得ない」という一意な意味に構造的に閉じる（「初回はINSERTが無いため0行」といった
+  曖昧さが生じない）。**加えて、既存のSET句/WHERE句を移植する際は一字も変えないことが重要**（MySQLの
+  `ON DUPLICATE KEY UPDATE`のSET句は左→右評価という既知挙動（Sprint4の教訓）に暗黙依存しており、
+  独立に書き直すと評価順ズレの再発リスクがある）。#41（ログイン/登録レート制限のTOCTOU是正）で確立し、
+  #39（未認証監査writeのquota）でも同じ2文構成を無改造で再利用できた（`AuditWriteQuotaService`も
+  `ensureRow`→条件付きUPDATEの同型）。今後同種の「既存の非原子ゲートを原子化する」Story全般で再利用できる
+  設計イディオムとして`backend-conventions`§9（DB-backedレート制限節）へ即時反映した（詳細は
+  「Skills更新履歴」）。
+- **セキュリティ統制そのもの（fail-closed）と、その統制を支える可用性のための緩和策（fail-open）を
+  区別する判断軸を確立した。** #39（未認証監査writeのquota）で、quota自体は「無制限write成長を防ぐ
+  可用性のための緩和策」であり、quotaチェック（`tryAcquire`）が例外を投げた場合にfail-closed（例外伝播＝
+  監査記録が止まる）にすると、**quota障害という新しい経路でSBD-14の監査記録という統制そのものを止めて
+  しまう**（守るべき主目的の統制が緩和策のバグで倒れる本末転倒）。fail-open（例外時は「枠あり」とみなし
+  記録処理へ進む・ERRORログは残す）を採用し、判断根拠をjavadocに明記した。新しい緩和策/補助機構を設計する
+  際は、それが「守っている主目的の統制」より弱い可用性で失敗するとどちらに倒すべきか（統制自体はfail-closed、
+  統制を支える補助機構はfail-open）を最初に切り分ける判断軸として今後も使える。`backend-conventions`§9へ
+  即時反映した（詳細は「Skills更新履歴」）。
+- **ApplicationContext起動失敗の固定は、実ブート経路のSpec（`ApplicationBootFailFastSpec`）に足すのではなく、
+  `ApplicationContextRunner`で分離したSpecに書く方がFlyway/DataSource初期化順のflakinessを避けられる。**
+  `ApplicationContextRunner`は`withUserConfiguration(...)`＋`withPropertyValues(...)`だけでBean生成時
+  例外ではなく**コンテキスト起動失敗そのもの**を高速・DB不要でassertできるが、`Duration`型`@Value`のような
+  型変換を伴うプロパティを使う場合は`conversionService`（`ApplicationConversionService`）を明示登録しない
+  と変換失敗により別理由の起動失敗で偽陽性GREENになる罠がある（#38・`JwtSecretContextFailFastSpec`実装時に
+  発覚し明示登録で解消）。実ブート経路での確認自体は別途DoD（実機1回）で担保し、否定ACの主固定は
+  `ApplicationContextRunner`側に寄せる設計を`backend-conventions`§9へ即時反映した（詳細は
+  「Skills更新履歴」）。
+- **interfaceのみのMyBatis Mapper（実装クラスがフレームワーク生成のプロキシ）へ「1回だけ例外を注入する」
+  e2e回帰テストは、`@MockitoSpyBean`＋`doThrow(...).when(...)`で実現できる。** `doCallRealMethod()`は
+  具象クラスが必要なためinterfaceのみのMapperには使えないが、spyの既定delegate（実Beanへの委譲）に
+  任せれば`doThrow`で指定した1呼び出しだけ例外化しつつ他の呼び出しは実処理のまま通せる。テスト間の波及を
+  防ぐため`cleanup:`で`Mockito.reset()`を必ず呼ぶ。`OrderFailureAuditL3RegressionSpec`（#40 N3 e2e）・
+  `AuditSuppressionL3RegressionSpec`（#39 AC-neg2 e2e）の両方で採用した。今後「実装層に1回だけ障害を注入して
+  e2eの否定ACを固定したい」Story全般で再利用できる技法として記録する（発生頻度が読めないため今回はSkill
+  未反映）。
+  発生スプリント: Sprint20（#38/#39/#40/#41。原子化イディオム・fail-open/fail-closed判断軸・
+  ApplicationContextRunner分離はいずれも「知らないと書けない参照知識・実装パターン」の2回ルール例外として
+  即時反映。`@MockitoSpyBean`単発例外注入技法は発生頻度未知のため今回はlong_term.md止まり）
 
 ### jpetstore-frontend
 - **backendのSpring Security 7 CSRF設定（非XOR `CsrfTokenRequestAttributeHandler`・consume-then-
@@ -1363,15 +1469,55 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   リポジトリ冒頭に記録した。
 - `#skills-changelog` へ `[DEV]` で投稿済み。
 
+### Sprint 20（#38/#39/#40/#41・Phase 4 L3セキュリティ回帰の確定所見Find-and-Fix）
+
+- **`backend-conventions`**: `## 9. jpetstore-backend 固有の注意事項`の「セキュリティ関連の試行カウンタ/
+  レート制限はDB-backedテーブルで永続化する」節へ、以下を追記した。**既存の§9昇格済みエントリへの追記の
+  ため2回ルール対象外**（Sprint17のbcrypt 72バイト追記と同じ位置づけ）:
+  1. 枠確保の原子化トランザクションは`@Transactional(propagation = REQUIRES_NEW)`で統一し、**同型の
+     カウンタ系サービス（`RegisterAttemptService`/`AuditWriteQuotaService`/`LoginAttemptService`）間で
+     伝播属性が非対称にならないよう明示する**（Sprint20 performance-reviewer指摘の再発防止）。
+  2. check-then-actを条件付きUPDATEで原子化する2文イディオム（no-op ODKUで行の存在を保証する`ensureRow`→
+     既存check式をそのまま`WHERE`句へ移植した条件付きUPDATEの`affected rows`で可否判定する`acquireSlot`）
+     を実装レシピとして追記。既存のSET句/WHERE句を一字も変えず移植することの重要性（左→右評価順依存の
+     再発防止）も明記。
+  さらに新規サブセクションとして以下2点を新設した。**初出だが「知らないと書けない参照知識・実装パターン」の
+  2回ルール例外として即時反映**:
+  3. **セキュリティ統制（fail-closed）と、統制を支える可用性のための緩和策（fail-open）を区別する判断軸**
+     （#39・quotaチェック自体の障害で本来の統制＝監査記録を止めない設計）。
+  4. **`ApplicationContextRunner`によるコンテキスト起動失敗の分離固定**（実ブート経路のSpecに足すと
+     Flyway/DataSource初期化順でflakyになるため分離する・`Duration`型`@Value`変換には`conversionService`の
+     明示登録が必要という罠を含む）。
+- **`backend-conventions`/`frontend-conventions`へ反映しなかったもの**: 以下はいずれも初出（1回目。同一
+  スプリント内の複数発生は2回ルールの「異なるレビュー時点で2回」を満たさないと判断）または発生頻度が
+  読めない技法のため、`memory/dev/long_term.md`への記録に留めた:
+  - performance指摘（`LoginAttemptService`のtx伝播属性の兄弟クラス非対称）・SM verification確定所見
+    （`AuditLogRecorder`のbest-effort保護境界の呼び出し元遡り漏れ）→「繰り返し指摘されるパターン」
+    （jpetstore-backend）に初出として記録。
+  - convention非ブロッキング指摘（Spring AOP自己呼び出しjavadoc注記の適用漏れ）は既存§9ルールの適用漏れの
+    実例のため新規昇格対象外→同上セクションに記録。
+  - javadocの`{@link}`宙吊り参照2件（#38・#41）は同一スプリント内発生のため2回ルール未充足と判定し
+    Skill未反映（javadoc lint導入はSM/インフラ判断のため申し送り事項として提起）→同上セクションに記録。
+  - `@MockitoSpyBean`による単発例外注入技法（interfaceのみのMyBatis Mapperへの障害注入）→「習得したこと」
+    （jpetstore-backend）に記録（発生頻度が読めないため見送り）。
+- 3reviewer・SM独立verificationの結果は**tier分離19連続クリーン記録が途切れた**（performance 1件＋SM
+  verification確定所見1件、計2件。1ラウンドに束ねて対応し往復ゼロで解消。convention・securityは指摘0件）。
+  チェックリスト項目ではなくプロセス上の記録のため`memory/dev/long_term.md`「繰り返し指摘されるパターン」
+  （jpetstore-backend冒頭）に記録した。
+- `frontend-conventions`は本スプリントfrontend無変更のため対象外。
+- `#skills-changelog` へ `[DEV]` で投稿済み。
+
 ## 卒業済みルール
 
 （該当なし。棚卸し対象となるルールが直近15スプリント基準に達していない。
-  jpetstore-backendはSprint2・3・4・6・7・8・9・10・11・12・13・14・15・16・17・18・19の17スプリント、
-  jpetstore-databaseはSprint1・3・6・14・16・18・19の7スプリント、jpetstore-frontendはSprint5・6・7・8・
-  10・11・14・15・16・17・18・19の12スプリントのみのため、いずれも対象外。§9/§7昇格済みルールの昇格後
-  経過スプリント数（直近15スプリント基準の分子）は、catch-all例外横取り（Sprint7昇格）が12スプリント
-  （Sprint8〜19）・Spockの`given:`裸stub×`then:`引数一致（Sprint12昇格）が7スプリント（Sprint13〜19）・
-  DB-backedレート制限（Sprint16昇格）が3スプリント（Sprint17〜19）・frontend CRLFノイズ選択add
-  （Sprint18昇格）が1スプリント（Sprint19）・frontend共通レイアウトへの新規要素追加時のfind('button')/
-  find('form')衝突確認（Sprint19昇格）が0スプリント（昇格直後）で、いずれも15スプリントに満たない。
-  Sprint4〜Sprint18 Retroに続きSprint19 Retroでも棚卸しを実施したが同様の理由で卒業候補なし）
+  jpetstore-backendはSprint2・3・4・6・7・8・9・10・11・12・13・14・15・16・17・18・19・20の18スプリント、
+  jpetstore-databaseはSprint1・3・6・14・16・18・19・20の8スプリント、jpetstore-frontendはSprint5・6・7・8・
+  10・11・14・15・16・17・18・19の12スプリント（Sprint20はfrontend無変更のため不算入）のみのため、いずれも
+  対象外。§9/§7昇格済みルールの昇格後経過スプリント数（直近15スプリント基準の分子）は、catch-all例外横取り
+  （Sprint7昇格）が13スプリント（Sprint8〜20）・Spockの`given:`裸stub×`then:`引数一致（Sprint12昇格）が
+  8スプリント（Sprint13〜20）・DB-backedレート制限（Sprint16昇格）が4スプリント（Sprint17〜20。Sprint20は
+  §9追記のみで新規逸脱ではないため「未発生」継続としてカウント）・frontend CRLFノイズ選択add（Sprint18昇格）
+  が1スプリント（Sprint19。Sprint20はfrontend無変更のため不算入・据え置き）・frontend共通レイアウトへの
+  新規要素追加時のfind('button')/find('form')衝突確認（Sprint19昇格）が0スプリント（昇格直後のまま・
+  Sprint20はfrontend無変更のため不算入）で、いずれも15スプリントに満たない。
+  Sprint4〜Sprint19 Retroに続きSprint20 Retroでも棚卸しを実施したが同様の理由で卒業候補なし）
