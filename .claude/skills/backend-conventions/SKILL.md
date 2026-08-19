@@ -561,6 +561,7 @@ public ResponseEntity<LoginResponse> me() {
 | `MissingServletRequestParameterException` | 400 | 必須クエリパラメータの欠落 |
 | `NoResourceFoundException` | 404 | どのハンドラマッピング・静的リソースにも一致しない未知パス |
 | `HttpMessageNotReadableException` | 400 | リクエストボディの型不一致・不正JSON（非数値文字列等でのデシリアライズ失敗） |
+| `DataIntegrityViolationException` | 400 | `@Size`/`@Valid`カスケード等の入口検証をすり抜けた想定外のDB制約違反（列幅超過・NOT NULL違反等） |
 
 > **背景（Sprint 3 #18・Sprint 7 #3）**: Sprint 3で`HttpRequestMethodNotSupportedException`が
 > catch-allに落ちて500になる問題が初めて発覚（自動テストで顕在化）。当時は初出のためSkill未反映
@@ -835,12 +836,37 @@ package-infoに置く）。
   （既出）。
 - 超過判定はService層のゲート（`assertNotLocked`/`assertNotRateLimited`）に閉じ、既存の失敗系統
   （401/429等）へ合流させる（新しい失敗系統を作らない）。
+- **枠確保の原子化トランザクションは`@Transactional(propagation = Propagation.REQUIRES_NEW)`で統一し、
+  同型のカウンタ系サービス間で伝播属性が非対称にならないようにする。** `RegisterAttemptService`/
+  `AuditWriteQuotaService`/`LoginAttemptService`はいずれも同じ「(1)行の存在保証→(2)条件付きUPDATEで
+  affected rowsを見る」構造を持つ。1クラスだけ`REQUIRES_NEW`を欠くと、そのクラスだけ2文が別々の
+  autocommitでコミットされ性能特性が揃わなくなる。新規に同型カウンタサービスを追加・改修する際は、
+  既存の同型クラスとtx伝播属性が揃っているか横断的に突き合わせること（Sprint20 performance-reviewer指摘）。
+- **既存のcheck-then-act（非原子）ゲートを条件付きUPDATEで原子化する2文イディオム**: (1) no-op ODKUで
+  行の存在を保証する（例: `INSERT INTO t_xxx (...) VALUES (?, 0, ...) ON DUPLICATE KEY UPDATE
+  col = col`）→ (2) 既存のcheck判定式を**一字も変えずに**`WHERE`句へ移植した条件付き`UPDATE`を発行し、
+  `affected rows`で可否を判定する。(1)で行の存在を常に保証するため、`affected rows==0`は「条件不一致
+  （枠切れ/ロック中）」以外の意味になり得ず、曖昧さが構造的に排除される。既存のSET句/WHERE句を独立に
+  書き直さず移植するのは、`ON DUPLICATE KEY UPDATE`のSET句が左→右評価される既知挙動（Sprint4の教訓・
+  上記「技術的なハマりポイント」参照）に暗黙依存している式があり、書き直すと評価順ズレが再発しうるため。
+
+```java
+// (1) ensureRow: no-op ODKUで行の存在を保証（seedはDDLのDEFAULTと一致させる）
+mapper.ensureRow(key);
+// (2) acquireSlot: 既存のcheck式をそのままWHERE句へ移植した条件付きUPDATE
+int affected = mapper.acquireSlot(key); // UPDATE ... SET count = count + 1, ... WHERE key = ? AND (...)
+if (affected == 0) {
+  throw new RateLimitExceededException(key); // 既存の失敗系統へ合流させる
+}
+```
 
 > **背景（Sprint4 #20 `t_login_attempt`で初出→Sprint16 #13 `t_register_attempt`で2回目発生・2回ルール
 > 昇格）**: 登録レート制限の計画フェーズでは当初in-memory案が候補に挙がったが、ユーザーが「in-memoryでは
 > なくDB-backedを選択」と明示的に確定した（`backlog/sprint_16/sprint_backlog.md` E1。3-repo化の要因にも
 > なった）。2スプリントにまたがり同じ設計判断（DB永続化を選ぶ）が繰り返されたため、以後デフォルトで
-> in-memory案を出さずDB-backedを第一候補とする一般ルールとして明文化した。
+> in-memory案を出さずDB-backedを第一候補とする一般ルールとして明文化した。**Sprint20（#41・ログイン/
+> 登録レート制限のTOCTOU是正、#39・未認証監査writeのquota）で上記の原子化2文イディオムを確立し、
+> `REQUIRES_NEW`統一の教訓とあわせて本節へ追記した**（既存節への追記のため2回ルール対象外）。
 
 ### version楽観ロックUPDATEの実装パターン（コードベース初のUPDATE実装・#14）
 
@@ -955,3 +981,78 @@ public UserPreferences getPreferences(Long userId) {  // /api/auth/login・/api/
 > `getPreferences(Long userId)`という明示引数版のread methodを新設し、login()は返却値の`userId()`を、
 > me()は`currentUserProvider`由来のuserIdを、それぞれ渡す設計で解決した。詳細は`memory/dev/long_term.md`
 > 「習得したこと」（jpetstore-backend）参照。
+
+### セキュリティ統制（fail-closed）と、統制を支える可用性のための緩和策（fail-open）を区別する
+
+新しい緩和策/補助機構（quota・キャッシュ・レート制限等）を、既存のセキュリティ統制（監査記録・認証・認可等）
+の**内側**に追加する場合、その緩和策自体が障害を起こしたときにfail-closed（例外伝播）とfail-open（握り潰して
+主処理を継続）のどちらに倒すべきかを、**その緩和策が「守っている主目的の統制」より弱い可用性であってよいか**
+で判断する。
+
+- **主目的の統制自体（例: 認証・認可・監査記録の実行）は原則fail-closed**（統制が効かない状態で処理を
+  継続させない）。
+- **その統制を支えるためだけに追加した緩和策（例: 監査write量を抑えるquota）はfail-open**にする。
+  fail-closedにすると、緩和策自身の障害（DB接続枯渇等）が新しい経路になって**主目的の統制そのものを
+  止めてしまう**本末転倒が起きる。
+
+```java
+// NG: quota障害で監査記録という主目的の統制ごと止まってしまう（fail-closed）
+public void recordAuthzFailure(...) {
+  if (!auditWriteQuotaService.tryAcquire(clientIp)) { // tryAcquire自体が例外を投げるとここで止まる
+    return; // 抑止
+  }
+  mapper.insert(entity); // 到達しない = 監査記録という統制自体が失われる
+}
+
+// OK: quotaチェック自体の障害はfail-openにし、監査記録（主目的の統制）は継続させる
+private boolean isWithinQuota(String clientIp) {
+  try {
+    return auditWriteQuotaService.tryAcquire(clientIp);
+  } catch (RuntimeException e) {
+    log.error("audit write quota check failed; treating as within quota (fail-open)", e);
+    return true; // 枠ありとみなし記録処理へ進む
+  }
+}
+```
+
+新しい緩和策/補助機構を設計する際は、まず「これは主目的の統制そのものか、それとも統制を支える補助的な
+可用性対策か」を切り分けてから、fail-closed/fail-openの既定を決めること。
+
+> **背景（Sprint20 #39）**: `AuditLogRecorder.recordAuthzFailure`のquotaチェック（`tryAcquire`・
+> `@Transactional(REQUIRES_NEW)`で新規コネクション取得）が例外保護の外にあり、quota障害時に監査記録
+> （SBD-14）という主目的の統制自体が失われる状態だった（SMのコア精読で発見。#39が修正対象にしている
+> N2＝監査抑止と同一の失敗モードがトリガを変えて再現していた）。`isWithinQuota`ヘルパーへ切り出し
+> fail-openで是正した。詳細は`memory/dev/long_term.md`「繰り返し指摘されるパターン」（jpetstore-backend）
+> 参照。
+
+### `ApplicationContextRunner`でコンテキスト起動失敗を実ブート経路と分離して固定する
+
+`@Value`のfail-fast検証（例: `JwtProperties`のdenylist/エントロピー判定）のように、**特定のプロパティ値で
+アプリケーションコンテキストの起動自体が失敗すること**を固定したい否定ACは、既存の実ブート経路のSpec
+（`ApplicationBootFailFastSpec`等・Testcontainers込みの実DB起動）へケースを足すのではなく、`Spring
+ApplicationContextRunner`で分離した専用Specに書く。
+
+```groovy
+new ApplicationContextRunner()
+    .withUserConfiguration(JwtProperties)
+    .withBean(ConversionService, ApplicationConversionService.&getSharedInstance) // 下記の罠を参照
+    .withPropertyValues("jwt.secret=" + weakSecret)
+    .run { context ->
+        assert context.startupFailure != null
+    }
+```
+
+- **利点**: Bean生成時例外ではなく**コンテキスト起動失敗そのもの**をassertできる／DB不要で高速／実ブート
+  経路（Flyway・DataSource初期化順）に依存しないため、実ブートSpecへ足すより既存specへの副作用が無くflaky
+  にならない。
+- **罠**: `Duration`型など変換を要する`@Value`プロパティを使う場合、素の`ApplicationContextRunner`には
+  変換器が無いため、意図した検証ロジックとは無関係な型変換失敗で常に起動失敗となり**偽陽性GREEN**になる
+  （否定ACが「本当に検証ロジックで落ちているか」を確認せず通ってしまう）。`conversionService`
+  （`ApplicationConversionService.getSharedInstance()`）を明示登録して解消する。
+- 実ブート経路での確認自体が必要な場合（DoD等）は、別途1回の実機起動確認で担保し、否定ACの主固定は
+  `ApplicationContextRunner`側に寄せる。
+
+> **背景（Sprint20 #38）**: `JwtSecretContextFailFastSpec`実装時、素の`ApplicationContextRunner`だと
+> `Duration`型`@Value`の変換が常に失敗しAC-neg1/AC-neg2が別理由の起動失敗で偽陽性GREENになる罠があり、
+> `conversionService` bean明示登録で解消した。詳細は`memory/dev/long_term.md`「習得したこと」
+> （jpetstore-backend）参照。

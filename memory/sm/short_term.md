@@ -1,19 +1,25 @@
 # SM 短期記憶（今スプリント）
 
-Sprint 19（#36 テーマ切替/#25 日本語ローカライズ完全実装/#37 トークンスロット撤去/#35 .gitattributes・3-repo・実効13-15SP）完了。Retro 済み。次スプリント開始時にリセット済み。
+Sprint 20（#38 JWT署名鍵 fail-fast / #39 監査抑止＋未認証write増幅 / #40 注文失敗監査＋入力制約 / #41 レート制限 TOCTOU・13SP・2-repo）完了。Retro 済み。次スプリント開始時にリセット済み。
 
-- 実装: 3-repo `feature/36-user-preferences-i18n`（frontend #12 closes #36/#25/#37/#35・backend #19・database #9）→全マージ済。3観点+SM verification 全クリーン12回目相当・tier分離19連続・Sprint Review 指摘1件（⑦b で R__test_user.sql seed 修正〔`color_scheme_preference='system'` 明示追加〕・真因は実機非再現だが安全側修正でユーザー了承クローズ）。local main 3repo 同期済（frontend 70ef75c・backend 1aa2a92・database a4e7e5a）。#36/#25/#37/#35 クローズ確認・open は #32 のみ。
-- 委譲論点: 横断 Q1=#25完全実装/Q2=/api/auth/me拡張/Q3=FOUC head script ＋ DEV recon 由来 Q-1=フォーマット最小-正/Q-2=AccountEdit パリティ。共有 `usePreferencesStore`（Pinia単一ソース）に集約・apply primitive 非対称（テーマ=htmlクラス/言語=locale・FOUC はテーマ専用）。backend 拡張=AuthController.LoginResponse（/me+/login 共有・A1）・login は getPreferences(Long userId)（A2）。
+- **性格**: Phase 4 L3（セキュリティ回帰）の Find-and-Fix の **Fix 半分**＝機能追加ゼロのセキュリティ修正スプリント（新種）。主成果物は**否定AC の回帰テスト**＝SEC が手で実証した PoC の CI 資産化。
+- **実装**: backend `fix/38-l3-security-fixes`（7コミット・PR #20 で `closes #38/#39/#40/#41`）／database 同名（1コミット・PR #10 `Related:`）。**両 PR マージ済・4 Issue クローズ確認済・local main 両 repo 同期済**（backend `73c8d13` / database `17c40de`）。frontend 無変更。**AC 26/26**。
+- **レビュー**: 初回＝conv/sec 指摘なし・perf 1件（`LoginAttemptService` の tx 非対称）／**SM verification 確定所見1件**（quota チェックが best-effort 境界の外＝#39 が直している N2 と同一失敗モードの残存・**sec は false negative**）。デルタ再レビュー＝perf/sec クリーン・conv suggestion 1件（javadoc）→ **docs のみのため4回目ラウンドは省略し SM 現物確認でクローズ**。**Sprint Review 指摘ゼロ**。
+- **C2 成功**: SEC が自粛したライブ・バーストPoC（L3 §3 残件1）を `RateLimitBurstConcurrencySpec`（Testcontainers＋20並列）で資産化 → **L3 残件1 クローズ**。
+- **Skills 昇格2件**（詳細は long_term「Skills更新履歴 Sprint 20」）: `scrum-master-workflow` ④＝reviewer 全クリアでも SM 独立 verification 必須／⑥＝push フォールバックのはしご＋merge は MCP。
 
 ## 要フォロー（次回）
-- (1) teammate 完了は idle≠完了。成果物直接確認（memory/スレッド/branch）。**★副作用を伴う最終化（Discord投稿/コミット等）の未反映 nudge は「既に完了済みなら再実行せず Message ID を返答して（重複投稿しないで）」の冪等指示にする**（Sprint19 で idle 直後 stale read の nudge が二重投稿を招いた＝反映遅延4回目・次回再発で scrum-master-workflow 冒頭 idle 注記へ昇格判定）。
-- (2) frontend EOL(CRLF) ノイズ → #35 `.gitattributes`（`* text=auto eol=lf`）で恒久対策**実装・マージ済**。次スプリント以降に再発しないか観測（再発ゼロなら要フォロー(2)クローズ）。
-- (3) curl 破壊系（merge PUT 等）が分類器ブロック → PR マージは `mcp__github__merge_pull_request`（Sprint19 で全3PR マージ成功）、Issue操作は MCP github、Projects は GraphQL curl POST（通る）。
-- (4) **git push は環境で挙動が割れる（Sprint19 で判明）**: product repo は `git push origin`（credential helper）で成功（frontend は2分でタイムアウト→個別 push＋300s で解消）。**agent-base は `git push origin` が GCM ダイアログ待ちで5分+ハング→token URL 埋め込み `git push "https://x-access-token:$GITHUB_PERSONAL_ACCESS_TOKEN@github.com/ryokkon624/migration-agent-base.git" <branch>` で回避成功**（Sprint8 GCM ハング教訓の再来。Sprint17/18「token URL 分類器ブロック」とは逆＝今回は token URL が通り credential helper がハング＝環境で揺れる）。fetch/pull・ls-remote（read）は credential helper で問題なし。**push ハング時は token URL を試す**。
-- (5) DEV(dev-s19-impl) が Sprint Review HTML 生成時に mcp__github__* 不可で curl フォールバック使用と報告（SM は MCP 使用可）。次回 reviewer/DEV の github MCP 可否に留意。
+- (1) **teammate 完了は idle≠完了**。成果物直接確認（memory/Discord/Issue/branch）。**副作用を伴う最終化の nudge は冪等指示**（「完了済みなら再実行せず Message ID を返答」）＝Sprint20 で有効性実証・二重投稿ゼロ。
+- (2) **teammate のツール可否は個体差あり**（Sprint19 DEV=github MCP 不可／Sprint20 DEV=`discord_get_messages` 不可）。**SM の成果物確認は teammate の完了報告受領後に行う**と観測ずれが出ない。
+- (3) **push はセッション単位で揺れる** → ⑥ に昇格済（①タイムアウト付き `git push origin` →②token URL →③別セッション代行）。**agent-base も同様**。マージは `mcp__github__merge_pull_request`。
+- (4) **javadoc `{@link}` 宙吊り参照**が Sprint20 で2件（同一スプリント内＝2回ルール未達で見送り）。**3件目が出たら `backend-conventions §9` に「`{@link}` 先の実在確認」を追加 → それでも再発ならビルド設定（`-Xdoclint`）を Issue 起票**、の順で判定する（DEV 申し送りへの SM 判定）。
+- (5) frontend EOL(CRLF) ノイズは #35 `.gitattributes` 済。**Sprint20 は frontend 無変更のため観測機会なし**（要フォロー継続）。
 
 ## 次スプリント候補
-- open Issue は #32（メール検証・NotReady/deferred）のみ。機能面 Epic（E1-E4）完了。Sprint 20 対象は Planning 時に Projects の Sprint フィールドで特定。
+- open Issue は **#42 / #43 / #44 / #45（いずれも L3 Low 束・Ready=Draft）** と **#32（メール検証・NotReady/deferred）**。
+- #42〜#45 はすべて Phase 4 L3 由来で **Sprint 20 と同じ「PoC → 回帰テスト」枠組みがそのまま使える**。Sprint 21 対象は Planning 時に Projects の Sprint フィールドで特定する。
+- **Retro 積み残し**: PO が #44(B)（`languagePreference` allowlist）を保持中。Sprint20 では allowlist を実装せず**データ衛生（dev DB の正規化）のみ**実施した。
 
-## agent-base 成果物（step12・実施中）
-- 対象: backlog/sprint_19/（sprint_backlog.md・review-{36,25,37,35}.html）・memory/{sm,dev,po}/{short,long}.md・.claude/skills/{backend,frontend}-conventions・spec/intended-diff-ledger.md。ブランチ `docs/sprint-19-preferences-i18n`・`Related: #36/#25/#37/#35`（closes にしない）。
+## agent-base 成果物（step12）
+- 対象: `backlog/sprint_20/`（sprint_backlog・implementation-notes・review-#{38,39,40,41}.html）／`memory/{sm,dev,po}/{short,long}_term.md`／`.claude/skills/{scrum-master-workflow,backend-conventions}/SKILL.md`／`spec/intended-diff-ledger.md`（ID-11・ID-25 強化）／**`reports/after/l3-security-regression-{backend,frontend}.md`（SEC の L3 レポート・未追跡だったので今回追加）**。
+- ブランチ `docs/sprint-20-l3-security-fixes`・PR body は `Related: #38/#39/#40/#41`（`closes` にしない）。

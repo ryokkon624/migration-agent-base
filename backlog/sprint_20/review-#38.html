@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint 20 Review — #38 JWT署名鍵の公開placeholder稼働</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #f8f7f5; }
+  .page { max-width: 900px; margin: 0 auto; padding: 48px 24px; }
+
+  .sprint-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin-bottom: 8px; }
+  h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px; }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+  .badge-sprint { background: #e8f0fe; color: #1a56db; }
+  .badge-issue { background: #fef2f2; color: #991b1b; }
+  .badge-bug { background: #fef2f2; color: #b91c1c; }
+  .badge-security { background: #fdf4ff; color: #86198f; }
+  .badge-critical { background: #1a1a1a; color: #fff; }
+
+  section { margin-bottom: 40px; }
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #888; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e5e5e5; }
+
+  /* 発生事象: PoCターミナル風 before/after */
+  .symptom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .symptom-box { background: white; border: 1px solid #e5e5e5; border-radius: 10px; padding: 20px; }
+  .symptom-box .sym-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; }
+  .sym-label-bad { color: #b91c1c; }
+  .sym-label-good { color: #166534; }
+  .poc-terminal { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; background: #1e1e2e; color: #cdd6f4; border-radius: 8px; padding: 12px 14px; line-height: 1.7; }
+  .poc-line { display: block; white-space: pre-wrap; word-break: break-all; }
+  .poc-req { color: #89b4fa; }
+  .poc-status-bad { color: #f38ba8; font-weight: 700; }
+  .poc-status-good { color: #a6e3a1; font-weight: 700; }
+  .poc-note { color: #a6adc8; }
+  .poc-caption { font-size: 12px; color: #6b7280; margin-top: 10px; }
+
+  /* 原因分析 */
+  .cause-box { background: white; border: 1px solid #fca5a5; border-radius: 10px; overflow: hidden; margin-bottom: 16px; }
+  .cause-header { background: #fef2f2; padding: 12px 18px; display: flex; align-items: center; gap: 8px; }
+  .cause-header .icon { font-size: 16px; }
+  .cause-header .title { font-size: 13px; font-weight: 700; color: #991b1b; }
+  .cause-body { padding: 16px 18px; }
+  .cause-body p { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+
+  .mismatch-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 4px; }
+  .mismatch-table th { padding: 7px 12px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .mismatch-table td { padding: 8px 12px; border: 1px solid #e5e5e5; }
+  .mismatch-table .code { font-family: 'SF Mono', 'Fira Code', monospace; }
+  .mismatch-table .mismatch { background: #fef2f2; }
+  .mismatch-table .match { background: #f0fdf4; }
+
+  /* 破壊的変更バナー */
+  .breaking-box { background: #1a1a1a; color: #fff; border-radius: 10px; padding: 18px 20px; margin-bottom: 24px; display: flex; gap: 14px; align-items: flex-start; }
+  .breaking-box .icon { font-size: 22px; flex-shrink: 0; }
+  .breaking-box .title { font-size: 14px; font-weight: 700; margin-bottom: 6px; color: #fde047; }
+  .breaking-box p { font-size: 13px; color: #e5e5e5; margin-bottom: 8px; }
+  .breaking-box code { background: rgba(255,255,255,0.12); padding: 1px 5px; border-radius: 3px; font-family: 'SF Mono', 'Fira Code', monospace; }
+  .breaking-box .ok-note { background: rgba(74, 222, 128, 0.15); border: 1px solid rgba(74, 222, 128, 0.4); border-radius: 6px; padding: 8px 12px; font-size: 12px; color: #bbf7d0; margin-top: 8px; }
+
+  /* Code blocks */
+  .file-change { margin-bottom: 16px; }
+  .file-name { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; background: #f3f4f6; color: #374151; padding: 5px 10px; border-radius: 4px 4px 0 0; border: 1px solid #e5e5e5; border-bottom: none; display: flex; justify-content: space-between; }
+  .diff-stat { color: #888; }
+  .code-block { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.7; background: #1e1e2e; color: #cdd6f4; padding: 14px 16px; border-radius: 0 0 6px 6px; overflow-x: auto; }
+  .code-line { display: flex; }
+  .line-num { color: #45475a; min-width: 28px; user-select: none; }
+  .line-add { background: rgba(166, 227, 161, 0.12); color: #a6e3a1; }
+  .line-del { background: rgba(243, 139, 168, 0.12); color: #f38ba8; }
+  .line-ctx { color: #cdd6f4; }
+  .line-prefix { min-width: 14px; }
+  .annotation { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-size: 12px; color: #78350f; display: flex; gap: 8px; }
+  .annotation-icon { font-size: 14px; flex-shrink: 0; }
+
+  /* 実装メモ */
+  .note-box { background: white; border: 1px solid #e5e5e5; border-radius: 10px; padding: 16px 18px; margin-bottom: 12px; }
+  .note-box .note-title { font-size: 12px; font-weight: 700; color: #1a1a1a; margin-bottom: 6px; }
+  .note-box p { font-size: 13px; color: #4b5563; }
+  .tradeoff-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 16px 18px; margin-bottom: 12px; }
+  .tradeoff-box .note-title { font-size: 12px; font-weight: 700; color: #92400e; margin-bottom: 6px; }
+  .tradeoff-box p { font-size: 13px; color: #78350f; }
+
+  /* AC cards */
+  .ac-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
+  .ac-header { display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-bottom: 1px solid #f0f0f0; }
+  .ac-check { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .ac-check.done { background: #dcfce7; color: #166534; }
+  .ac-num { font-size: 11px; font-weight: 700; color: #888; }
+  .ac-text { font-size: 13px; font-weight: 600; flex: 1; }
+  .ac-body { padding: 14px 18px; font-size: 13px; color: #4b5563; }
+
+  /* Verify */
+  .verify-list { list-style: none; }
+  .verify-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; }
+  .verify-item:last-child { border-bottom: none; }
+  .verify-num { width: 22px; height: 22px; background: #e8f0fe; color: #1a56db; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .verify-content { flex: 1; }
+  .verify-content strong { font-size: 13px; color: #1a1a1a; display: block; margin-bottom: 3px; }
+  .verify-content span { font-size: 12px; color: #6b7280; }
+
+  /* Regression mapping table */
+  .regression-box { background: white; border: 1px solid #e5e5e5; border-radius: 10px; padding: 16px 18px; }
+  .regression-box p { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+  .mapping-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .mapping-table th { padding: 7px 10px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 10.5px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; text-align: left; }
+  .mapping-table td { padding: 8px 10px; border: 1px solid #e5e5e5; vertical-align: top; }
+  .mapping-table .code { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11.5px; color: #374151; }
+  .mapping-table .findingkey { font-family: 'SF Mono', 'Fira Code', monospace; font-weight: 700; color: #991b1b; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="sprint-label">Sprint 20 Review · Security Bug Fix</div>
+  <h1>#38 — JWT署名鍵が公開のplaceholder値で稼働し、<br>資格情報なしで任意ユーザ/ADMINのトークンを偽造できる</h1>
+  <div class="meta">
+    <span class="badge badge-sprint">Sprint 20</span>
+    <span class="badge badge-issue">#38</span>
+    <span class="badge badge-bug">bug</span>
+    <span class="badge badge-security">security</span>
+    <span class="badge badge-critical">Critical (L3 as-run)</span>
+  </div>
+
+  <!-- 発生事象 -->
+  <section>
+    <h2>発生事象（SEC ライブPoC実測）</h2>
+    <p style="font-size:13px; color:#4b5563; margin-bottom:16px;">
+      backend は git 追跡下の <code style="font-family:'SF Mono',monospace; background:#f3f4f6; padding:1px 5px; border-radius:3px;">.env.example</code>
+      に平文で書かれた placeholder 鍵（<code style="font-family:'SF Mono',monospace; background:#f3f4f6; padding:1px 5px; border-radius:3px;">please-replace-with-a-random-secret-of-at-least-32-bytes</code>）で
+      JWT を署名・検証していた。起動時の fail-fast 検証は<b>鍵の長さ（32byte以上）しか見ておらず</b>、この既知の公開値でも普通に起動してしまう。
+      その結果、<b>リポジトリを読めるだけの第三者が、資格情報なしに任意ユーザ・任意ロール（ADMIN）の有効な JWT を偽造できる</b>状態だった。
+    </p>
+    <div class="symptom-grid">
+      <div class="symptom-box">
+        <div class="sym-label sym-label-bad">修正前（バグあり）</div>
+        <div class="poc-terminal">
+<span class="poc-line poc-req">$ curl -H "Cookie: access_token=&lt;.env.exampleの公開鍵で偽造&gt;" \</span>
+<span class="poc-line poc-req">       https://backend/api/account/me</span>
+<span class="poc-line poc-status-bad">← 200 OK</span>
+<span class="poc-line poc-note">   氏名・email・電話・住所（他人のPII）を資格情報なしで取得</span>
+<span class="poc-line">&nbsp;</span>
+<span class="poc-line poc-req">$ curl -H "Cookie: access_token=&lt;roles:[ADMIN]を偽造&gt;" \</span>
+<span class="poc-line poc-req">       https://backend/api/secured/ping</span>
+<span class="poc-line poc-status-bad">← 200 OK</span>
+<span class="poc-line poc-note">   ADMIN限定 @PreAuthorize を突破（垂直昇格）</span>
+        </div>
+        <div class="poc-caption">出典: <code style="font-family:'SF Mono',monospace;">reports/after/l3-security-regression-backend.md</code> §2.1 N1（SEC run <code style="font-family:'SF Mono',monospace;">security/20260819_01</code>）</div>
+      </div>
+      <div class="symptom-box">
+        <div class="sym-label sym-label-good">修正後（正常）</div>
+        <div class="poc-terminal">
+<span class="poc-line poc-req">$ curl -H "Cookie: access_token=&lt;.env.exampleの公開鍵で偽造&gt;" \</span>
+<span class="poc-line poc-req">       https://backend/api/auth/me</span>
+<span class="poc-line poc-status-good">← 401 Unauthorized</span>
+<span class="poc-line poc-note">   PII取得を阻止</span>
+<span class="poc-line">&nbsp;</span>
+<span class="poc-line poc-req">$ curl -H "Cookie: access_token=&lt;roles:[ADMIN]を偽造&gt;" \</span>
+<span class="poc-line poc-req">       https://backend/api/secured/ping</span>
+<span class="poc-line poc-status-good">← 401 Unauthorized</span>
+<span class="poc-line poc-note">   垂直昇格を阻止</span>
+<span class="poc-line">&nbsp;</span>
+<span class="poc-line poc-req">$ JWT_SECRET=please-replace-with... ./gradlew bootRun</span>
+<span class="poc-line poc-status-good">← 起動失敗（denylistメッセージ）</span>
+<span class="poc-line poc-note">   稼働そのものを許さない（根本対策）</span>
+        </div>
+        <div class="poc-caption">上2件は新設 <code style="font-family:'SF Mono',monospace;">JwtForgedTokenL3RegressionSpec</code>（IT）で固定・下1件は実機で1回実測（DoD3）</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 原因分析 -->
+  <section>
+    <h2>原因分析</h2>
+    <div class="cause-box">
+      <div class="cause-header">
+        <span class="icon">🔍</span>
+        <span class="title">fail-fast検証が「鍵の長さ」しか見ていなかった</span>
+      </div>
+      <div class="cause-body">
+        <p>
+          <code>JwtProperties.java:19,30-37</code>（修正前）は最小鍵長（32byte）のみを検証していた。
+          <code>.env.example</code> の placeholder は56byteあり、この検証を素通りする。README の手順も
+          「<code>.env.example</code> を <code>.env</code> にコピーして値を設定する」という導線で、値の差し替えを強制していなかった。
+          対照として、<b>別の秘密鍵で署名したトークンは正しく401になる</b>ことをSECが確認済み＝署名検証ロジック自体は正常。根本原因は「鍵そのものが公開されていること」。
+        </p>
+        <table class="mismatch-table">
+          <tr>
+            <th>検証項目</th>
+            <th>修正前</th>
+            <th>修正後</th>
+          </tr>
+          <tr>
+            <td>鍵の長さ（≥32byte）</td>
+            <td class="code match">検証あり</td>
+            <td class="code match">維持（既存のまま）</td>
+          </tr>
+          <tr>
+            <td>既知 placeholder / 弱いリテラル</td>
+            <td class="code mismatch">検証なし</td>
+            <td class="code match">denylist で拒否（AC1）</td>
+          </tr>
+          <tr>
+            <td>最小エントロピー（ユニーク文字数）</td>
+            <td class="code mismatch">検証なし</td>
+            <td class="code match">24未満は拒否（AC2・補助）</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- 破壊的変更バナー -->
+  <section>
+    <h2>⚠️ 破壊的変更（Sprint Reviewでの実機確認に影響）</h2>
+    <div class="breaking-box">
+      <span class="icon">⚠️</span>
+      <div>
+        <div class="title">.env.example をそのままコピーした .env では backend が起動しなくなります</div>
+        <p>今回のdenylistには <code>.env.example</code> の実リテラル値が恒久的に含まれるため、README の手順どおりコピーしただけの
+          <code>.env</code>（値を差し替えていないもの）は<b>起動時に必ず拒否される</b>ようになりました。既に稼働・開発中の環境で
+          <code>JWT_SECRET</code> が <code>please-replace-with-a-random-secret-of-at-least-32-bytes</code> のままの場合は、
+          <code>openssl rand -base64 32</code> 等で生成した値へ差し替える必要があります。</p>
+        <div class="ok-note">
+          ✓ DEVがローカル環境の <code>.env</code> を調査した結果、<code>JWT_SECRET</code> は既に64文字・ユニーク43種の乱数値へローテート済み
+          （L3 PoC実施後にSECが差し替え）でした。denylist・エントロピー検証とも問題なく通過するため、<b>現ローカル環境では追加作業は不要</b>です。
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 改修内容 -->
+  <section>
+    <h2>改修内容</h2>
+
+    <div class="file-change">
+      <div class="file-name">
+        <span>src/main/java/.../infrastructure/security/JwtSecretPolicy.java（新規）</span>
+        <span class="diff-stat">+99</span>
+      </div>
+      <div class="code-block">
+        <div class="code-line line-ctx"><span class="line-num">20</span><span class="line-prefix"> </span><span>final class JwtSecretPolicy {</span></div>
+        <div class="code-line line-add"><span class="line-num">32</span><span class="line-prefix">+</span><span>  private static final Set&lt;String&gt; DENYLIST = Set.of(</span></div>
+        <div class="code-line line-add"><span class="line-num">34</span><span class="line-prefix">+</span><span>      "please-replace-with-a-random-secret-of-at-least-32-bytes",</span></div>
+        <div class="code-line line-add"><span class="line-num">35</span><span class="line-prefix">+</span><span>      "changeme", "change-me", "changeit", ..., "secret", "password", ...);</span></div>
+        <div class="code-line line-add"><span class="line-num">69</span><span class="line-prefix">+</span><span>  static void validate(String secret) {</span></div>
+        <div class="code-line line-add"><span class="line-num">70</span><span class="line-prefix">+</span><span>    String normalized = secret.trim().toLowerCase(Locale.ROOT);</span></div>
+        <div class="code-line line-add"><span class="line-num">71</span><span class="line-prefix">+</span><span>    if (DENYLIST.contains(normalized)) { throw new IllegalStateException(...); } // (1) denylist</span></div>
+        <div class="code-line line-add"><span class="line-num">79</span><span class="line-prefix">+</span><span>    if (keyBytes.length &lt; MIN_SECRET_BYTES) { throw ...; }  // (2) 最小鍵長（既存維持）</span></div>
+        <div class="code-line line-add"><span class="line-num">89</span><span class="line-prefix">+</span><span>    if (uniqueChars &lt; MIN_UNIQUE_CHARS) { throw ...; }       // (3) 最小エントロピー</span></div>
+        <div class="code-line line-ctx"><span class="line-num">99</span><span class="line-prefix"> </span><span>}</span></div>
+      </div>
+      <div class="annotation">
+        <span class="annotation-icon">💡</span>
+        <span>検証順序は (1) denylist → (2) 鍵長 → (3) エントロピー。denylistを最初に置くことで、短い placeholder（例: <code>changeme</code>）でも「鍵長不足」ではなく対処が明確な専用メッセージになる。例外メッセージには秘密の値そのものを含めない（AC3）。</span>
+      </div>
+    </div>
+
+    <div class="file-change">
+      <div class="file-name">
+        <span>src/main/java/.../infrastructure/security/JwtProperties.java</span>
+        <span class="diff-stat">-9 / +2</span>
+      </div>
+      <div class="code-block">
+        <div class="code-line line-ctx"><span class="line-num">24</span><span class="line-prefix"> </span><span>  public JwtProperties(</span></div>
+        <div class="code-line line-ctx"><span class="line-num">25</span><span class="line-prefix"> </span><span>      @Value("${jwt.secret}") String secret, ...) {</span></div>
+        <div class="code-line line-del"><span class="line-num">-</span><span class="line-prefix">-</span><span>    byte[] keyBytes = secret.getBytes(...);</span></div>
+        <div class="code-line line-del"><span class="line-num">-</span><span class="line-prefix">-</span><span>    if (keyBytes.length &lt; MIN_SECRET_BYTES) { throw new IllegalStateException(...); }</span></div>
+        <div class="code-line line-add"><span class="line-num">28</span><span class="line-prefix">+</span><span>    JwtSecretPolicy.validate(secret);</span></div>
+        <div class="code-line line-add"><span class="line-num">29</span><span class="line-prefix">+</span><span>    this.signingKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));</span></div>
+      </div>
+      <div class="annotation">
+        <span class="annotation-icon">💡</span>
+        <span>検証ロジックは<code>JwtSecretPolicy</code>（DB非依存のpackage-private final）へ集約。<code>JwtProperties</code>は呼び出すだけにし、高速な単体テストで境界値を網羅できるようにした。</span>
+      </div>
+    </div>
+
+    <div class="file-change">
+      <div class="file-name">
+        <span>README.md（秘密管理節）</span>
+        <span class="diff-stat">+4 / -1</span>
+      </div>
+      <div class="code-block">
+        <div class="code-line line-ctx"><span class="line-num">54</span><span class="line-prefix"> </span><span>1. `.env.example` を `.env` にコピーして値を設定する（`.env` は `.gitignore` 対象）。</span></div>
+        <div class="code-line line-add"><span class="line-num">56</span><span class="line-prefix">+</span><span>   ⚠️ 破壊的変更（#38）: .env.example の JWT_SECRET はダミー値であり、そのままコピーしただけでは</span></div>
+        <div class="code-line line-add"><span class="line-num">56</span><span class="line-prefix">+</span><span>   backend が起動しない（既知 placeholder として denylist で拒否される）。必ず openssl rand ...</span></div>
+        <div class="code-line line-add"><span class="line-num">57</span><span class="line-prefix">+</span><span>   本番デプロイでは実秘密を環境変数/シークレットストアから注入する運用とする旨も明記（AC4）。</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 実装メモ -->
+  <section>
+    <h2>実装メモ（仕様外の判断・変更・妥協点）</h2>
+    <div class="note-box">
+      <div class="note-title">既存テスト鍵フィクスチャの一括是正（不可避な付随作業）</div>
+      <p>AC2（ユニーク文字数24未満で起動不可）を導入すると、既存の統合テストが使っていたテスト用鍵（例:
+        <code>"a" * 32</code>＝ユニーク1種）が軒並みコンテキスト起動失敗になることが計画時点で判明していた。
+        新設 <code>support/TestJwtSecrets</code>（<code>STRONG</code>/<code>ENV_EXAMPLE_PLACEHOLDER</code>/<code>LOW_ENTROPY</code>）に集約し、
+        5ファイル（<code>IntegrationTestBase</code>/<code>JwtServiceSpec</code>/<code>JwtAuthenticationFilterSpec</code>/<code>JwtPropertiesSpec</code>/<code>ApplicationBootFailFastSpec</code>）を一括是正した。</p>
+    </div>
+    <div class="note-box">
+      <div class="note-title">ApplicationContextRunner の Duration 変換の罠</div>
+      <p>起動失敗そのものを固定する新規 <code>JwtSecretContextFailFastSpec</code> を素の <code>ApplicationContextRunner</code> で組んだところ、
+        Spring Boot 拡張の <code>Duration</code> コンバータが無いため <code>JWT_SECRET</code> の値に関わらず常にコンテキスト起動が失敗し、
+        AC-neg1/AC-neg2 が「別の理由での起動失敗」に紛れて偽陽性GREENになる罠があった。<code>conversionService</code> という bean 名で
+        <code>ApplicationConversionService</code> を明示登録して解消した。</p>
+    </div>
+    <div class="note-box">
+      <div class="note-title">宙吊り参照の是正</div>
+      <p><code>JwtPropertiesSpec</code> javadoc の <code>{@link SecretFailFastSpec}</code>（実在しないクラス）を、実在する
+        <code>{@link ApplicationBootFailFastSpec}</code> へ修正した（#38 改修方針4のとおり）。</p>
+    </div>
+    <div class="tradeoff-box">
+      <div class="note-title">意図的な設計: .env.example の値そのものは変更しない</div>
+      <p>PO判断により、<code>.env.example</code> の <code>JWT_SECRET</code> 値は据え置いた。値を変えずdenylistへ恒久収録することで
+        「コピーしただけでは起動しない」＝実運用不能化を達成する。将来 <code>.env.example</code> の値を変更しても、過去に配布した値を
+        denylist から削除しないこと（既存の <code>.env</code> コピーが黙って残り続けるため）。DBの資格情報（<code>DB_USERNAME</code>/<code>DB_PASSWORD</code>）は
+        本Issue対象外（別Issue #43(C)(E) のスコープ）。</p>
+    </div>
+  </section>
+
+  <!-- AC確認 -->
+  <section>
+    <h2>AC確認</h2>
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC1</div><div class="ac-text">既知 placeholder 値の denylist で起動失敗（fail-fast）</div></div>
+      <div class="ac-body"><code>.env.example</code> の実リテラルを恒久収録。<code>changeme</code>/<code>secret</code>/<code>password</code> 等の弱いリテラルも収録。判定は前後空白除去・大文字小文字非依存の完全一致。</div>
+    </div>
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC2</div><div class="ac-text">最小エントロピー要件（ユニーク文字数24未満で起動不可）を補助として追加</div></div>
+      <div class="ac-body">既存の最小鍵長（32byte）検証は維持したまま追加。denylistが主・本ACは補助という位置づけ。</div>
+    </div>
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC3</div><div class="ac-text">起動失敗時の例外メッセージに秘密の値そのものを含めない</div></div>
+      <div class="ac-body">denylist側・エントロピー側とも対処方法（<code>openssl rand -base64 32</code>）のみ提示し、入力値は出力しない。<code>JwtSecretPolicySpec</code>で固定。</div>
+    </div>
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC4</div><div class="ac-text">README秘密管理節を更新し、差し替え必須を明記</div></div>
+      <div class="ac-body">「そのままでは起動しない」旨と本番デプロイでの実秘密注入運用を明記（運用そのものの動作確認は対象外・PO判断）。</div>
+    </div>
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC-neg1</div><div class="ac-text">.env.example の値のまま設定した状態では起動しない</div></div>
+      <div class="ac-body"><code>JwtSecretContextFailFastSpec</code>で固定。実機でも1回実測（DoD3）。</div>
+    </div>
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC-neg2</div><div class="ac-text">ユニーク文字数24未満では起動しない／正当な鍵では正常起動</div></div>
+      <div class="ac-body">同上Specで両方向を固定（誤って正当な鍵を拒否しないことも確認）。</div>
+    </div>
+  </section>
+
+  <!-- 動作確認ポイント -->
+  <section>
+    <h2>動作確認ポイント（ユーザー確認用）</h2>
+    <ul class="verify-list">
+      <li class="verify-item">
+        <div class="verify-num">1</div>
+        <div class="verify-content">
+          <strong>今まで通り backend が起動し、ログインできること</strong>
+          <span>ローカルの .env は既に乱数値へ差し替え済みのため、追加作業なしで <code>./gradlew bootRun</code> → <code>/api/ping</code>・<code>/actuator/health</code> が200になることを確認</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">2</div>
+        <div class="verify-content">
+          <strong>.env.example の値のままでは backend が起動しなくなっていること</strong>
+          <span>JWT_SECRET を .env.example の値に一時的に差し替えて起動 → 起動失敗し、秘密値を含まないエラーメッセージが表示されることを確認（元に戻せば通常起動）</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">3</div>
+        <div class="verify-content">
+          <strong>README の秘密管理節に破壊的変更の注記が追加されていること</strong>
+          <span>「.env.example のJWT_SECRETはダミー値であり差し替え必須」の一文が明記されているか確認</span>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- 再発防止 -->
+  <section>
+    <h2>再発防止（L3 finding → 回帰テスト 対応表）</h2>
+    <div class="regression-box">
+      <p>SECが実測したライブPoC（N1）を、CIで恒常的に守れる回帰テストへ変換した。今後この経路が再び開いても、テストが確実に失敗する。</p>
+      <table class="mapping-table">
+        <tr><th>L3</th><th>Issue/AC</th><th>テストクラス</th><th>概要</th></tr>
+        <tr><td class="findingkey">N1 live PoC(偽造token)</td><td>AC-neg1相当</td><td class="code">JwtForgedTokenL3RegressionSpec（新規IT）</td><td>.env.example実鍵の偽造access token → /api/auth/me 401</td></tr>
+        <tr><td class="findingkey">N1 live PoC(ADMIN捏造)</td><td>Q3</td><td class="code">同上</td><td>同鍵 roles:["ADMIN"] → /api/secured/ping 401</td></tr>
+        <tr><td class="findingkey">N1 根因</td><td>AC-neg1</td><td class="code">JwtSecretContextFailFastSpec（新規）</td><td>.env.exampleの値ではコンテキスト起動失敗</td></tr>
+        <tr><td class="findingkey">N1 補助</td><td>AC2/AC-neg2</td><td class="code">同上</td><td>ユニーク24未満で起動失敗／openssl rand -base64 32相当は正常起動</td></tr>
+        <tr><td class="findingkey">N1 denylist/メッセージ</td><td>AC1/AC3</td><td class="code">JwtSecretPolicySpec（新規unit）</td><td>trim/大小文字非依存の完全一致・秘密値非露出</td></tr>
+        <tr><td class="findingkey">N1 鍵長維持</td><td>AC2</td><td class="code">JwtPropertiesSpec（改修）</td><td>32byte未満は例外＋宙吊り参照是正</td></tr>
+      </table>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>

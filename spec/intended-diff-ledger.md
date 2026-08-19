@@ -20,7 +20,7 @@
 | **ID-8** | 実カード列を永続化・カード欄必須（ダミー処理） | カード列/入力欄/必須検証を撤去・支払プレースホルダ（文言はカード情報を「扱わない/保持しない」旨を明示。孤立したカード型残骸〔frontend enum/定数〕も撤去、DBのm_code区分値0002は温存） | 機微データ非保持 | F3.6 決定 / Sprint15 決定 2026-08-17 | #12, #22 |
 | **ID-9** | 注文確定が GET リンクで成立（状態変更 GET）・CSRF 全域不在 | 非冪等 POST＋CSRF トークン | CSRF 防止 | SBD-3 / S5,R6 | #8, #6, #16, #18 |
 | **ID-10** | ログイン/登録成功時にセッションID 非再生成（固定化） | ログイン/登録時にセッション再生成 | 固定化防止 | SBD-4 / S8,R7 | #18, #13 |
-| **ID-11** | 資格情報を GET でも受理・`j2ee/j2ee` プリフィル・ロックアウト無し（ログイン）／登録試行に列挙対策なし（メール検証は #32 へ分離） | POST body 限定・プリフィル廃止・レート制限/ロックアウト（ログイン=`t_login_attempt`・登録=`t_register_attempt`、いずれも DB-backed。architecture-conventions D7） | 認証堅牢化 | SBD-6 / S10,S11,R10,R13,S12,R14 | #20, #13 |
+| **ID-11** | 資格情報を GET でも受理・`j2ee/j2ee` プリフィル・ロックアウト無し（ログイン）／登録試行に列挙対策なし（メール検証は #32 へ分離） | POST body 限定・プリフィル廃止・レート制限/ロックアウト（ログイン=`t_login_attempt`・登録=`t_register_attempt`、いずれも DB-backed。architecture-conventions D7）。ゲートは「照合前にスロットを原子確保」する方式のため、成功ログインも枠を1つ消費する意味論を伴う（同一usernameへの高並行「成功」ログインが`max-attempts`超で一過性401になり得るが、`recordSuccess`のDELETEで即自己回復する受容済みトレードオフ・Sprint20決定） | 認証堅牢化 | SBD-6 / S10,S11,R10,R13,S12,R14 | #20, #13, #41 |
 | **ID-12** | `forwardAction` を無検証 `sendRedirect`（オープンリダイレクト） | リダイレクト先は allowlist/相対のみ | フィッシング防止 | SBD-9 / S9,R11 | #20 |
 | **ID-13** | 現在PW 未確認で PW 変更 | 現在PW 確認/再認証を必須 | 機微操作保護 | SBD-16 / S6 | #15 |
 | **ID-14** | stale-session/不正 ID で 500＋スタックトレース露出（3経路） | 404/空へ正規化・trace 非露出 | 情報漏えい防止 | SBD-10 / S18,R9 | #3, #2, #10, #23 |
@@ -34,7 +34,7 @@
 | **ID-22** | `status="P"` 固定1行（orderstatus: linenum=orderId 等の異形） | 固定プレースホルダ・状態変更は監査ログに記録（注文作成は成功・失敗いずれも `ORDER_CREATE` イベントとして記録し、失敗時は `result=FAILURE`） | スコープ簡素化 | E3 決定 / SBD-14 | #8, #22 |
 | **ID-23** | orderId 採番が select→+1→update（非アトミック・重複リスク） | DB 原子採番 | 正確性/並行安全 | D6 | #8, #22 |
 | **ID-24** | 注文詳細（履歴経由）で明細の商品名が空 | 商品名を表示（非等価改善） | UX 改善 | E3 決定 2026-08-11 | #10 |
-| **ID-25** | Axis 管理PW/認証情報をソースに平文・HTTP 平文・Cookie フラグ欠落 | シークレットストア・TLS 前提・Secure/HttpOnly/SameSite | 設定衛生 | SBD-11 / SBD-15 / S17,S19,R15,R16 | #23, #24 |
+| **ID-25** | Axis 管理PW/認証情報をソースに平文・HTTP 平文・Cookie フラグ欠落 | シークレットストア・TLS 前提・Secure/HttpOnly/SameSite。JWT 署名鍵は起動時 fail-fast を denylist（既知 placeholder・弱リテラルの恒久収録）→最小鍵長 32byte（既存維持）→ユニーク文字数 24 以上（補助）の3段に強化し、`.env.example` 配布値のままでは起動不能化（Sprint20決定。将来値を変更しても過去配布値は denylist から削除しない） | 設定衛生 | SBD-11 / SBD-15 / S17,S19,R15,R16 | #23, #24, #38 |
 | **ID-26** | EOL/脆弱依存（Struts1.2.9/Axis1.4/Spring3.1/hsqldb1.8…）・版レンジ未固定 | 保守された現行版・版固定（`jpetstore-database`: `mysql-connector-j` はCVE-2023-22102〔HIGH〕確認のため`8.0.33→26.7.0`へ更新。他5依存〔Flyway/Spock/Testcontainers等〕は重大CVE・EOLとも未確認のため据え置き。更新判断基準＝「EOLまたは重大CVE確認時のみ更新」） | 依存健全化 | SBD-12 / S20,S21,R12,R17 | #23, #26 |
 | **ID-27** | 多言語＝english/japanese（日英 JSP 同梱） | i18n 基盤（文言外部化）を実装。日本語ローカライズは **#25 で完了**（`ja.ts` 全キー翻訳・ヘッダー言語切替UI・DB権威〔`m_profile.language_preference`〕での跨デバイス追従）。数値・日付フォーマットは、日付を `datetimeFormats.ja` 新設＋OrderHistory/OrderDetailの2箇所へ適用、通貨は既存の全画面インラインIntl（`style:'currency'`）がlocale連動済みのため維持し名前付きnumberFormatsは追加せず（m_code は日英データ保有済＝D4） | スコープ決定（段階的ローカライズ・#25で完結） | E4②/E5① 決定 / backlog #25 / Sprint19決定 2026-08-18 | #24, #13, #25 |
 | **ID-31** | テーマ/配色の切替機能なし（固定配色・legacyに比較対象概念自体が無い） | ライト/ダーク/システム連動のテーマ切替UIをヘッダーに新設。ヘッダーで即時切替（localStorage）＋アカウント保存時にDB永続化（`m_profile.color_scheme_preference`）・DB権威で跨デバイス追従。AccountEditにも同等のテーマ/言語selectを追加（ヘッダーと対称・preferences store単一化で二重ソース回避） | 新規UX（配色パーソナライズ・OS追従） | Sprint19決定 2026-08-18 | #36, #25 |
