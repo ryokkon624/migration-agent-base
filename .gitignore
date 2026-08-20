@@ -21,3 +21,4 @@ build/
 /tools/legacy-jacoco/jacocoagent.jar
 /tools/legacy-jacoco/jacococli.jar
 /tools/legacy-jacoco/out/
+/tools/legacy-jacoco/out*/

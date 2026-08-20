@@ -65,7 +65,7 @@ cd ../migration-agent-base
 # 5. graceful停止（★ docker stop -t 30 でないとexecが書かれない。強制停止しないこと）
 docker stop -t 30 jpetstore-legacy-jacoco-measure
 
-# 6. レポート生成（AC3手順4・コンテナはまだ削除しない＝docker cpでclassfilesを取り出すため）
+# 6. レポート生成（AC3手順4・AC5: 2本出し。コンテナはまだ削除しない＝docker cpでclassfilesを取り出すため）
 tools/legacy-jacoco/report.sh jpetstore-legacy-jacoco-measure \
   tools/legacy-jacoco/out/jacoco.exec tools/legacy-jacoco/out/report
 
@@ -73,9 +73,14 @@ tools/legacy-jacoco/report.sh jpetstore-legacy-jacoco-measure \
 docker rm jpetstore-legacy-jacoco-measure
 ```
 
-レポートは `tools/legacy-jacoco/out/report/index.html`（HTML）・`jacoco.xml`（XML）。
-`--classfiles`にはAC1で定義した分母（`domain`/`dao`配下のみ）だけを渡す（`web.struts`/`web.spring`/
-`service`はID-5/ID-6により分母から除外＝`report.sh`が自動的にこの2パッケージのみ抽出する）。
+`report.sh`は**PO合意（AC5）により2本のレポートを出力**する（`tools/legacy-jacoco/out/report/ac1/`＝
+AC1分母＝計測の分母29クラス/解析22・`tools/legacy-jacoco/out/report/gate/`＝ゲート分母＝
+AC1−到達不能3クラス＝判定用。それぞれ`index.html`/`jacoco.xml`/`jacoco.csv`）。あわせて、
+**到達不能3クラス（`SendOrderConfirmationEmailAdvice`/`MsSqlOrderDao`/`OracleSequenceDao`）の
+カバレッジが1つでも0を超えたら即座にfail**する（除外の前提「未配線=構造的に到達不能」が崩れたことを
+検知する反証チェック）。`--classfiles`にはAC1で定義した分母（`domain`/`dao`配下のみ）だけを渡す
+（`web.struts`/`web.spring`/`service`はID-5/ID-6により分母から除外＝`report.sh`が自動的にこの2パッケージ
+のみ抽出する）。
 
 ## 実測結果
 

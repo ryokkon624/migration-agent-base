@@ -206,3 +206,67 @@ itemIdの不一致や表定義の変更等でUPDATEが対象行に当たって�
 
 `./gradlew parityTest`（legacy停止状態・`--rerun`）: **BUILD SUCCESSFUL**（4 Spec・13テスト全green）。
 `./gradlew test integrationTest`: 既存26本含め全green（非干渉を再確認）。
+
+---
+
+## レビュー対応: #50因果分析の訂正＋PO合意ゲート値の反映（SM指摘×2ラウンド）
+
+### ラウンド1: `SendOrderConfirmationEmailAdvice`の因果分析を実コードで確定
+
+初出レポートは「メールサーバ接続不能等でadvice冒頭からリターンしている可能性」と推測していたが、
+`legacy-jpetstore/src/main/webapp/WEB-INF/applicationContext.xml`を確認したところ、**bean定義と
+advisor設定の両方がコメントアウトされ一度もインスタンス化されない**ことを確認した（legacy無改変・
+調査のみ）。`SendOrderConfirmationEmailAdvice.java`のソースも確認し、branch内訳
+（`mailSender == null`判定=1分岐2アウトカム＋`account.getEmail()`のOR複合条件=2分岐4アウトカム＝
+計6アウトカム）が実測「6 of 6」と一致することも確認した。`reports/after/l2-parity-coverage.md`の
+§3因果分析・§2到達可能分母の再計算（当時36分岐と算出）・§4次シナリオ候補・§5申し送りを差し替えた。
+`spec/l2-parity-design.md` §7.2にも、spikeの実測値は残したまま「次に足すべきシナリオ」の推論が
+誤りだった旨を訂正として追記した。
+
+### ラウンド2: 到達可能分母の数値誤り（36→34）とPO合意ゲート値の反映
+
+PO が`jacoco.csv`を直接パースした結果、**`MsSqlOrderDao`がBRANCH 0/2を持つ**ことが判明。ラウンド1の
+レポート§5が「`MsSqlOrderDao`（instruction 46）」とだけ書きbranch 2を落としていたため、到達不能分岐の
+集計から漏れ、「到達可能分母36」という誤った値が報告されていた（正しくは**34**）。実コードで独立検証
+（`jacoco.xml`を`grep -oP`で直接パースし`MsSqlOrderDao`のBRANCH counter=`missed="2" covered="0"`を確認・
+`OracleSequenceDao`はBRANCH counter自体が存在しない=総分岐数0であることも確認）。
+
+対応:
+
+- **レポート差し替え**: §2（dao.ibatis到達可能分母を10/22→10/20へ訂正・per-package LINE/INSTRUCTION
+  ゲート分母を`gate/jacoco.csv`から`awk`で再集計し正確な値へ差し替え）、§3（`MsSqlOrderDao`のbranch 2を
+  追記・根拠ファイルを行番号つきで追加）、§5（PO合意ゲート値を新設・全5項目を明記）、§6（新設）。
+- **根拠ファイルの実物確認**（legacy無改変・読み取りのみ）:
+  - `applicationContext.xml` L74-89（`aop:advisor` L80-82・bean L86-89）
+  - `dataAccessContext-local.xml` L68-73（`MsSqlOrderDao`）・L83-87（`OracleSequenceDao`）
+  - `web.xml` L36（activeな`contextConfigLocation`は`dataAccessContext-local.xml`）・L38（`-jta`版は
+    コメントアウトで未使用）。念のため`dataAccessContext-jta.xml`も確認し、同2クラスが同様に
+    コメントアウトされていることを確認（いずれの設定でも結論は不変）。
+- **`report.sh`を機構的な除外担保へ変更**（PO指摘「手計算の派生値はdriftする」への対応）:
+  1. `--classfiles`ツリーを2種類用意（AC1ツリー＝従来どおり全29クラス中解析対象22・
+     ゲートツリー＝到達不能3クラスの`.class`を削除したもの）
+  2. `jacococli report`を2回実行し`<out_dir>/ac1/`・`<out_dir>/gate/`へ`index.html`/`jacoco.xml`/
+     `jacoco.csv`を出力
+  3. AC1レポートの`jacoco.csv`から到達不能3クラスの行を取り出し、`INSTRUCTION_COVERED`/
+     `BRANCH_COVERED`が1でも0を超えたら`exit 1`でfail（ゲートレポート生成はこの検査通過後のみ）
+
+### `report.sh`の実行確認（実測・全て実施）
+
+全9シナリオを`jpetstore-legacy-jacoco`（overlayイメージ）に対して再実行し、`docker stop -t 30`
+（graceful）で停止後に新`report.sh`を実行した。
+
+- **AC1レポート**（22クラス解析）: 合計BRANCH 16/42・INSTRUCTION 1144/1765（既存レポート§2の
+  「合計（AC1分母）」と一致）。
+- **除外反証チェック**: 3クラスとも0カバレッジのまま＝`OK: all excluded classes remain at 0
+  coverage (exclusion premise holds).`
+- **ゲートレポート**（19クラス解析=22−3）: 合計**BRANCH 16/34=47.1%・INSTRUCTION 1144/1588=72.0%・
+  LINE 304/407=74.7%・CLASS 19/19=100%**。PO合意値と完全一致することを確認（`awk`によるCSV集計で
+  per-package値も再検証済み）。
+- **fail-pathの動作確認**: legacyの設定は変更できないため、`jacoco.csv`の`MsSqlOrderDao`行を
+  一時的に書き換えた合成データ（`instruction_covered=2`）を用意し、チェックロジック単体を実行。
+  期待どおり`FAIL: excluded class MsSqlOrderDao now has coverage ...`・終了コード1で失敗することを
+  確認した（legacy自体・実データは変更していない）。
+
+採取用コンテナは`docker stop -t 30`で停止後、レポート生成（`docker cp`でclassfiles抽出）を経てから
+削除済み。`jpetstore-legacy`イメージは無改変。`legacy-jpetstore`リポジトリも`git status`でクリーンな
+ままであることを確認済み（設定ファイルは読み取りのみで一切変更していない）。

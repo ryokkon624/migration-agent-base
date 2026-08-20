@@ -12,25 +12,26 @@
 
 ## 全体結論（サマリ）
 
-| 指標 | spike時点（読み取り系一部＋W1のみ・§7.2） | **本実測（#48+#49・全9シナリオ）** | 増分 |
+**PO とのゲート値合意が完了しました（AC5）。** 合意内容は §5 参照。
+
+| 指標 | spike時点（読み取り系一部＋W1のみ・§7.2） | **本実測（#48+#49・全9シナリオ・AC1分母）** | 増分 |
 | --- | --- | --- | --- |
 | **BRANCH** | 16/42 = 38.1% | **16/42 = 38.1%** | ±0（詳細は§2） |
 | LINE | 297/452 = 65.7% | **304/452 = 67.3%** | +7 lines |
 | INSTRUCTION | 1119/1765 = 63.4% | **1144/1765 = 64.8%** | +25 instructions |
 | CLASS | 19/22 = 86.4% | **19/22 = 86.4%** | ±0 |
 
-**ゲート値は本レポートでは決めない**（backlog #50 AC5のとおり、実測を提示したうえでSMがPOを起動し合意する。
-先に数値を決めると帳尻合わせになるため）。実測と分析は本レポートで完結させ、SMへ実測値を報告して
-ゲート値合意のステップへ引き継ぐ。
-
 分母の定義（29クラス・うちJaCoCoが解析対象とするのは22クラス。`web.struts`/`web.spring`はID-6、
 `service`/`service.client`はID-5によりそれぞれ除外）は下記§1のとおり（Issue #50 AC1で確定済み・変更なし）。
 
-> **【差し替え】到達不能分岐を除いた「到達可能分母」での再計算**（実コード裏取りで確定・§3参照）:
-> BRANCH分母42のうち**6分岐（`SendOrderConfirmationEmailAdvice`）は`applicationContext.xml`で
-> bean定義・advisorとも丸ごとコメントアウトされ一度もインスタンス化されない=構造的に到達不能**と判明した。
-> 到達可能な分母は **36分岐**、実測は**16/36 = 44.4%**（AC1の分母定義29クラス自体は変更しない。
-> あくまでAC5が求める「到達不能な分岐の除外理由」を明記したうえでの参考値）。
+> **【差し替え】到達不能分岐を除いた「ゲート分母」での再計算**（実コード裏取りで確定・§3参照。
+> ※初出時「36分岐」と報告したが、`MsSqlOrderDao`のBRANCH 2を除外計算に反映し忘れていた誤りがあり
+> **34分岐が正**。訂正の経緯は§5参照）:
+> BRANCH分母42のうち**8分岐（`SendOrderConfirmationEmailAdvice`6＋`MsSqlOrderDao`2）は
+> Spring設定でコメントアウトされ一度もインスタンス化されない=構造的に到達不能**と判明した
+> （`OracleSequenceDao`はBRANCH総数0のためbranch分母には影響しない）。
+> **ゲート分母は34分岐、実測は16/34 = 47.1%**（AC1の分母定義29クラス自体は変更しない。
+> AC5が求める「到達不能な分岐の除外理由」を明記したうえでの、PO合意済みのゲート判定用の値）。
 
 ---
 
@@ -54,18 +55,23 @@
 
 ## §2 パッケージ別の実測（BRANCH/LINE 中心）
 
-| パッケージ | BRANCH（AC1分母） | BRANCH（**到達可能分母**） | LINE | INSTRUCTION | 所見 |
+| パッケージ | BRANCH（AC1分母） | BRANCH（**ゲート分母**） | LINE（ゲート分母） | INSTRUCTION（ゲート分母） | 所見 |
 | --- | --- | --- | --- | --- | --- |
-| `domain` | 6/14 = 42.9%（spike同値） | 同左（到達不能分岐なし） | 211/253 = 83.4%（spike 81.4%から微増） | 746/909 = 82.1% | `Order`はbranch 100%（2/2）。`Account`はbranch 0%（0/4） |
-| `dao.ibatis` | 10/22 = 45.5%（spike同値） | 同左（到達不能分岐なし） | 90/99 = 90.9% | 310/475 = 65.3% | Category/Product/Sequence系DAOは軒並み100%。`SqlMapAccountDao`は0%（§3） |
-| **`domain.logic`** | 0/6 = 0.0%（spike同値） | **6分岐全て到達不能（§3）＝到達可能分母0** | 31/131 = 23.7%（spike 25.0%から微減\*） | 88/381 = 23.1% | **branch 0%は死んだコード(未配線advice)を分母に数えていた見かけ上のギャップ。§3参照** |
+| `domain` | 6/14 = 42.9%（spike同値） | 同左（到達不能分岐なし） | 211/253 = 83.4% | 746/909 = 82.1% | `Order`はbranch 100%（2/2）。`Account`はbranch 0%（0/4） |
+| `dao.ibatis` | 10/22 = 45.5%（spike同値） | **10/20 = 50.0%**（`MsSqlOrderDao`のBRANCH 2を除外） | 67/85 = 78.8% | 310/409 = 75.8% | Category/Product/Sequence系DAOは軒並み100%。`SqlMapAccountDao`は0%（§3） |
+| **`domain.logic`** | 0/6 = 0.0%（spike同値） | **6分岐全て到達不能（§3）＝ゲート分母0（n/a）** | 26/69 = 37.7% | 88/270 = 32.6% | **branch 0%は死んだコード(未配線advice)を分母に数えていた見かけ上のギャップ。§3参照** |
 | `dao` | n/a | n/a | n/a | n/a | インタフェースのみ（分岐なし・解析対象外） |
-| **合計** | **16/42 = 38.1%** | **16/36 = 44.4%** | 304/452 = 67.3% | 1144/1765 = 64.8% | 到達不能6分岐は全て`domain.logic`（advice）に集中 |
+| **合計（AC1分母）** | **16/42 = 38.1%** | — | 304/452 = 67.3% | 1144/1765 = 64.8% | — |
+| **合計（ゲート分母）** | — | **16/34 = 47.1%** | **304/407 = 74.7%** | **1144/1588 = 72.0%** | 到達不能8分岐（advice 6・`MsSqlOrderDao` 2）＋到達不能177 instruction（advice 111・`MsSqlOrderDao` 46・`OracleSequenceDao` 20） |
+
+（ゲート分母の数値は`tools/legacy-jacoco/report.sh`が機構的に生成した`gate/jacoco.csv`の実測値。§6参照）
+
+**CLASS（参考・ゲートにしない）**: AC1分母19/22=86.4% → ゲート分母**19/19=100%**（除外3クラス＝未カバー3クラスが
+完全一致。**除外の妥当性そのものの傍証**として残す。PO合意§5参照）。
 
 \* `domain.logic`のLINE分母がspike計測時（§7.2記載）と本実測でわずかに異なって見えるのは、
 spikeが読み取り系の一部（カテゴリ5・商品3・アイテム3）のみを対象にした暫定計測であるのに対し、
-本実測は#48+#49で確立した正式な9シナリオ全件を対象にしているため（母数となるクラス構成自体は不変・
-`domain.logic`は4クラス360命令のうち94命令をカバー）。
+本実測は#48+#49で確立した正式な9シナリオ全件を対象にしているため（母数となるクラス構成自体は不変）。
 
 ---
 
@@ -86,7 +92,7 @@ coverageは16/42のまま変化しなかった**。当初は「メールサー�
     <!--
     <aop:advisor pointcut="execution(* *..PetStoreFacade.insertOrder(*..Order))" advice-ref="emailAdvice"/>
     -->
-<\aop:config>
+</aop:config>
 
 <!-- AOP advice used to send confirmation email after order has been submitted -->
 <!--
@@ -118,11 +124,30 @@ branch数の内訳（6の由来）: `afterPropertiesSet()`の`mailSender == null
 | `AccountValidator` | branch: n/a・instruction 5% | アカウント系シナリオ未実装（W4/W5・下記§4）のため未踏 |
 | `PetStoreImpl` | branch: n/a（分岐なし）・instruction 77% | ファサードクラス。9シナリオでよく踏めている |
 
-`dao.ibatis`の`MsSqlOrderDao`（0%・46 instruction）・`OracleSequenceDao`（0%・20 instruction）も、
-HSQLDBデプロイでは**Spring設定上インスタンス化されない別DB向け実装**であり、シナリオ追加では**到達不能**
-（AC5「到達不能な分岐の除外理由」に該当）。分母定義（Issue #50 AC1）は変更しないが、ゲート値合意の際は
-この2クラス（合計66 instruction）＋`SendOrderConfirmationEmailAdvice`（6分岐）が構造的に到達不能である
-点を根拠として提示する（§5）。
+`dao.ibatis`の`MsSqlOrderDao`（instruction 0%・**branch 0/2**）・`OracleSequenceDao`（instruction 0%・
+branch総数0）も、HSQLDBデプロイでは**Spring設定上インスタンス化されない別DB向け実装**であり、シナリオ追加
+では**到達不能**（AC5「到達不能な分岐の除外理由」に該当）。分母定義（Issue #50 AC1）は変更しない。
+
+> **【訂正】`MsSqlOrderDao`のBRANCH 2を当初の集計から見落としていた。** 初出時は「到達不能な分岐は
+> `SendOrderConfirmationEmailAdvice`の6のみ・到達可能分母36」と報告したが、`MsSqlOrderDao`が
+> **BRANCH 0/2を持つ**ことが§2の集計に反映されていなかった（instruction 46のみ記載しbranchを落としていた）。
+> PO が`jacoco.csv`を直接パースして発見・SMが検算で確認した（未踏18分岐の内訳
+> ＝`SqlMapAccountDao` 4・`Account` 4・`SqlMapItemDao` 3・`Cart` 3・`SqlMapOrderDao` 2・
+> `SqlMapSequenceDao` 1・`CartItem` 1 → 16+18=34で整合）。**正しい到達不能分岐は8（advice 6＋
+> `MsSqlOrderDao` 2）、ゲート分母は34**（§5・§6の機構的チェックで今後同種のdriftを防ぐ）。
+
+到達不能な3クラスの根拠（設定ファイルの実物・行番号つき）:
+
+| クラス | 根拠ファイル:行 | 内容 |
+| --- | --- | --- |
+| `SendOrderConfirmationEmailAdvice` | `applicationContext.xml` L74-89 | `aop:advisor`（L80-82）・bean定義（L86-89）とも丸ごとコメントアウト |
+| `MsSqlOrderDao` | `dataAccessContext-local.xml` L68-73 | `orderDao` bean定義（MS SQL Server向け代替実装）がコメントアウト |
+| `OracleSequenceDao` | `dataAccessContext-local.xml` L83-87 | `sequenceDao` bean定義（Oracle向け代替実装）がコメントアウト |
+
+**除外根拠はactiveな設定に基づく**: `web.xml` L36の`contextConfigLocation`が実際に読み込むのは
+`dataAccessContext-local.xml`（L38の`-jta`版は丸ごとコメントアウトされ未使用）。念のため`-jta`版
+（`dataAccessContext-jta.xml`）も確認したが、`MsSqlOrderDao`（L79-84）・`OracleSequenceDao`（L96-100）
+とも同様にコメントアウトされており、**いずれの設定を採用しても結論は不変**。
 
 ---
 
@@ -133,7 +158,7 @@ HSQLDBデプロイでは**Spring設定上インスタンス化されない別DB�
 
 | # | 候補 | 対象 | 根拠 |
 | --- | --- | --- | --- |
-| 1 | **W4: アカウント新規登録**（`newAccountForm.do`→`newAccount.do`） | `Account`（branch 0/4）・`AccountValidator`（instruction 5%）・`SqlMapAccountDao`（instruction 34%・branch 0/4） | 最も明確な未踏クラス群。design.md §6-2で「次イテレーション」と位置付け済み。到達可能分岐（36分母）に対する寄与も最大 |
+| 1 | **W4: アカウント新規登録**（`newAccountForm.do`→`newAccount.do`） | `Account`（branch 0/4）・`AccountValidator`（instruction 5%）・`SqlMapAccountDao`（instruction 34%・branch 0/4） | 最も明確な未踏クラス群。design.md §6-2で「次イテレーション」と位置付け済み。ゲート分母（34分岐）に対する寄与も最大 |
 | 2 | **W5: アカウント編集**（`editAccountForm.do`→`editAccount.do`） | 同上（更新系分岐の追加） | 同上 |
 | 3 | **注文履歴照会**（`listOrders.do`/`viewOrder.do`） | `SqlMapOrderDao`（branch 50%・2/4未踏） | `dao.ibatis`の残存ギャップ最大手 |
 | 4 | **カート境界値**（空カートでの`removeItemFromCart.do`等） | `Cart`/`CartItem`（branch 50%） | W1〜W3で未踏の分岐が残る |
@@ -141,30 +166,117 @@ HSQLDBデプロイでは**Spring設定上インスタンス化されない別DB�
 
 ---
 
-## §5 ゲート値合意への申し送り（SM→PO）
+## §5 PO合意ゲート値（AC5・確定）
 
-- **実測（AC1分母）**: BRANCH 16/42=38.1%・LINE 304/452=67.3%・INSTRUCTION 1144/1765=64.8%・
-  CLASS 19/22=86.4%（全9シナリオ）。
-- **実測（到達可能分母・参考値）**: BRANCH **16/36=44.4%**（§2/§3。AC1の29クラス分母自体は変更しない）。
-- **到達不能な分岐/クラスの候補（計3クラス）**:
-  - `SendOrderConfirmationEmailAdvice`（branch 6・instruction 111）: `applicationContext.xml`で
-    bean定義・advisorとも丸ごとコメントアウトされ一度もインスタンス化されない。**実コードで確定
-    （§3）**・調査ではなく除外対象
-  - `MsSqlOrderDao`（instruction 46）・`OracleSequenceDao`（instruction 20）: 別DB向け実装で
-    HSQLDBデプロイでは到達不能（従来どおり）
-  - ゲート値合意の際、この3クラスの分母からの除外要否も含めて検討候補として提示する
-    （**本レポート時点では分母を変更していない**＝Issue #50 AC1の29クラスを維持）。
-- **`domain.logic`のbranch 0%**: シナリオ本数の問題ではなく、未配線advice（構造的に到達不能）を
-  分母に数えていたことによる見かけ上のギャップだった（§3で確定）。**追加調査は不要・除外対象として
-  扱う**。
-- **次イテレーション候補**: §4のW4/W5（アカウント系）・注文履歴照会が最有力（優先度繰り上げ）。
+PO とのゲート値合意が完了した。合意時に提示した「到達可能分母36」は誤りで、`MsSqlOrderDao`のBRANCH 2を
+除外集計に反映し忘れていたため**正しくは34**（§3の訂正参照。PO が`jacoco.csv`を直接パースして発見）。
+以下は訂正後の値で確定した合意内容。
+
+### 1. 指標: BRANCH（主）＋ INSTRUCTION（副）の二本立て
+
+- **LINE はゲートにしない**（INSTRUCTIONと冗長・報告のみ）。
+- **CLASS もゲートにしない**（除外後19/19=100%で弁別力ゼロ。ただし**除外集合と未カバークラス集合が
+  完全一致する＝除外の妥当性の傍証**として有用なのでレポートには残す＝§2）。
+- **INSTRUCTION併用の理由**: 除外後の`domain.logic`に残る3クラス（`PetStoreImpl`・`OrderValidator`・
+  `AccountValidator`）は**総分岐数0**で、BRANCH単独では踏めているか否かを原理的に観測できない
+  （`OrderValidator`はinstruction 3/111=2.7%という明確な実ギャップがある＝§3参照）。
+
+### 2. 分母: AC1（計測の分母）とゲート分母の二層構成
+
+- **AC1（29クラス/解析22）は変更せず「計測の分母」として維持**する（§1）。
+- その上に**ゲート分母＝AC1 − 到達不能3クラス**を新たに定義する（AC1の変更ではなく1層足す扱い）。
+- **両方の数値を必ず併記する**（§2）。片方だけにすると、含めれば理論上限34/42=81.0%の天井に対する
+  判定になり（AC1分母では到達不能8分岐が最初からBRANCH分母に混ざり満点を阻むため）、消せば
+  silentな打ち切りになる。
+
+### 3. ゲート値: 実測値そのものを非退行フロアに置く
+
+| 指標 | ゲート値 | 根拠 |
+| --- | --- | --- |
+| **BRANCH** | **≥ 16/34（47.0%）** | 実測そのもの |
+| **INSTRUCTION** | **≥ 1144/1588（72.0%）** | 実測そのもの |
+
+- **絶対数を正とし%は可読形**（丸めの議論を封じ、分母が動いたら即座に気づけるように）。
+  **分母の変更自体が再合意のトリガ**。
+- 根拠: 実測より上は#50にスコープクリープを強いる帳尻合わせ、下は無意味なゲート。
+- **現在値ちょうど＝「十分」ではなく「ここから下げない」という非退行フロア**（次イテレーションで
+  上げる方向のみを想定）。
+
+### 4. 運用: シナリオ集合が変わったときに評価
+
+- 評価契機は**コミット単位ではなく「シナリオ集合が変わったとき」**（＝`captureGolden`再実行時）。
+  legacyは凍結アーティファクトのためシナリオが変わらない限り数値は動かない。
+- 判定は当該Storyの**DoD**に載せ、SMがSprint Reviewで確認する。**フロア割れはDoneにしない**。
+- GitHub Actions導入時は`parityTest`のCIゲート化を進めてよいが、**カバレッジ計測はDocker legacy起動が
+  要るためper-PRジョブにしない**（シナリオ変更契機のジョブに留める）。
+- **フロアの引き上げはPO/SM確認のうえ手動**（**自動ラチェットはしない**＝計測ブレでの誤ラチェット防止）。
+
+### 5. 除外を機構で担保する（`report.sh`の2本出し＋除外反証fail）
+
+**手計算の派生値はdriftする**（今回の「36 vs 34」の取り違えがまさにその実例）。`tools/legacy-jacoco/report.sh`
+を、1つのexecから **(a) AC1分母のレポート**と**(b) ゲート分母のレポート**の**2本を出力**し、
+**除外3クラスのカバレッジが1つでも0を超えたらfailする**よう変更した（実装・実行確認は§6）。
+
+### 次イテレーション候補（暫定目標・#50の合否には影響しない）
+
+§4で名指しした10分岐（`Account` 4・`SqlMapAccountDao` 4・`SqlMapOrderDao` 2）のうち**8以上**を踏む＝
+**BRANCH ≥ 24/34（70%）・INSTRUCTION ≥ 80%**が次イテレーションの暫定目標（PO合意）。%を先に決めたのでは
+なく未踏分岐リストから逆算した値（design.md §4.4のループそのもの）。**暫定であり完了時に実測で再合意する**。
 
 ---
 
-## §6 採取後の後始末（AC-neg1）
+## §6 `report.sh`の2本出し＋除外反証チェック（実装・実行確認）
+
+PO合意§5-5への対応として、`tools/legacy-jacoco/report.sh`を変更した。
+
+- `--classfiles`に渡す分母ツリーを2種類用意する:
+  - **AC1ツリー**: 従来どおり`domain`/`dao`配下をまるごと抽出（29クラス中解析対象22クラス）
+  - **ゲートツリー**: AC1ツリーから到達不能3クラスの`.class`を削除したもの
+    （`domain/logic/SendOrderConfirmationEmailAdvice.class`・`dao/ibatis/MsSqlOrderDao.class`・
+    `dao/ibatis/OracleSequenceDao.class`）
+- `jacococli report`を2回実行し、`<out_dir>/ac1/`・`<out_dir>/gate/`へそれぞれ
+  `index.html`/`jacoco.xml`/`jacoco.csv`を出力する。
+- **除外反証チェック**: AC1レポートの`jacoco.csv`（`GROUP,PACKAGE,CLASS,INSTRUCTION_MISSED,
+  INSTRUCTION_COVERED,BRANCH_MISSED,BRANCH_COVERED,...`）から到達不能3クラスの行を取り出し、
+  `INSTRUCTION_COVERED`または`BRANCH_COVERED`が1でも0を超えていたら**即座にfailする**
+  （「未配線だから到達不能」という前提が崩れたことを検知する）。ゲートレポートの生成は
+  この検査をパスした後にのみ行う。
+
+### 実行確認（実測）
+
+全9シナリオを`jpetstore-legacy-jacoco`（overlayイメージ・legacy無改変）に対して再実行し、
+`docker stop -t 30`（graceful）で停止後に`report.sh`を実行した:
+
+```
+[report] extracting denominator classfiles (domain/dao) from container 'jpetstore-legacy-jacoco-measure' ...
+[report] generating AC1-denominator report -> .../out2/report/ac1
+[INFO] Analyzing 22 classes.
+[report] verifying excluded classes remain unreachable (0 coverage) ...
+[report] OK: all excluded classes remain at 0 coverage (exclusion premise holds).
+[report] generating gate-denominator report (AC1 minus 3 unreachable classes) -> .../out2/report/gate
+[INFO] Analyzing 19 classes.
+[report] done:
+[report]   AC1分母(計測の分母) : .../out2/report/ac1/index.html
+[report]   ゲート分母(判定用)  : .../out2/report/gate/index.html
+```
+
+- **AC1レポート**: 22クラス解析、合計値は本レポート§2の「合計（AC1分母）」と一致（BRANCH 16/42・
+  INSTRUCTION 1144/1765）。
+- **ゲートレポート**: 19クラス解析（22−3）、合計値は§2の「合計（ゲート分母）」と一致
+  （**BRANCH 16/34=47.1%・INSTRUCTION 1144/1588=72.0%・LINE 304/407=74.7%・CLASS 19/19=100%**）。
+  §5で合意したゲート値と完全に一致することを確認した（=このレポートの数値は`report.sh`が機構的に
+  算出したものであり、手計算ではない）。
+- **除外反証チェックの動作確認（fail-path）**: legacyの設定を変更することは禁止されているため、
+  `jacoco.csv`の`MsSqlOrderDao`行を一時的に書き換えた合成データ（`instruction_covered=2`）を用意し、
+  チェックロジック単体を実行したところ、**期待どおり`FAIL: excluded class MsSqlOrderDao now has
+  coverage ...`で終了コード1になる**ことを確認した（legacy自体は無改変・実データは変更していない）。
+
+---
+
+## §7 採取後の後始末（AC-neg1）
 
 - `jpetstore-legacy`イメージは無改変（計測用は別タグ`jpetstore-legacy-jacoco`のみビルド）。
 - 採取用コンテナ`jpetstore-legacy-jacoco-measure`は`docker stop -t 30`（graceful）で停止後、
-  レポート生成（`docker cp`でclassfiles抽出）を経てから削除済み。
+  レポート生成（`docker cp`でclassfiles抽出。§6）を経てから削除済み。
 - 採取に使用したHSQLDBは計測専用コンテナのボリューム内のみに存在し、`jpetstore-legacy`本体のデータには
   影響しない（採取用コンテナ削除により消滅）。
