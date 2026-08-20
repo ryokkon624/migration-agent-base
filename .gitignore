@@ -16,3 +16,8 @@ build/
 
 # reports/ は Phase1 scan(before) / Phase4 verify(after) の成果を版管理する（このリポは private 前提）。
 # public 化する場合は reports/ の内容を必ずレビューすること。
+
+# [L2] #50: JaCoCo agent/cli jar（fetch-jars.shで取得。バイナリは版管理しない）と計測時の出力一式。
+/tools/legacy-jacoco/jacocoagent.jar
+/tools/legacy-jacoco/jacococli.jar
+/tools/legacy-jacoco/out/
