@@ -148,3 +148,61 @@ scenario=order-single-item: EQUIVALENT宣言だが差分あり(台帳に無い�
 `./gradlew parityTest`（legacy停止状態）: **BUILD SUCCESSFUL**（4 Spec・13テスト全green）。
 内訳: `ParityIntegrationTestBaseSmokeSpec`(1)・`NewHttpClientSpec`(3)・`OrderParitySpec`(W1/W2/W3・3)・
 `CatalogParitySpec`(R1〜R6・6)。`./gradlew integrationTest`も既存26本全green（非干渉を再確認）。
+
+---
+
+## レビュー対応: W3(ID-1)の証拠固定化（SM verification確定所見）
+
+### 指摘の要旨
+
+`LegacyScenarioRunner.orderInsufficientStock()`は在庫を1にしてから2個注文するが、**goldenに残るのは
+delta `-2`と`outcome: SUCCESS`だけ**で、前提（在庫<注文数）も結果の絶対値（在庫がマイナス化したこと）も
+記録・検証されていなかった。加えて`LegacyDbReader.restoreInventoryQty`はaffected rowsを検査しない
+裸のUPDATEだった。**前処理UPDATEが黙って0行になっても（itemId不一致・表定義変更等）legacyは在庫10000の
+まま注文成功→goldenは現状とバイト同一になり、`parityTest`はgreenのままID-1の観測点だけが静かに失われる**
+という指摘（AC-neg1「台帳の形骸化を検知する」の趣旨に反する欠落）。
+
+### 対応
+
+- **(a)** `LegacyDbReader#update`をaffected rows（`int`）を返すよう変更し、`restoreInventoryQty`が
+  **0行なら`IllegalStateException`でfail**するようにした。
+- **(b)** `orderInsufficientStock()`で、前処理直後に**「事前在庫 < 注文数」**を、`placeOrder`実行後に
+  **「事後在庫 < 0」**を実際にDBへ問い合わせて検証し、いずれかが満たされなければ**goldenを書き出さずに
+  fail**するようにした（`LegacyScenarioRunner`の戻り値を`ParitySnapshot`から`CaptureResult`
+  （snapshot+任意の`preconditions`）へ変更）。
+- **(c)（推奨・採用）** 検証した実測値（`qtyBefore`/`qtyAfter`）を`ParityGolden.preconditions`
+  （`capturedFrom`と同階層・`@JsonInclude(NON_NULL)`で未使用シナリオのJSON schemaは変えない）として
+  goldenへ残した。`ParityComparator`は参照しない（canonical比較の対象外）。W3のgolden実例:
+
+  ```json
+  "preconditions" : { "EST-1" : { "qtyBefore" : 1, "qtyAfter" : -1 } }
+  ```
+
+### 実証（(a)(b)が実際に機能することを確認）
+
+`orderInsufficientStock()`内の`restoreInventoryQty`呼び出しを一時的に存在しないitemId
+（`EST-DOES-NOT-EXIST`）へ差し替えて`captureGolden`を実行したところ、**affected rows=0を検知して
+即座に例外でfailし、goldenを書き出さないこと**を確認した:
+
+```
+Exception in thread "main" java.lang.IllegalStateException:
+restoreInventoryQty(itemId=EST-DOES-NOT-EXIST, qty=1)の更新行数が0(期待値=1)。
+itemIdの不一致や表定義の変更等でUPDATEが対象行に当たっていない可能性がある。
+```
+
+確認後、legacy DBの状態（`EST-1`在庫=10000・注文2件・sequence初期値）が変化していないことをJDBCで確認し
+（例外は駆動前に発生するため実害なし）、修正を元に戻して**実golden 9本を再採取**した。
+
+### その他のレビュー対応
+
+- **②（軽微）**: `NewHttpClient`/`LegacyHttpClient`の`captureCookies`内`return`（`.each{}`内で
+  continue相当・正しい実装）に、意図的な実装であることを示すコメントを1行追加した（挙動は変更なし）。
+- **③（却下・対応不要）**: conv reviewerの「`captureCookies`も`for`へ統一すべき」提案はSM verification
+  で却下済み。`ensureCsrfToken`（本物のバグ）と`captureCookies`（continueとして正しい）は同じ`return`
+  でも意味論が逆であり、機械的統一は「不正ヘッダ1件でCookie取り込みが全停止」する実バグを招くため
+  対応不要（コード変更なし）。
+
+### 再確認結果
+
+`./gradlew parityTest`（legacy停止状態・`--rerun`）: **BUILD SUCCESSFUL**（4 Spec・13テスト全green）。
+`./gradlew test integrationTest`: 既存26本含め全green（非干渉を再確認）。
