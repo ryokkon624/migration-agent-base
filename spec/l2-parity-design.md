@@ -239,6 +239,18 @@ new    : inventoryDelta{EST-1:-2}  ordersCreated 1  orderTotal "33.00"  lines[ES
 → **`domain.logic` の branch 0%** が「あと何本必要か」を名指ししている。次に足すべきは在庫不足（W3）・複数商品（W2）・アカウント系（W4/W5）・注文履歴照会。
 → **ゲート値は未定**。この実測を出発点に PO と合意する（§6-1）。
 
+> **【訂正・Sprint 21 #50 実測後】上記「次に足すべきは在庫不足（W3）・複数商品（W2）…」という推論は誤りだった。**
+> spike の実測値（16/42=38.1% 等）自体は事実であり訂正しない。誤っていたのは**そこから導いた「シナリオを
+> 足せば domain.logic の branch coverage が上がる」という推論**。実際に W2/W3 を含む全9シナリオへ拡張した後も
+> `domain.logic` の branch coverage は **16/42 のまま 1件も動かなかった**（`reports/after/l2-parity-coverage.md` §2）。
+> 実コード（`legacy-jpetstore/src/main/webapp/WEB-INF/applicationContext.xml`）を確認した結果、
+> `domain.logic` の該当6分岐は全て `SendOrderConfirmationEmailAdvice`（注文確定後のメール送信advice）に
+> 属し、**bean定義・advisor設定の両方がコメントアウトされて一度もインスタンス化されない＝構造的に到達不能**
+> であることが判明した（同レポート §3）。到達不能な分岐はシナリオを何本追加しても踏めないため、この
+> クラスは「次に足すべきシナリオ」の根拠にはならない（AC5の除外対象）。到達可能な分母（36分岐）に対する
+> 実測は 16/36=44.4%。次に足すべきシナリオは引き続き **アカウント系（W4/W5）・注文履歴照会**（`Account`/
+> `AccountValidator`/`SqlMapAccountDao`/`SqlMapOrderDao` が実際に未踏のまま残っている）。
+
 ### 7.3 JaCoCo の注入は overlay イメージで行う（legacy リポジトリ無改変）
 
 `run/Dockerfile`/`entrypoint.sh` を書き換えず、**既存イメージに被せる**。凍結アーティファクトの原則を保てる。
