@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint 21 Review — #50 legacyカバレッジを実測しゲート値をPOと合意</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #f8f7f5; }
+  .page { max-width: 960px; margin: 0 auto; padding: 48px 24px; }
+
+  .sprint-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin-bottom: 8px; }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px; }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+  .badge-sprint { background: #e8f0fe; color: #1a56db; }
+  .badge-issue { background: #f0fdf4; color: #166534; }
+  .badge-foundation { background: #eef2ff; color: #3730a3; }
+  .badge-sp { background: #f3f4f6; color: #374151; }
+  .badge-noui { background: #1a1a1a; color: #fff; }
+
+  section { margin-bottom: 40px; }
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #888; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e5e5e5; }
+  h3 { font-size: 13px; font-weight: 700; color: #1a1a1a; margin: 16px 0 8px; }
+
+  .lead { font-size: 13px; color: #4b5563; margin-bottom: 16px; }
+  .lead code, p code, li code, td code { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; background: #f3f4f6; padding: 1px 5px; border-radius: 3px; color: #374151; }
+
+  .problem-box { background: #fff8f0; border-left: 3px solid #f59e0b; border-radius: 0 8px 8px 0; padding: 16px 20px; margin-bottom: 20px; }
+  .problem-box .label { font-size: 11px; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .problem-box p { color: #451a03; font-size: 13px; }
+
+  /* overlay architecture */
+  .overlay-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: center; margin-bottom: 8px; }
+  .overlay-box { background: white; border: 1px solid #e5e5e5; border-radius: 10px; padding: 16px; }
+  .overlay-box.frozen { border-color: #86efac; }
+  .overlay-box.overlay { border-color: #93c5fd; }
+  .overlay-box .arch-title { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .overlay-box .flow-item { font-size: 12px; color: #374151; padding: 3px 0; }
+  .overlay-arrow { font-size: 20px; color: #888; text-align: center; }
+
+  /* denominator table */
+  .denom-table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-bottom: 8px; }
+  .denom-table th { text-align: left; padding: 8px 10px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 10.5px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .denom-table td { padding: 8px 10px; border: 1px solid #e5e5e5; vertical-align: top; color: #374151; }
+  .denom-table tr.excluded td { background: #fef2f2; color: #991b1b; }
+  .denom-table tr.included td { background: #f0fdf4; }
+  .incl-badge { font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 4px; }
+  .incl-yes { background: #dcfce7; color: #166534; }
+  .incl-no { background: #fef2f2; color: #991b1b; }
+
+  /* Big metric grid */
+  .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 16px 0; }
+  .metric-box { background: white; border: 1px solid #e5e5e5; border-radius: 10px; padding: 16px; text-align: center; }
+  .metric-box .lbl { font-size: 10.5px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+  .metric-box .val { font-size: 24px; font-weight: 700; color: #1a1a1a; }
+  .metric-box .sub { font-size: 11px; color: #6b7280; margin-top: 4px; }
+  .metric-box .delta { font-size: 11px; font-weight: 700; margin-top: 4px; }
+  .delta-up { color: #166534; }
+  .delta-flat { color: #6b7280; }
+
+  /* progress bars */
+  .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .bar-label { width: 150px; font-size: 12px; color: #374151; flex-shrink: 0; }
+  .bar-track { flex: 1; height: 16px; background: #f3f4f6; border-radius: 8px; overflow: hidden; position: relative; }
+  .bar-fill { height: 100%; background: linear-gradient(90deg,#60a5fa,#1a56db); border-radius: 8px 0 0 8px; }
+  .bar-val { width: 90px; text-align: right; font-size: 12px; font-weight: 700; color: #1a1a1a; flex-shrink: 0; }
+
+  /* comparison table (spike vs actual) */
+  .compare-table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-bottom: 8px; }
+  .compare-table th { text-align: left; padding: 8px 10px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 10.5px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .compare-table td { padding: 8px 10px; border: 1px solid #e5e5e5; color: #374151; }
+  .compare-table .num { font-family: 'SF Mono', monospace; font-weight: 700; }
+
+  /* cause box */
+  .cause-box { background: white; border: 1px solid #93c5fd; border-radius: 10px; overflow: hidden; margin-bottom: 16px; }
+  .cause-header { background: #eff6ff; padding: 12px 18px; display: flex; align-items: center; gap: 8px; }
+  .cause-header .icon { font-size: 16px; }
+  .cause-header .title { font-size: 13px; font-weight: 700; color: #1e40af; }
+  .cause-body { padding: 16px 18px; }
+  .cause-body p { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+
+  .code-block { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11.5px; line-height: 1.6; background: #1e1e2e; color: #cdd6f4; padding: 14px 16px; border-radius: 6px; overflow-x: auto; white-space: pre; margin-bottom: 8px; }
+  .file-label { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; background: #f3f4f6; color: #374151; padding: 5px 10px; border-radius: 4px 4px 0 0; border: 1px solid #e5e5e5; border-bottom: none; }
+  .file-label + .code-block { border-radius: 0 0 6px 6px; margin-bottom: 12px; }
+
+  .poc-terminal { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11.5px; background: #1e1e2e; color: #cdd6f4; border-radius: 8px; padding: 12px 14px; line-height: 1.7; overflow-x: auto; margin-bottom: 8px; }
+  .poc-line { display: block; white-space: pre-wrap; word-break: break-word; }
+  .poc-bad { color: #f38ba8; font-weight: 700; }
+  .poc-good { color: #a6e3a1; font-weight: 700; }
+  .poc-note { color: #a6adc8; }
+
+  /* Gate value showcase */
+  .gate-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+  .gate-box { background: #1a1a1a; color: #fff; border-radius: 12px; padding: 20px; }
+  .gate-box .gate-lbl { font-size: 11px; font-weight: 700; color: #a1a1aa; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .gate-box .gate-val { font-size: 28px; font-weight: 700; color: #4ade80; }
+  .gate-box .gate-frac { font-size: 13px; color: #d4d4d8; margin-top: 4px; }
+  .floor-note { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 12px 16px; font-size: 12.5px; color: #78350f; margin-top: 8px; }
+
+  /* mechanism box */
+  .mech-box { background: white; border: 1px solid #e5e5e5; border-radius: 10px; padding: 16px 18px; margin-bottom: 12px; }
+  .mech-box .note-title { font-size: 12px; font-weight: 700; color: #1a1a1a; margin-bottom: 6px; }
+  .mech-box p { font-size: 13px; color: #4b5563; margin-bottom: 8px; }
+  .mech-steps { list-style: decimal; margin-left: 18px; font-size: 12.5px; color: #374151; }
+  .mech-steps li { margin-bottom: 4px; }
+
+  /* AC cards */
+  .ac-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
+  .ac-header { display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-bottom: 1px solid #f0f0f0; }
+  .ac-check { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .ac-check.done { background: #dcfce7; color: #166534; }
+  .ac-num { font-size: 11px; font-weight: 700; color: #888; white-space: nowrap; }
+  .ac-text { font-size: 13px; font-weight: 600; flex: 1; }
+  .ac-body { padding: 12px 18px; font-size: 13px; color: #4b5563; }
+
+  .next-table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-bottom: 8px; }
+  .next-table th { text-align: left; padding: 8px 10px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 10.5px; font-weight: 700; color: #6b7280; text-transform: uppercase; }
+  .next-table td { padding: 8px 10px; border: 1px solid #e5e5e5; color: #374151; }
+
+  .verify-list { list-style: none; }
+  .verify-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; }
+  .verify-item:last-child { border-bottom: none; }
+  .verify-num { width: 22px; height: 22px; background: #e8f0fe; color: #1a56db; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .verify-content { flex: 1; }
+  .verify-content strong { font-size: 13px; color: #1a1a1a; display: block; margin-bottom: 3px; }
+  .verify-content span { font-size: 12px; color: #6b7280; }
+
+  .scope-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .scope-table th { text-align: left; padding: 8px 12px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .scope-table td { padding: 10px 12px; border: 1px solid #e5e5e5; color: #374151; vertical-align: top; }
+  .tag-changed { font-size: 11px; font-weight: 600; background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 3px; }
+  .tag-unchanged { font-size: 11px; font-weight: 600; background: #f3f4f6; color: #6b7280; padding: 2px 6px; border-radius: 3px; }
+  .tag-new { font-size: 11px; font-weight: 600; background: #e8f0fe; color: #1a56db; padding: 2px 6px; border-radius: 3px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="sprint-label">Sprint 21 Review · Phase 4 L2（旧新パリティ検証基盤）</div>
+  <h1>#50 — legacy のカバレッジを overlay イメージで計測し、<br>ゲート値を PO と合意する</h1>
+  <div class="meta">
+    <span class="badge badge-sprint">Sprint 21</span>
+    <span class="badge badge-issue">#50</span>
+    <span class="badge badge-foundation">foundation</span>
+    <span class="badge badge-sp">SP 3</span>
+    <span class="badge badge-noui">画面の変更なし（計測ツールのみ）</span>
+  </div>
+
+  <section>
+    <h2>目的</h2>
+    <div class="problem-box">
+      <div class="label">問題</div>
+      <p>#48・#49 でシナリオを積み上げても、「それが legacy の "保存すべき業務ロジック" をどれだけ踏めているか」を示す物差しがなければ、
+      「テストの本数は十分か／網羅性は担保されているか」という現場の問いに実測で答えられない。</p>
+    </div>
+    <p class="lead">legacy（無改変）に JaCoCo agent を <b>overlay イメージ</b>として被せ、#48+#49 の全9シナリオを実行した際のカバレッジを、
+    「保存対象」として定義した分母に対して実測する。数値は先に決めず、<b>実測を見てから PO と合意</b>する（帳尻合わせの防止）。</p>
+  </section>
+
+  <!-- overlay architecture -->
+  <section>
+    <h2>overlay イメージのアーキテクチャ（legacy 無改変の担保）</h2>
+    <div class="overlay-grid">
+      <div class="overlay-box frozen">
+        <div class="arch-title">凍結アーティファクト</div>
+        <div class="flow-item"><code>jpetstore-legacy</code> イメージ</div>
+        <div class="flow-item"><code>run/Dockerfile</code> / <code>run/entrypoint.sh</code></div>
+        <div class="flow-item">ソース・WAR</div>
+        <div class="flow-item">一切変更しない</div>
+      </div>
+      <div class="overlay-arrow">＋<br>overlay</div>
+      <div class="overlay-box overlay">
+        <div class="arch-title">計測専用（別タグ）</div>
+        <div class="flow-item"><code>jpetstore-legacy-jacoco</code></div>
+        <div class="flow-item"><code>jacocoagent.jar</code> を注入</div>
+        <div class="flow-item"><code>entrypoint-jacoco.sh</code>（<code>CATALINA_OPTS</code>差し込み）</div>
+        <div class="flow-item">全9シナリオ実行後 <code>docker stop -t 30</code></div>
+      </div>
+    </div>
+    <p class="lead" style="margin-top:8px;">計測用コンテナは削除・HSQLDBは計測専用コンテナのボリューム内のみに存在するため、<code>jpetstore-legacy</code>本体には一切影響しない（AC-neg1で実証・下記§末尾）。</p>
+  </section>
+
+  <!-- 分母定義 -->
+  <section>
+    <h2>分母の定義（AC1）— 「保存すべき業務ロジック」だけに絞る</h2>
+    <table class="denom-table">
+      <tr><th>パッケージ</th><th>クラス数</th><th>採否</th><th>理由</th></tr>
+      <tr class="included"><td>domain</td><td>8</td><td><span class="incl-badge incl-yes">含む</span></td><td>業務ロジックの中核</td></tr>
+      <tr class="included"><td>domain.logic</td><td>6</td><td><span class="incl-badge incl-yes">含む</span></td><td>同上</td></tr>
+      <tr class="included"><td>dao</td><td>5</td><td><span class="incl-badge incl-yes">含む</span></td><td>永続化（クエリの意味を保存・インタフェースのみ）</td></tr>
+      <tr class="included"><td>dao.ibatis</td><td>10</td><td><span class="incl-badge incl-yes">含む</span></td><td>同上</td></tr>
+      <tr class="excluded"><td>web.struts</td><td>24</td><td><span class="incl-badge incl-no">除外</span></td><td>SPA+RESTへ置換（ID-6）</td></tr>
+      <tr class="excluded"><td>web.spring</td><td>18</td><td><span class="incl-badge incl-no">除外</span></td><td>同上（ID-6）</td></tr>
+      <tr class="excluded"><td>service / service.client</td><td>2</td><td><span class="incl-badge incl-no">除外</span></td><td>remoting廃止（ID-5）</td></tr>
+    </table>
+    <p class="lead">分母 <b>29クラス</b>（うち JaCoCo が解析対象とするのは <b>22</b>。<code>dao</code>の5クラスは全てインタフェースのため解析対象外）。全73クラス中29に絞ることで、
+    「保存対象29クラス（解析22）に対してブランチ○%」という定義済みの分母で語れる状態にした。</p>
+  </section>
+
+  <!-- 実測サマリ -->
+  <section>
+    <h2>実測結果（AC4）— spike時点 vs 本実測（全9シナリオ）</h2>
+    <div class="metric-grid">
+      <div class="metric-box">
+        <div class="lbl">BRANCH</div>
+        <div class="val">16/42</div>
+        <div class="sub">38.1%</div>
+        <div class="delta delta-flat">±0（spikeと同値）</div>
+      </div>
+      <div class="metric-box">
+        <div class="lbl">LINE</div>
+        <div class="val">304/452</div>
+        <div class="sub">67.3%</div>
+        <div class="delta delta-up">+7 lines</div>
+      </div>
+      <div class="metric-box">
+        <div class="lbl">INSTRUCTION</div>
+        <div class="val">1144/1765</div>
+        <div class="sub">64.8%</div>
+        <div class="delta delta-up">+25 instructions</div>
+      </div>
+      <div class="metric-box">
+        <div class="lbl">CLASS</div>
+        <div class="val">19/22</div>
+        <div class="sub">86.4%</div>
+        <div class="delta delta-flat">±0（spikeと同値）</div>
+      </div>
+    </div>
+    <table class="compare-table">
+      <tr><th>指標</th><th>spike時点（読み取り系一部＋W1のみ）</th><th>本実測（#48+#49・全9シナリオ）</th></tr>
+      <tr><td>BRANCH</td><td class="num">16/42 = 38.1%</td><td class="num">16/42 = 38.1%</td></tr>
+      <tr><td>LINE</td><td class="num">297/452 = 65.7%</td><td class="num">304/452 = 67.3%</td></tr>
+      <tr><td>INSTRUCTION</td><td class="num">1119/1765 = 63.4%</td><td class="num">1144/1765 = 64.8%</td></tr>
+      <tr><td>CLASS</td><td class="num">19/22 = 86.4%</td><td class="num">19/22 = 86.4%</td></tr>
+    </table>
+    <p class="lead">BRANCHがシナリオを6本増やしても<b>ぴったり同じ</b>16/42のまま動かなかった。これは「シナリオが足りない」のではなく別の理由があった（次節）。</p>
+  </section>
+
+  <!-- domain.logicの発見 -->
+  <section>
+    <h2>発見: <code>domain.logic</code> の branch 0% は「死んだコード」だった</h2>
+    <div class="cause-box">
+      <div class="cause-header"><span class="icon">🔍</span><span class="title">spikeの推論を実測が反証・実コードで確定した原因</span></div>
+      <div class="cause-body">
+        <p>spike時点の初期報告では「メールサーバ接続不能等でadvice冒頭からリターンしている可能性」と<b>推測</b>していた。
+        しかし <code>legacy-jpetstore</code> の実コード（<code>applicationContext.xml</code>）を確認した結果、原因は別（かつ確定的）だった。</p>
+        <div class="file-label">legacy-jpetstore/src/main/webapp/WEB-INF/applicationContext.xml</div>
+        <div class="code-block">&lt;aop:config&gt;
+    &lt;!--
+    &lt;aop:advisor pointcut="execution(* *..PetStoreFacade.insertOrder(*..Order))" advice-ref="emailAdvice"/&gt;
+    --&gt;
+&lt;/aop:config&gt;
+
+&lt;!-- AOP advice used to send confirmation email after order has been submitted --&gt;
+&lt;!--
+&lt;bean id="emailAdvice" class="org.springframework.samples.jpetstore.domain.logic.SendOrderConfirmationEmailAdvice"&gt;
+    &lt;property name="mailSender" ref="mailSender"/&gt;
+&lt;/bean&gt;--&gt;</div>
+        <p><b><code>SendOrderConfirmationEmailAdvice</code>はbean定義・advisor設定の両方がコメントアウトされ、一度もインスタンス化されない。</b>
+        シナリオを何本足しても分岐が動かなかったのは「未配線＝構造的に到達不能」だから。傍証: このクラスは<code>InitializingBean</code>を実装し配線されていれば起動時に必ず1分岐は踏まれるはずだが、実測は0/6のまま = 「一度も生成されていない」という推論と完全に整合する。</p>
+      </div>
+    </div>
+    <p class="lead"><b>結論: 「シナリオ不足」ではなく「死んだコード（未配線advice）を分母に数えていた見かけ上のギャップ」だった。</b>
+    到達不能分岐は <code>SendOrderConfirmationEmailAdvice</code>（6）＋ <code>MsSqlOrderDao</code>（2・MS SQL Server向け代替実装で同様にコメントアウト）＝ <b>8分岐</b>。
+    根拠は行番号つきで確認済み（<code>applicationContext.xml</code> L74-89・<code>dataAccessContext-local.xml</code> L68-73/L83-87、<code>-jta</code>版も同様の結論）。</p>
+  </section>
+
+  <!-- ゲート値合意 -->
+  <section>
+    <h2>PO合意ゲート値（AC5）— 実測を見てから合意</h2>
+    <p class="lead">AC1の分母（29クラス/解析22）はそのまま維持しつつ、その上に「AC1 − 到達不能3クラス」の<b>ゲート分母</b>を新たに定義した（分母を差し替えるのではなく1層足す扱い）。</p>
+    <div class="gate-grid">
+      <div class="gate-box">
+        <div class="gate-lbl">BRANCH（主指標）</div>
+        <div class="gate-val">≥ 47.0%</div>
+        <div class="gate-frac">16 / 34（ゲート分母）</div>
+      </div>
+      <div class="gate-box">
+        <div class="gate-lbl">INSTRUCTION（副指標）</div>
+        <div class="gate-val">≥ 72.0%</div>
+        <div class="gate-frac">1144 / 1588（ゲート分母）</div>
+      </div>
+    </div>
+    <div class="floor-note">
+      現在値ちょうど＝「十分」という意味ではなく、<b>「ここから下げない」という非退行フロア</b>。次イテレーションで上げる方向のみを想定。
+      評価契機は「シナリオ集合が変わったとき」（＝<code>captureGolden</code>再実行時）。フロア割れは Done にしない。フロアの引き上げは PO/SM 確認のうえ手動（自動ラチェットはしない）。
+    </div>
+    <h3>なぜ2層構成か</h3>
+    <table class="compare-table">
+      <tr><th>分母</th><th>位置づけ</th><th>数値</th></tr>
+      <tr><td>AC1分母（計測の分母）</td><td>変更しない・22クラス解析</td><td class="num">BRANCH 16/42・INSTRUCTION 1144/1765</td></tr>
+      <tr><td>ゲート分母（判定用）</td><td>AC1 − 到達不能3クラス・19クラス解析</td><td class="num">BRANCH 16/34・INSTRUCTION 1144/1588</td></tr>
+    </table>
+    <p class="lead">片方だけだと、AC1分母のみでは到達不能8分岐が最初から混ざり理論上限34/42=81.0%が天井になり、逆にゲート分母だけだと除外の妥当性がsilentな打ち切りに見える。両方を必ず併記する。</p>
+    <h3>LINE・CLASSをゲートにしない理由</h3>
+    <p class="lead">LINEはINSTRUCTIONと冗長なため報告のみ。CLASSは除外後19/19=100%で弁別力ゼロ（ただし<b>除外3クラス＝未カバー3クラスが完全一致</b>する事実は「除外の妥当性そのものの傍証」としてレポートに残す）。</p>
+  </section>
+
+  <!-- パッケージ別内訳 -->
+  <section>
+    <h2>パッケージ別の内訳（BRANCH・ゲート分母）</h2>
+    <div class="bar-row">
+      <div class="bar-label">domain</div>
+      <div class="bar-track"><div class="bar-fill" style="width:42.9%"></div></div>
+      <div class="bar-val">6/14 = 42.9%</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label">dao.ibatis</div>
+      <div class="bar-track"><div class="bar-fill" style="width:50.0%"></div></div>
+      <div class="bar-val">10/20 = 50.0%</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label">domain.logic</div>
+      <div class="bar-track"><div class="bar-fill" style="width:0%; background:#e5e5e5;"></div></div>
+      <div class="bar-val" style="color:#6b7280;">0/0（n/a）</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label"><b>合計（ゲート分母）</b></div>
+      <div class="bar-track"><div class="bar-fill" style="width:47.1%; background:linear-gradient(90deg,#4ade80,#166534);"></div></div>
+      <div class="bar-val">16/34 = 47.1%</div>
+    </div>
+    <p class="lead"><code>domain.logic</code>は6分岐全てが到達不能と確定したためゲート分母0（n/a）。<code>domain</code>では<code>Order</code>がbranch 100%（2/2）である一方<code>Account</code>は0%（0/4、アカウント系シナリオ未実装のため）。</p>
+  </section>
+
+  <!-- 除外を機構で担保 -->
+  <section>
+    <h2>除外を機構で担保する — <code>report.sh</code> の2本出し＋除外反証fail</h2>
+    <div class="mech-box">
+      <div class="note-title">「手計算の派生値はdriftする」への対応</div>
+      <p>実は合意プロセス中に一度、到達不能分岐の集計ミス（<code>MsSqlOrderDao</code>のBRANCH 2を計算に反映し忘れ「到達可能分母36」と誤報告）が起きた。PO が <code>jacoco.csv</code> を直接パースして発見し、正しくは<b>34</b>と訂正した。
+      この経緯を踏まえ、除外の妥当性を脚注ではなく<b>スクリプトが自動検証する仕組み</b>に変更した。</p>
+      <ol class="mech-steps">
+        <li>1つの <code>jacoco.exec</code> から <b>(a) AC1分母レポート</b>と<b>(b) ゲート分母レポート</b>の2本を出力</li>
+        <li>(a) の <code>jacoco.csv</code> から到達不能3クラスの行を取り出し、<code>INSTRUCTION_COVERED</code>/<code>BRANCH_COVERED</code>が1でも0を超えたら<b>即fail</b></li>
+        <li>この検査を通過した場合のみ (b) ゲートレポートを生成</li>
+      </ol>
+    </div>
+    <div class="poc-terminal">
+<span class="poc-line">[report] verifying excluded classes remain unreachable (0 coverage) ...</span>
+<span class="poc-line poc-good">[report] OK: all excluded classes remain at 0 coverage (exclusion premise holds).</span>
+<span class="poc-line">[report] generating gate-denominator report (AC1 minus 3 unreachable classes) -&gt; .../out2/report/gate</span>
+<span class="poc-line poc-note">[INFO] Analyzing 19 classes.</span>
+    </div>
+    <p class="lead">fail-path も実証済み: <code>jacoco.csv</code>の<code>MsSqlOrderDao</code>行を一時的に書き換えた合成データ（legacy実データは変更せず）でチェックロジック単体を実行し、期待どおり以下で終了コード1になることを確認した。</p>
+    <div class="poc-terminal">
+<span class="poc-line poc-bad">[report] FAIL: excluded class 'MsSqlOrderDao' now has coverage (instruction_covered=2, branch_covered=...).</span>
+<span class="poc-line poc-note">[report]       '構造的に到達不能(未配線)'という除外の前提が崩れている。ゲート分母の再定義とPO再合意が必要（自動ラチェットはしない）。</span>
+    </div>
+  </section>
+
+  <!-- 次に足すべきシナリオ -->
+  <section>
+    <h2>次に足すべきシナリオ（AC6）— 未踏分岐からの名指し</h2>
+    <table class="next-table">
+      <tr><th>#</th><th>候補</th><th>対象クラス</th><th>根拠</th></tr>
+      <tr><td>1</td><td>W4: アカウント新規登録</td><td>Account（0/4）・AccountValidator・SqlMapAccountDao（0/4）</td><td>最も明確な未踏クラス群。ゲート分母への寄与も最大</td></tr>
+      <tr><td>2</td><td>W5: アカウント編集</td><td>同上（更新系分岐）</td><td>同上</td></tr>
+      <tr><td>3</td><td>注文履歴照会</td><td>SqlMapOrderDao（branch 50%・2/4未踏）</td><td>dao.ibatisの残存ギャップ最大手</td></tr>
+      <tr><td>4</td><td>カート境界値</td><td>Cart / CartItem（branch 50%）</td><td>W1〜W3で未踏の分岐が残る</td></tr>
+    </table>
+    <p class="lead">次イテレーション暫定目標（PO合意・完了時に実測で再合意）: 上記の未踏10分岐のうち<b>8以上</b>を踏み、<b>BRANCH ≥ 24/34（70%）・INSTRUCTION ≥ 80%</b>。<code>SendOrderConfirmationEmailAdvice</code>は到達不能と確定したため候補から除外した。</p>
+  </section>
+
+  <!-- AC確認 -->
+  <section>
+    <h2>AC確認</h2>
+    <div class="ac-card"><div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC1</div><div class="ac-text">分母の固定（29クラス・解析22）</div></div><div class="ac-body">上記「分母の定義」節のとおり確定。除外理由（ID-5/ID-6）を明記。</div></div>
+    <div class="ac-card"><div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC2</div><div class="ac-text">overlayイメージで注入・legacy無改変</div></div><div class="ac-body"><code>tools/legacy-jacoco/</code>（Dockerfile・entrypoint-jacoco.sh・fetch-jars.sh・report.sh）を新設。<code>run/Dockerfile</code>・<code>run/entrypoint.sh</code>・WARは一切変更しない。</div></div>
+    <div class="ac-card"><div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC3</div><div class="ac-text">採取と集計の運用（全シナリオを1つのexecに流し直す）</div></div><div class="ac-body">全9シナリオ実行 → <code>docker stop -t 30</code>（graceful）→ <code>jacococli report</code>。マージのstale事故ゼロを担保。</div></div>
+    <div class="ac-card"><div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC4</div><div class="ac-text">実測の提示（パッケージ別・spike併記）</div></div><div class="ac-body">上記「実測結果」「パッケージ別の内訳」節のとおり。<code>reports/after/l2-parity-coverage.md</code>に記録。</div></div>
+    <div class="ac-card"><div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC5</div><div class="ac-text">ゲート値の合意（実測後・PO合意）</div></div><div class="ac-body">上記「PO合意ゲート値」節のとおり。到達不能分岐の除外理由を根拠ファイル行番号つきで明記。</div></div>
+    <div class="ac-card"><div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC6</div><div class="ac-text">次に足すべきシナリオの名指し</div></div><div class="ac-body">上記「次に足すべきシナリオ」節のとおり。W4/W5・注文履歴照会等を優先度順に列挙。</div></div>
+    <div class="ac-card"><div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC-neg1</div><div class="ac-text">legacy無改変・後始末</div></div><div class="ac-body"><code>jpetstore-legacy</code>イメージは無改変（計測用は別タグのみ）。採取用コンテナは<code>docker stop -t 30</code>で停止後にレポート生成しレポート後に削除。計測用HSQLDBは専用コンテナのボリューム内のみに存在し本体データへ影響しない。</div></div>
+  </section>
+
+  <!-- 動作確認ポイント -->
+  <section>
+    <h2>動作確認ポイント（ユーザー確認用）</h2>
+    <ul class="verify-list">
+      <li class="verify-item">
+        <div class="verify-num">1</div>
+        <div class="verify-content">
+          <strong><code>reports/after/l2-parity-coverage.md</code> の実測値とゲート値を確認できること</strong>
+          <span>BRANCH 16/34(47.1%)・INSTRUCTION 1144/1588(72.0%)が§5の合意値と一致しているか</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">2</div>
+        <div class="verify-content">
+          <strong><code>docker images</code> で <code>jpetstore-legacy</code> のイメージIDが変わっていないこと</strong>
+          <span>計測用は別タグ<code>jpetstore-legacy-jacoco</code>としてのみ存在するか</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">3</div>
+        <div class="verify-content">
+          <strong><code>tools/legacy-jacoco/report.sh</code>を実行すると除外反証チェックがOKと出ること</strong>
+          <span>「除外3クラスは今も0カバレッジ」というメッセージが出力されるか（機構で除外の前提を担保している証拠）</span>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- 改修スコープ確認 -->
+  <section>
+    <h2>改修スコープ確認</h2>
+    <table class="scope-table">
+      <tr><th>対象</th><th>変更</th><th>内容</th></tr>
+      <tr><td><code>migration-agent-base/tools/legacy-jacoco/</code></td><td><span class="tag-new">新規</span></td><td>Dockerfile / entrypoint-jacoco.sh / fetch-jars.sh / report.sh / README.md</td></tr>
+      <tr><td><code>reports/after/l2-parity-coverage.md</code></td><td><span class="tag-new">新規</span></td><td>実測・ゲート値合意・除外理由の記録</td></tr>
+      <tr><td><code>legacy-jpetstore/run/Dockerfile</code> / <code>run/entrypoint.sh</code> / ソース / WAR</td><td><span class="tag-unchanged">変更なし</span></td><td>凍結アーティファクトの原則を維持（overlayで被せるのみ）</td></tr>
+      <tr><td><code>jpetstore-backend</code>（新側のカバレッジゲート運用）</td><td><span class="tag-unchanged">変更なし</span></td><td>既存 <code>jacocoTestReport</code> はスコープ外</td></tr>
+    </table>
+  </section>
+
+</div>
+</body>
+</html>

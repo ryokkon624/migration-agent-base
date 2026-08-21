@@ -251,6 +251,8 @@ git diff [sprint-start-commit]^...HEAD で変更内容を確認してくださ�
    reviewer は「新規追加された関数・クラスの内部」は正しく見るが、**その新コードが呼び出し側の既存の前提（フロー・境界）の内側にあるか**までは追い切れないことがある。SM は**変更の中核ファイルを精読し、呼び出し元まで遡って**次を確認する：
    - **非機能差分の純増**：同一フローで DB クエリ・書込・ラウンドトリップが増えていないか（Sprint 12＝`findByUserId` 二重呼びを reviewer 全員が見落とし）。**呼び出し側フロー単位でクエリ数を数える**。
    - **例外保護・トランザクション等「境界」の内側にあるか**：AC が「例外を捕捉して正常復帰する」「別 tx で確定させる」等を要求している場合、**同一スプリントで追加した新コードがその境界の外に置かれていないか**（Sprint 20＝`AuditLogRecorder.recordAuthzFailure` の quota チェックが best-effort の try/catch の外にあり、修正対象の失敗モードがトリガを変えて残存。security reviewer は「例外は捕捉されている」と明言＝false negative）。
+   - **検証資産が「前提が将来崩れたときに気づけるか」**：テストや golden 等の検証資産を作る Story では、**「今回たまたま通ったか」でなく「前提が将来崩れたときに fail するか」**を見る（Sprint 21＝W3 の前処理 UPDATE が黙って0行になっても golden はバイト同一で `parityTest` は green のまま、ID-1 の観測点だけが静かに失われる経路が残っていた。3 reviewer は全員クリアだった＝**reviewer は新規コードの内部の正しさは見るが、資産としての耐久性は見ない**）。**確認の仕方**＝「この前処理/前提が満たされなくなったとき、テストは落ちるか？」を1つずつ問う。落ちないなら、前提そのものを assert するか、満たさなければ成果物を書き出さずに fail させる。
+   - **数値は一次データで検算する**（Sprint 20＝perf のクエリ数の数え落とし／Sprint 21＝perf の Spec 数の合算誤り、**かつ SM 自身が下流〔PO〕へ渡した分母も誤っていた**）。reviewer や DEV が**数値**を報告したら SM も自分で数えて突き合わせる。**SM が下流へ渡す数値も同様**で、レポートや報告書の記述を一次データと同一視しない（Sprint 21＝レポート §5 が `MsSqlOrderDao` を「instruction 46」とだけ書き BRANCH 2 を落としていたのを SM がそのまま引き継ぎ、到達可能分母を 36 と誤って PO に渡した。正しくは 34。**PO が jacoco.xml を直接パースして検出**）。**文書内の自己矛盾**（§3 で到達不能と認定したクラスの分岐数が §2 の分母計算に反映されていない等）は一次データに当たれば即座に分かる。**派生値（分母から除外した値等）が繰り返し使われるなら、脚注でなく機構で担保させる**（Sprint 21＝`report.sh` が2本のレポートを出し、除外クラスのカバレッジが0を超えたら fail する。手計算の数字は drift する）。
    - **確認の仕方**：呼び出し元を実際に開き、「例外が出たら誰が受けるか」「レスポンス書き込みの前か後か」を読む。reviewer の結論をそのまま信用しない。
    - 発見した場合は reviewer 指摘と**同じ1ラウンド**に束ねて DEV へ回す（⑤）。
 5. **指摘がある場合（reviewer 指摘 or 上記 SM verification）→ DEVを再起動して修正依頼（⑤へ）**
@@ -386,6 +388,8 @@ git push -u origin [ブランチ名]
 >    （出力に PAT が出ないよう `| sed "s/${GITHUB_PERSONAL_ACCESS_TOKEN}/***/g"` を通す）
 > 3. それも分類器にブロックされたら、**別セッション（SM）が代行する**。DEV が push できなくても**コミットはローカルブランチに残るので作業消失リスクは無い**（Sprint 20 実績＝DEV がブロック → SM が token URL で両 repo とも push 成功）。
 > 判定の助けに: **`git ls-remote`（read）は credential helper で即応答する**ので、read が通って push だけハングするなら「認証情報が無い」のではなく**push 時の GCM 対話待ち**。
+>
+> ⚠️ **代行する前に、その push が `rules/git.md` に照らして正当かを確認する**（Sprint 21）。このはしごは「**正当な push がセッション/サンドボックス差でブロックされた**」場合の手順であって、「**そもそも禁止されている操作がブロックされた**」場合に適用してはならない。Sprint 21 では DEV が agent-base の `main` へ直接コミットし push がブロックされて代行を依頼してきたが、**`rules/git.md` は main 直 push を禁止しており、ブロックは正しい挙動だった**。正しい対応は代行ではなく**是正**（コミットをブランチへ退避し、ローカル main を `origin/main` へ戻す。作業成果は保全される）。**teammate に「ブランチを切らず直接書いてよい」と指示すると main 直コミットを誘発する**ので、SM が先にブランチを切って渡すこと。
 >
 > ⚠️ **PR マージは `mcp__github__merge_pull_request` を使う**（Sprint 18 初出 → Sprint 19/20 で再現・昇格）。`curl -X PUT .../merge` は実行環境の分類器にブロックされる。Issue 操作も MCP github 系を優先し、**Projects フィールド操作のみ GraphQL curl POST**（これは通る）。
 
@@ -588,6 +592,7 @@ Sprint Review ファイルをブラウザで開いて動作確認をお願いし
    - **対象**＝今スプリントで生じた agent-base の変更全部: `backlog/sprint_XX/`（`sprint_backlog.md`・`implementation-notes.md`・`review-#N.html` 等）／`memory/{sm,dev,po}/{short_term,long_term}.md`／更新した `.claude/skills`・`rules`・`agents` 等。`git status --short` で漏れなく拾う。
    - **`rules/git.md` に従い main 直 push は禁止**。ブランチを切って PR→マージ。ブランチ名は `docs/sprint-XX-<短い説明>`、コミットは `docs: Sprint XX 完了(...) (ryokkon624/jpetstore-manage#N)`（docs プレフィックス）。コミットメッセージ末尾に Co-Authored-By トレーラを付ける（ハーネス規約）。
    - **リポジトリは `ryokkon624/migration-agent-base`**（Issue ホストの `jpetstore-manage` とは**別 repo**）。PR body は該当 Issue を **`Related: ryokkon624/jpetstore-manage#N`** に留める（`closes` にしない＝Issue は既に各プロダクト repo の PR マージでクローズ済みのため、二重クローズ・早期クローズを避ける）。
+     - **例外＝capstone が agent-base にある Story**（Sprint 21 #50＝成果物が `tools/legacy-jacoco/` と `reports/after/` のみで、プロダクト repo に変更が1行も無い検証/計測 Story）。この場合**「既にプロダクト repo の PR でクローズ済み」という前提が成立しない**ため、`Related:` のままだと Issue が永久にクローズされない。**agent-base PR に `closes` を置く**（同一 PR 内の他 Issue は従来どおり `Related:`）。判断基準は ⑥ と同じ「**capstone のある repo に closes を集約**」で一貫する。
    - **手順**（cwd=agent-base ルート `C:\work\java-migration\migration-agent-base`）:
      1. `git checkout -b docs/sprint-XX-xxx` → `git add -A`
      2. メッセージファイル（heredoc）で `git commit -F <file>`（日本語安全化）

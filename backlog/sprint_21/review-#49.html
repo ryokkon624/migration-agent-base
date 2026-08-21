@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint 21 Review — #49 シナリオ台帳を読み取り系＋W2/W3へ拡張</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #f8f7f5; }
+  .page { max-width: 920px; margin: 0 auto; padding: 48px 24px; }
+
+  .sprint-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin-bottom: 8px; }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px; }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+  .badge-sprint { background: #e8f0fe; color: #1a56db; }
+  .badge-issue { background: #f0fdf4; color: #166534; }
+  .badge-foundation { background: #eef2ff; color: #3730a3; }
+  .badge-sp { background: #f3f4f6; color: #374151; }
+  .badge-noui { background: #1a1a1a; color: #fff; }
+
+  section { margin-bottom: 40px; }
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #888; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e5e5e5; }
+  h3 { font-size: 13px; font-weight: 700; color: #1a1a1a; margin: 16px 0 8px; }
+
+  .lead { font-size: 13px; color: #4b5563; margin-bottom: 16px; }
+  .lead code, p code, li code, td code { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; background: #f3f4f6; padding: 1px 5px; border-radius: 3px; color: #374151; }
+
+  /* Scenario ledger table */
+  .scenario-table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-bottom: 8px; }
+  .scenario-table th { text-align: left; padding: 8px 10px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 10.5px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .scenario-table td { padding: 8px 10px; border: 1px solid #e5e5e5; vertical-align: top; color: #374151; }
+  .scenario-table tr.highlight td { background: #fffbeb; }
+  .exp-badge { font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 4px; white-space: nowrap; display: inline-block; }
+  .exp-eq { background: #dcfce7; color: #166534; }
+  .exp-div { background: #fef3c7; color: #92400e; }
+
+  /* divergence showcase */
+  .div-box { background: white; border: 1px solid #fde68a; border-radius: 10px; overflow: hidden; margin-bottom: 20px; }
+  .div-header { background: #fffbeb; padding: 12px 18px; display: flex; align-items: center; gap: 10px; justify-content: space-between; }
+  .div-header .title { font-size: 13px; font-weight: 700; color: #92400e; }
+  .div-header .idtag { font-size: 11px; font-weight: 700; background: #92400e; color: #fff; padding: 2px 8px; border-radius: 4px; }
+  .div-body { padding: 16px 18px; }
+  .div-body p { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+
+  .symptom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 12px; }
+  .symptom-box { background: #fafafa; border: 1px solid #e5e5e5; border-radius: 8px; padding: 14px; }
+  .sym-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
+  .sym-label-old { color: #92400e; }
+  .sym-label-new { color: #1a56db; }
+  .poc-terminal { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11.5px; background: #1e1e2e; color: #cdd6f4; border-radius: 8px; padding: 12px 14px; line-height: 1.7; overflow-x: auto; }
+  .poc-line { display: block; white-space: pre-wrap; word-break: break-word; }
+  .poc-bad { color: #f38ba8; font-weight: 700; }
+  .poc-good { color: #a6e3a1; font-weight: 700; }
+  .poc-note { color: #a6adc8; }
+
+  .code-block { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11.5px; line-height: 1.6; background: #1e1e2e; color: #cdd6f4; padding: 14px 16px; border-radius: 6px; overflow-x: auto; white-space: pre; margin-bottom: 8px; }
+  .file-label { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; background: #f3f4f6; color: #374151; padding: 5px 10px; border-radius: 4px 4px 0 0; border: 1px solid #e5e5e5; border-bottom: none; }
+  .file-label + .code-block { border-radius: 0 0 6px 6px; margin-bottom: 12px; }
+
+  /* Notes */
+  .note-box { background: white; border: 1px solid #e5e5e5; border-radius: 10px; padding: 16px 18px; margin-bottom: 12px; }
+  .note-box .note-title { font-size: 12px; font-weight: 700; color: #1a1a1a; margin-bottom: 6px; }
+  .note-box p { font-size: 13px; color: #4b5563; }
+  .fix-box { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 16px 18px; margin-bottom: 12px; }
+  .fix-box .note-title { font-size: 12px; font-weight: 700; color: #166534; margin-bottom: 6px; }
+  .fix-box p { font-size: 13px; color: #14532d; }
+
+  /* AC cards */
+  .ac-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
+  .ac-header { display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-bottom: 1px solid #f0f0f0; }
+  .ac-check { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .ac-check.done { background: #dcfce7; color: #166534; }
+  .ac-num { font-size: 11px; font-weight: 700; color: #888; white-space: nowrap; }
+  .ac-text { font-size: 13px; font-weight: 600; flex: 1; }
+  .ac-body { padding: 12px 18px; font-size: 13px; color: #4b5563; }
+
+  /* Verify */
+  .verify-list { list-style: none; }
+  .verify-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; }
+  .verify-item:last-child { border-bottom: none; }
+  .verify-num { width: 22px; height: 22px; background: #e8f0fe; color: #1a56db; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .verify-content { flex: 1; }
+  .verify-content strong { font-size: 13px; color: #1a1a1a; display: block; margin-bottom: 3px; }
+  .verify-content span { font-size: 12px; color: #6b7280; }
+
+  /* Scope table */
+  .scope-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .scope-table th { text-align: left; padding: 8px 12px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .scope-table td { padding: 10px 12px; border: 1px solid #e5e5e5; color: #374151; vertical-align: top; }
+  .tag-changed { font-size: 11px; font-weight: 600; background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 3px; }
+  .tag-unchanged { font-size: 11px; font-weight: 600; background: #f3f4f6; color: #6b7280; padding: 2px 6px; border-radius: 3px; }
+  .tag-new { font-size: 11px; font-weight: 600; background: #e8f0fe; color: #1a56db; padding: 2px 6px; border-radius: 3px; }
+
+  .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 8px; }
+  .stat-box { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 14px; text-align: center; }
+  .stat-box .num { font-size: 26px; font-weight: 700; color: #166534; }
+  .stat-box .lbl { font-size: 11px; color: #888; margin-top: 4px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="sprint-label">Sprint 21 Review · Phase 4 L2（旧新パリティ検証基盤）</div>
+  <h1>#49 — シナリオ台帳を読み取り系＋W2/W3へ広げ、<br>意図差分の宣言を実測で固定する</h1>
+  <div class="meta">
+    <span class="badge badge-sprint">Sprint 21</span>
+    <span class="badge badge-issue">#49</span>
+    <span class="badge badge-foundation">foundation</span>
+    <span class="badge badge-sp">SP 3</span>
+    <span class="badge badge-noui">画面の変更なし（test scope のみ）</span>
+  </div>
+
+  <section>
+    <h2>目的</h2>
+    <p class="lead">#48 で確立した規約（canonical モデル・コンパレータ・golden スキーマ・gradle タスク）は<b>一切変更せず</b>、
+    シナリオ台帳への行追加と両側 Runner へのメソッド追加だけで横展開できるかを検証した（#29→#30 と同型のチャレンジ）。
+    読み取り系6本（R1〜R6）＋注文の主要バリエーション2本（W2/W3）を追加し、W1と合わせて<b>全9シナリオ</b>で「説明可能な母集団」を作った。
+    特に、<b>意図的に違うはずの箇所（ID-1・ID-29）が宣言どおり違うこと</b>まで機械的に固定するのが本Storyの核心。</p>
+  </section>
+
+  <!-- 9シナリオ一覧 -->
+  <section>
+    <h2>9シナリオ一覧（R1〜R6・W1〜W3）</h2>
+    <table class="scenario-table">
+      <tr><th>ID</th><th>シナリオ</th><th>canonical</th><th>expectation</th></tr>
+      <tr><td>R1</td><td>カテゴリ一覧</td><td>categoryId の集合</td><td><span class="exp-badge exp-eq">EQUIVALENT</span></td></tr>
+      <tr><td>R2</td><td>カテゴリ配下の商品一覧（5カテゴリ）</td><td>productId の集合</td><td><span class="exp-badge exp-eq">EQUIVALENT</span></td></tr>
+      <tr><td>R3</td><td>商品配下のアイテム一覧</td><td>itemId ＋ listPrice</td><td><span class="exp-badge exp-eq">EQUIVALENT</span></td></tr>
+      <tr><td>R4</td><td>アイテム詳細</td><td>itemId / productName / listPrice</td><td><span class="exp-badge exp-eq">EQUIVALENT</span></td></tr>
+      <tr><td>R5</td><td>検索（複数語・部分一致・0件）</td><td>productId の集合</td><td><span class="exp-badge exp-eq">EQUIVALENT</span></td></tr>
+      <tr class="highlight"><td>R6</td><td>検索（<code>%</code> / <code>_</code> を含む語）</td><td>productId の集合</td><td><span class="exp-badge exp-div">INTENDED_DIVERGENCE(ID-29)</span></td></tr>
+      <tr><td>W1</td><td>注文確定（単一商品・#48で確立）</td><td>在庫デルタ／明細／合計</td><td><span class="exp-badge exp-eq">EQUIVALENT</span></td></tr>
+      <tr><td>W2</td><td>注文確定（複数商品）</td><td>在庫デルタ（複数itemId）／明細／合計</td><td><span class="exp-badge exp-eq">EQUIVALENT</span></td></tr>
+      <tr class="highlight"><td>W3</td><td>注文確定（在庫不足）</td><td>outcome／在庫デルタ／明細／合計</td><td><span class="exp-badge exp-div">INTENDED_DIVERGENCE(ID-1)</span></td></tr>
+    </table>
+    <p class="lead">アカウント系（W4登録・W5更新）とカート単体は本Storyの対象外（design.md §6-2・カートはセッション保持でDBに落ちないため注文確定に畳む）。</p>
+  </section>
+
+  <!-- 意図差分の可視化 -->
+  <section>
+    <h2>意図差分2件 — 「不一致になるのが正解」の実測</h2>
+
+    <div class="div-box">
+      <div class="div-header">
+        <span class="title">W3: 注文確定（在庫不足）</span>
+        <span class="idtag">ID-1 在庫ガード</span>
+      </div>
+      <div class="div-body">
+        <p>在庫を注文数未満（<code>qty=1</code>）へ下げてから<code>EST-1</code>を2個注文する。旧＝ガード無しで成功し在庫がマイナスになる／新＝409で失敗し在庫は不変。</p>
+        <div class="symptom-grid">
+          <div class="symptom-box">
+            <div class="sym-label sym-label-old">旧（legacy）— 実測</div>
+            <div class="poc-terminal">
+<span class="poc-line">outcome: <span class="poc-bad">SUCCESS</span></span>
+<span class="poc-line">inventoryDelta.EST-1: <span class="poc-bad">-2</span></span>
+<span class="poc-line">ordersCreated: 1</span>
+<span class="poc-line poc-note">qtyBefore=1 → qtyAfter=<span class="poc-bad">-1</span>（マイナス在庫）</span>
+            </div>
+          </div>
+          <div class="symptom-box">
+            <div class="sym-label sym-label-new">新（jpetstore-backend）— 実測</div>
+            <div class="poc-terminal">
+<span class="poc-line">outcome: <span class="poc-good">FAILURE</span>（409）</span>
+<span class="poc-line">inventoryDelta.EST-1: <span class="poc-good">0</span></span>
+<span class="poc-line">ordersCreated: 0</span>
+<span class="poc-line poc-note">在庫ガードで売り越しを阻止（SBD-2）</span>
+            </div>
+          </div>
+        </div>
+        <div class="file-label">src/test/resources/parity/golden/order-insufficient-stock.json</div>
+        <div class="code-block">{
+  "scenario" : "order-insufficient-stock",
+  "expectation" : "INTENDED_DIVERGENCE(ID-1)",
+  "divergenceId" : "ID-1",
+  "divergentFields" : [ "outcome", "inventoryDelta[EST-1]", "ordersCreated",
+                         "orderTotal", "lines[EST-1].quantity", "lines[EST-1].unitPrice" ],
+  "preconditions" : {
+    "EST-1" : { "qtyBefore" : 1, "qtyAfter" : -1 }
+  },
+  "snapshot" : {
+    "outcome" : "SUCCESS",
+    "inventoryDelta" : { "EST-1" : -2 },
+    "ordersCreated" : 1,
+    "orderTotal" : "33.00"
+  }
+}</div>
+        <p style="margin-top:8px;"><code>preconditions</code> は旧側で実測した「在庫がマイナス化した」ことそのものの証拠。<code>ParityComparator</code>の比較対象ではないが、
+        golden を見ればID-1が実際に踏まれたことが人の目でも確認できる（下記「レビュー対応」節に追加の経緯あり）。</p>
+      </div>
+    </div>
+
+    <div class="div-box">
+      <div class="div-header">
+        <span class="title">R6: 検索（<code>%</code> / <code>_</code> を含む語）</span>
+        <span class="idtag">ID-29 LIKEメタ文字</span>
+      </div>
+      <div class="div-body">
+        <p>旧＝<code>%</code>/<code>_</code>がLIKEワイルドカードとして機能し全16商品にマッチ／新＝ESCAPE併用でリテラル一致のため0件。</p>
+        <div class="symptom-grid">
+          <div class="symptom-box">
+            <div class="sym-label sym-label-old">旧（legacy）— 実測</div>
+            <div class="poc-terminal">
+<span class="poc-line">keyword="%" → <span class="poc-bad">16件</span>（全商品にマッチ）</span>
+<span class="poc-line">keyword="_" → <span class="poc-bad">16件</span>（全商品にマッチ）</span>
+<span class="poc-line poc-note">ワイルドカードとして解釈（意図せぬ全件マッチ）</span>
+            </div>
+          </div>
+          <div class="symptom-box">
+            <div class="sym-label sym-label-new">新（jpetstore-backend）— 実測</div>
+            <div class="poc-terminal">
+<span class="poc-line">keyword="%" → <span class="poc-good">0件</span></span>
+<span class="poc-line">keyword="_" → <span class="poc-good">0件</span></span>
+<span class="poc-line poc-note">ESCAPE併用でリテラル一致（SBD-17維持）</span>
+            </div>
+          </div>
+        </div>
+        <p>golden（<code>search-wildcard.json</code>）には旧側の実測16商品×2クエリ=32件が<code>entries</code>として記録されている。<code>divergentFields=["entries"]</code>のみを宣言し、それ以外の差分が混ざれば fail する。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 実装内容 (AC) -->
+  <section>
+    <h2>実装内容（AC別）</h2>
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC1</div><div class="ac-text">読み取り系6シナリオ（R1〜R6）を台帳へ追加</div></div>
+      <div class="ac-body">上記一覧表のとおり全6本を追加し golden を採取・コミット。</div>
+    </div>
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC2</div><div class="ac-text">全ページ走査（F5：ページサイズが旧4件/頁・新12件/頁で異なる）</div></div>
+      <div class="ac-body">読み取り系canonicalは<b>全ページを辿って</b>組む。1頁目だけの比較による偽の不一致を防止（ID-20の帰結）。</div>
+    </div>
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC3</div><div class="ac-text">R6は宣言どおり不一致になることを判定</div></div>
+      <div class="ac-body">上記「意図差分2件」のとおり実測・固定済み。</div>
+    </div>
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC4</div><div class="ac-text">W2 注文確定（複数商品）</div></div>
+      <div class="ac-body"><code>EST-1 × 2, EST-4 × 3</code> の複数商品注文を <code>EQUIVALENT</code> で追加。在庫デルタ・明細・合計とも完全一致。</div>
+    </div>
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC5</div><div class="ac-text">W3 注文確定（在庫不足）はID-1で不一致になるのが正解</div></div>
+      <div class="ac-body">上記「意図差分2件」のとおり実測・固定済み。</div>
+    </div>
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC6</div><div class="ac-text">スコープ境界（カート単体・アカウント系は対象外）</div></div>
+      <div class="ac-body">設計どおりW4/W5・カート単体シナリオ化は次イテレーションへ送った。</div>
+    </div>
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC7 / AC-neg1 / AC-neg2</div><div class="ac-text">legacy停止状態でgreen・宣言と実測の不一致検知・goldenメタ</div></div>
+      <div class="ac-body">全9シナリオを含めて legacy 停止状態で <code>parityTest</code> green。<code>EQUIVALENT</code>/<code>INTENDED_DIVERGENCE</code>いずれの方向の不一致も失敗することを実証。追加した全goldenに<code>legacyCommit</code>/<code>capturedAt</code>が入っている。</div>
+    </div>
+  </section>
+
+  <!-- 実装メモ -->
+  <section>
+    <h2>実装メモ（仕様外の判断・変更・妥協点）</h2>
+
+    <div class="note-box">
+      <div class="note-title">発見1: legacy実機では価格の<code>$</code>フォーマットが適用されない</div>
+      <p>design.md や JSP ソースは <code>pattern="$#,##0.00"</code> を指定しているが、実際にcurlで叩いた応答は<code>$</code>無し・末尾ゼロ無しの生数値（例: <code>16.5</code>）がそのまま出力される。
+      当初の<code>$</code>前提の正規表現では entries が空・listPrice が null になる欠陥として golden 採取直後に検出できたため、「セル内容が数値のみ」で識別する<code>extractPlainDecimal</code>へ是正した。</p>
+    </div>
+
+    <div class="note-box">
+      <div class="note-title">発見2: <code>ordersCreated</code>を採番IDの差分で算出すると複数シナリオ連続実行で誤る</div>
+      <p>新側MySQLの<code>t_order.order_id</code>はAUTO_INCREMENTのため<code>DELETE</code>後もカウンタが戻らない。<code>MAX(order_id)</code>差分では2番目以降のシナリオで実際の増加件数とズレる（<code>order-multi-item</code>実行時に実測2・golden期待1で不一致検出）。旧新とも<code>COUNT(*)</code>の前後差分へ是正した。</p>
+    </div>
+
+    <div class="fix-box">
+      <div class="note-title">W3で発覚した新側固有のカートレベルガード（design.mdにもACにも無い新事実）</div>
+      <p>新側 <code>POST /api/cart/items</code>は<b>カート追加時点で</b>在庫超過を400で拒否する（legacyにはこのガードが無い）。「先に在庫を下げてからカート追加」という旧と同じ手順では、カート追加自体が400で失敗し狙った「注文確定APIの409」に届かない。
+      <code>OrderControllerSpec</code>の「在庫不足（競合負けを含む）」テストと同じ手順（<b>在庫があるうちにカート追加→その後在庫を減らして注文確定</b>）へ設計変更し、<code>NewScenarioRunner#placeOrder</code>に<code>beforeOrderSubmit</code>フックを追加して解消した。</p>
+    </div>
+  </section>
+
+  <!-- レビュー対応 -->
+  <section>
+    <h2>レビュー対応: W3(ID-1)の証拠固定化（SM verification 確定所見）</h2>
+    <div class="note-box">
+      <div class="note-title">指摘の要旨</div>
+      <p>goldenに残るのは delta <code>-2</code> と <code>outcome: SUCCESS</code>だけで、前提（在庫&lt;注文数）も結果（在庫がマイナス化したこと）も検証・記録されていなかった。前処理UPDATEが黙って0行になっても（itemId不一致等）legacyは在庫のまま成功し、goldenは現状とバイト同一になり<code>parityTest</code>はgreenのままID-1の観測点だけが静かに失われる、という指摘。</p>
+    </div>
+    <div class="fix-box">
+      <div class="note-title">対応</div>
+      <p>(a) 復元UPDATEのaffected rowsを検査し0行なら即fail、(b) 前処理直後に「事前在庫&lt;注文数」・実行後に「事後在庫&lt;0」を実際にDBへ問い合わせて検証し、いずれかが満たされなければgoldenを書き出さずfail、(c) 実測値（<code>qtyBefore</code>/<code>qtyAfter</code>）を<code>preconditions</code>としてgoldenへ残す（比較対象外・人が読める証拠として保持）。</p>
+      <p style="margin-top:8px;">実際に <code>restoreInventoryQty</code> の対象itemIdを一時的に存在しないIDへ差し替えて実行し、期待どおり0行検知でfailすること・legacy DBの状態が変化していないことを確認したうえで、実golden 9本を再採取した。</p>
+    </div>
+  </section>
+
+  <!-- 検証結果 -->
+  <section>
+    <h2>検証結果</h2>
+    <div class="stat-grid">
+      <div class="stat-box"><div class="num">4 Spec / 13</div><div class="lbl">parityTest（legacy停止状態）green</div></div>
+      <div class="stat-box"><div class="num">26 / 26</div><div class="lbl">既存IT green（非干渉を再確認）</div></div>
+      <div class="stat-box"><div class="num">9 / 9</div><div class="lbl">シナリオ全件（golden採取済み）</div></div>
+    </div>
+  </section>
+
+  <!-- 動作確認ポイント -->
+  <section>
+    <h2>動作確認ポイント（ユーザー確認用）</h2>
+    <ul class="verify-list">
+      <li class="verify-item">
+        <div class="verify-num">1</div>
+        <div class="verify-content">
+          <strong>9シナリオ全件を含めて <code>parityTest</code> がgreenであること</strong>
+          <span>legacy停止状態で <code>./gradlew parityTest</code> を実行し、4 Spec・13テストが全てgreenになることを確認</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">2</div>
+        <div class="verify-content">
+          <strong>W3・R6が「不一致になること」自体が正しくテスト成功として扱われていること</strong>
+          <span><code>OrderParitySpec</code>・<code>CatalogParitySpec</code>のW3/R6テストで、宣言した<code>divergentFields</code>と実測差分が一致していることを golden JSON と突き合わせて確認</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">3</div>
+        <div class="verify-content">
+          <strong>#48で確立した仕組み（canonicalモデル・gradleタスク等）が無改造で再利用できていること</strong>
+          <span>本Storyの差分がシナリオ台帳・Runnerメソッド・golden追加の4種類だけに収まっているか（改修スコープ確認を参照）</span>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- 改修スコープ確認 -->
+  <section>
+    <h2>改修スコープ確認</h2>
+    <table class="scope-table">
+      <tr><th>対象</th><th>変更</th><th>内容</th></tr>
+      <tr><td><code>ParityScenarios.groovy</code></td><td><span class="tag-changed">変更あり</span></td><td>R1〜R6・W2・W3の行を追加</td></tr>
+      <tr><td><code>LegacyScenarioRunner.groovy</code> / <code>NewScenarioRunner.groovy</code></td><td><span class="tag-changed">変更あり</span></td><td>各シナリオの旧新手順メソッドを追加</td></tr>
+      <tr><td><code>CatalogParitySpec.groovy</code></td><td><span class="tag-new">新規</span></td><td>R1〜R6のdual-tag Spec</td></tr>
+      <tr><td><code>OrderParitySpec.groovy</code></td><td><span class="tag-changed">変更あり</span></td><td>W2/W3を追加（W1は#48で既存）</td></tr>
+      <tr><td>golden 8本（R1〜R6・W2・W3）</td><td><span class="tag-new">新規</span></td><td><code>src/test/resources/parity/golden/*.json</code></td></tr>
+      <tr><td><code>ParitySnapshot</code> / <code>ParityGolden</code> / <code>ParityComparator</code> / gradle タスク・タグ / golden スキーマ</td><td><span class="tag-unchanged">変更なし</span></td><td>#48の規約を無改造で再利用（C1チャレンジの実証）</td></tr>
+      <tr><td><code>jpetstore-backend/src/main/**</code>（プロダクトコード）</td><td><span class="tag-unchanged">変更なし</span></td><td>本Storyもテスト基盤の拡張のみ</td></tr>
+    </table>
+  </section>
+
+</div>
+</body>
+</html>

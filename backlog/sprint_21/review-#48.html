@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint 21 Review — #48 旧新パリティの検証基盤を確立</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #f8f7f5; }
+  .page { max-width: 920px; margin: 0 auto; padding: 48px 24px; }
+
+  .sprint-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin-bottom: 8px; }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px; }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+  .badge-sprint { background: #e8f0fe; color: #1a56db; }
+  .badge-issue { background: #f0fdf4; color: #166534; }
+  .badge-foundation { background: #eef2ff; color: #3730a3; }
+  .badge-sp { background: #f3f4f6; color: #374151; }
+  .badge-noui { background: #1a1a1a; color: #fff; }
+
+  section { margin-bottom: 40px; }
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #888; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e5e5e5; }
+  h3 { font-size: 13px; font-weight: 700; color: #1a1a1a; margin: 16px 0 8px; }
+
+  .lead { font-size: 13px; color: #4b5563; margin-bottom: 16px; }
+  .lead code, p code, li code, td code { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; background: #f3f4f6; padding: 1px 5px; border-radius: 3px; color: #374151; }
+
+  /* Problem box */
+  .problem-box { background: #fff8f0; border-left: 3px solid #f59e0b; border-radius: 0 8px 8px 0; padding: 16px 20px; margin-bottom: 20px; }
+  .problem-box .label { font-size: 11px; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .problem-box p { color: #451a03; font-size: 13px; }
+
+  /* 3-way diagram */
+  .arch3-grid { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 10px; align-items: stretch; margin-bottom: 8px; }
+  .arch3-box { background: white; border: 1px solid #e5e5e5; border-radius: 10px; padding: 16px; }
+  .arch3-box .arch-title { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
+  .arch3-box.legacy { border-color: #fca5a5; }
+  .arch3-box.canonical { border-color: #1a1a1a; background: #1a1a1a; }
+  .arch3-box.canonical .arch-title { color: #a1a1aa; }
+  .arch3-box.canonical .flow-item { color: #e5e5e5; }
+  .arch3-box.newside { border-color: #86efac; }
+  .arch-arrow { font-size: 20px; color: #888; text-align: center; display: flex; align-items: center; justify-content: center; }
+  .flow-item { font-size: 12px; color: #374151; padding: 3px 0; }
+  .flow-item b { font-weight: 700; }
+
+  /* Scenario ledger table */
+  .scenario-table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-bottom: 8px; }
+  .scenario-table th { text-align: left; padding: 8px 10px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 10.5px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .scenario-table td { padding: 8px 10px; border: 1px solid #e5e5e5; vertical-align: top; color: #374151; }
+  .exp-badge { font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 4px; white-space: nowrap; }
+  .exp-eq { background: #dcfce7; color: #166534; }
+  .exp-div { background: #fef3c7; color: #92400e; }
+
+  /* AC cards */
+  .ac-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
+  .ac-header { display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-bottom: 1px solid #f0f0f0; }
+  .ac-check { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .ac-check.done { background: #dcfce7; color: #166534; }
+  .ac-num { font-size: 11px; font-weight: 700; color: #888; white-space: nowrap; }
+  .ac-text { font-size: 13px; font-weight: 600; flex: 1; }
+  .ac-body { padding: 12px 18px; font-size: 13px; color: #4b5563; }
+  .ac-body ul { margin: 4px 0 0 18px; }
+
+  /* poc terminal */
+  .poc-terminal { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11.5px; background: #1e1e2e; color: #cdd6f4; border-radius: 8px; padding: 12px 14px; line-height: 1.7; overflow-x: auto; }
+  .poc-line { display: block; white-space: pre-wrap; word-break: break-word; }
+  .poc-bad { color: #f38ba8; }
+  .poc-good { color: #a6e3a1; }
+  .poc-note { color: #a6adc8; }
+  .poc-caption { font-size: 12px; color: #6b7280; margin-top: 10px; }
+
+  /* code block for JSON / bash */
+  .code-block { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.6; background: #1e1e2e; color: #cdd6f4; padding: 14px 16px; border-radius: 6px; overflow-x: auto; white-space: pre; margin-bottom: 8px; }
+  .file-label { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; background: #f3f4f6; color: #374151; padding: 5px 10px; border-radius: 4px 4px 0 0; border: 1px solid #e5e5e5; border-bottom: none; }
+  .file-label + .code-block { border-radius: 0 0 6px 6px; margin-bottom: 12px; }
+
+  /* Notes */
+  .note-box { background: white; border: 1px solid #e5e5e5; border-radius: 10px; padding: 16px 18px; margin-bottom: 12px; }
+  .note-box .note-title { font-size: 12px; font-weight: 700; color: #1a1a1a; margin-bottom: 6px; }
+  .note-box p { font-size: 13px; color: #4b5563; }
+  .note-box table { margin-top: 8px; }
+
+  /* small table (schema) */
+  .mini-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+  .mini-table th { padding: 6px 10px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 10.5px; font-weight: 700; color: #6b7280; text-transform: uppercase; }
+  .mini-table td { padding: 6px 10px; border: 1px solid #e5e5e5; color: #374151; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11.5px; }
+
+  /* Verify */
+  .verify-list { list-style: none; }
+  .verify-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; }
+  .verify-item:last-child { border-bottom: none; }
+  .verify-num { width: 22px; height: 22px; background: #e8f0fe; color: #1a56db; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .verify-content { flex: 1; }
+  .verify-content strong { font-size: 13px; color: #1a1a1a; display: block; margin-bottom: 3px; }
+  .verify-content span { font-size: 12px; color: #6b7280; }
+
+  /* Scope table */
+  .scope-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .scope-table th { text-align: left; padding: 8px 12px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .scope-table td { padding: 10px 12px; border: 1px solid #e5e5e5; color: #374151; vertical-align: top; }
+  .tag-changed { font-size: 11px; font-weight: 600; background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 3px; }
+  .tag-unchanged { font-size: 11px; font-weight: 600; background: #f3f4f6; color: #6b7280; padding: 2px 6px; border-radius: 3px; }
+  .tag-new { font-size: 11px; font-weight: 600; background: #e8f0fe; color: #1a56db; padding: 2px 6px; border-radius: 3px; }
+
+  /* stat grid */
+  .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 8px; }
+  .stat-box { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 14px; text-align: center; }
+  .stat-box .num { font-size: 26px; font-weight: 700; color: #166534; }
+  .stat-box .lbl { font-size: 11px; color: #888; margin-top: 4px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="sprint-label">Sprint 21 Review · Phase 4 L2（旧新パリティ検証基盤）</div>
+  <h1>#48 — 旧新パリティの検証基盤を確立し、<br>縦切り1本（W1 注文確定）を通す</h1>
+  <div class="meta">
+    <span class="badge badge-sprint">Sprint 21</span>
+    <span class="badge badge-issue">#48</span>
+    <span class="badge badge-foundation">foundation</span>
+    <span class="badge badge-sp">SP 5</span>
+    <span class="badge badge-noui">画面の変更なし（test scope のみ）</span>
+  </div>
+
+  <!-- なぜこの検証基盤が必要か -->
+  <section>
+    <h2>なぜこの検証基盤が必要か</h2>
+    <div class="problem-box">
+      <div class="label">問題</div>
+      <p>「移植した業務ロジックが、本当に旧（Struts1 + HSQLDB）と同じ結果になるのか」を、これまで機械的に判定する手段がなかった。
+      現場で必ず問われる「①テストの本数は十分か ②網羅性は担保されているか」に、印象論ではなく実測と台帳で答えられる状態にする。</p>
+    </div>
+    <p class="lead">旧と新は語彙も分岐点も違う（旧＝Struts <code>.do</code> + HSQLDB、新＝REST + MySQL）ため、そのまま突き合わせることはできない。
+    どちらの語彙でもない<b>正規形（canonical）</b>を間に挟み、旧新それぞれの実測値を canonical へ写像してから比較する。</p>
+    <div class="arch3-grid">
+      <div class="arch3-box legacy">
+        <div class="arch-title">旧（oracle）</div>
+        <div class="flow-item">Struts1 <code>.do</code> 駆動</div>
+        <div class="flow-item">HSQLDB(9002) へ JDBC</div>
+        <div class="flow-item">JSP HTML から値抽出</div>
+        <div class="flow-item">"保存すべき業務ロジック"の正解</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch3-box canonical">
+        <div class="arch-title">Canonical（正規形）</div>
+        <div class="flow-item"><b>outcome</b> / <b>inventoryDelta</b></div>
+        <div class="flow-item"><b>ordersCreated</b> / <b>orderTotal</b></div>
+        <div class="flow-item"><b>lines</b>（itemId, qty, unitPrice）</div>
+        <div class="flow-item"><b>entries</b>（読み取り系の汎用集合）</div>
+      </div>
+      <div class="arch-arrow">←</div>
+      <div class="arch3-box newside">
+        <div class="arch-title">新（検証対象）</div>
+        <div class="flow-item">REST API 実HTTP駆動</div>
+        <div class="flow-item">MySQL へ JdbcTemplate</div>
+        <div class="flow-item">JSONレスポンスから値抽出</div>
+        <div class="flow-item">"同値であるべき"実装</div>
+      </div>
+    </div>
+    <p class="lead" style="margin-top:8px;">旧新とも絶対値のシード（legacy <code>EST-1=10000</code>／new <code>EST-1=100</code>）が違うため、<b>デルタ（増減）で比較する</b>。
+    値が一致すれば <code>EQUIVALENT</code>、意図的に違うはずの箇所（ID-1・ID-29等）は <code>INTENDED_DIVERGENCE(ID-x)</code> を宣言し、宣言と実測が一致することまで判定する。</p>
+  </section>
+
+  <!-- 実装内容 -->
+  <section>
+    <h2>実装内容（AC別）</h2>
+
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC1</div><div class="ac-text">canonical モデル — 旧新どちらの語彙でもない正規形</div></div>
+      <div class="ac-body">
+        <code>ParitySnapshot</code>（outcome / inventoryDelta / ordersCreated / orderTotal / lines / entries）を新設。
+        新側 WHO 6列・<code>version</code>・自動採番ID・<code>created_at</code>/<code>updated_at</code>、旧側 <code>creditcard</code>/<code>exprdate</code>/<code>cardtype</code>/<code>courier</code>/<code>locale</code>/<code>orderstatus</code>/<code>linenum</code> は比較対象から除外。
+        金額は <code>setScale(2)</code> した文字列で保持し誤差0で比較する。
+      </div>
+    </div>
+
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC2</div><div class="ac-text">デルタ比較 — シードの絶対値差を吸収する</div></div>
+      <div class="ac-body">在庫・注文件数は実行前後の<b>デルタ</b>で比較する。<code>orderid</code> の値そのものは見ない（採番機構が違う＝ID-23）。旧 <code>EST-1=10000</code>・新 <code>EST-1=100</code> というシード差があっても判定が成立することを確認済み。</div>
+    </div>
+
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC3</div><div class="ac-text">順序の正規化 — 並び順は比較対象にしない</div></div>
+      <div class="ac-body">集合性を持つ canonical は比較前に canonical キーで昇順ソート。ページング仕様自体を意図的に変えている（ID-20）以上、「保存すべき業務ロジック」に並び順は含めない、という判断。</div>
+    </div>
+
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC4</div><div class="ac-text">expectation の宣言と一致判定</div></div>
+      <div class="ac-body">
+        <code>ParityComparator</code> が下記4分岐で判定する。
+        <ul>
+          <li><code>EQUIVALENT</code> 宣言で差分が空 → pass</li>
+          <li><code>EQUIVALENT</code> 宣言で差分あり → <b>fail</b>（台帳に無い差分＝欠陥候補）</li>
+          <li><code>INTENDED_DIVERGENCE(ID-x)</code> 宣言で差分が空 → <b>fail</b>（台帳の形骸化）</li>
+          <li><code>INTENDED_DIVERGENCE(ID-x)</code> 宣言で <code>divergentFields</code> 完全一致 → pass（宣言外の差分が混ざれば fail）</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC5</div><div class="ac-text">シナリオ台帳 — 本Storyでは W1 の1本を登録</div></div>
+      <div class="ac-body"><code>ParityScenarios</code> を新設し、シナリオを抽象識別子で記述（例: <code>USER_PRIMARY</code>）。旧新それぞれの Runner が実体へ写像する。R1〜R6・W2・W3 は #49（横展開Story）のスコープ。</div>
+    </div>
+
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC6 / AC7</div><div class="ac-text">旧側 capture ハーネス — 別ポート・設定可能な接続先</div></div>
+      <div class="ac-body">
+        <code>captureGolden</code> タスク（手動実行）が legacy を <code>signon.do → addItemToCart.do → updateCartQuantities.do → checkout.do → newOrderForm.do → newOrder.do → newOrder.do?confirmed=true</code> で駆動し、HSQLDB(9002) へ JDBC で読み出す。
+        legacy も新 backend も既定ポートが 8080 のため、採取用 legacy は別ポート（<code>-p 8081:8080 -p 9002:9002</code>）で起動し、base URL / JDBC 接続先は <code>-P</code> オプションで差し替え可能（ハードコードしない）。
+      </div>
+    </div>
+
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC8</div><div class="ac-text">golden の版管理 — 再現性の担保</div></div>
+      <div class="ac-body"><code>src/test/resources/parity/golden/*.json</code> にコミット。<code>capturedFrom.legacyCommit</code>（legacy repo の commit sha）と <code>capturedAt</code> を必ず埋める。sha を解決できなければ書き出さずに fail。</div>
+    </div>
+
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC9 / AC10</div><div class="ac-text">新側 verify の駆動 — 実HTTP・CSRFヘルパ・シナリオ間リセット</div></div>
+      <div class="ac-body">
+        <code>@SpringBootTest(webEnvironment = RANDOM_PORT)</code> の実HTTPで新側を駆動（MockMvcの <code>csrf()</code> 注入は使わない＝フィルタチェーン実経路を通すため）。DBは既存 <code>IntegrationTestBase</code> の Testcontainers MySQL 8.4 + Flyway を再利用。
+        各シナリオ実行前にカート／注文／在庫を既知状態へリセットする前処理を実装（前シナリオのカート残留による誤カウントを防止）。
+      </div>
+    </div>
+
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC11 / AC12</div><div class="ac-text">dual-tag と gradle タスク — legacy 停止状態でも green</div></div>
+      <div class="ac-body">
+        Spec は <code>@Tag("integration")</code>＋<code>@Tag("parity")</code> の dual-tag。<code>parityTest</code>（<code>includeTags 'parity'</code>）を新設し、既存 <code>integrationTest</code> に <code>excludeTags 'parity'</code> を追加して二重実行を回避。<code>check</code> には載せない（当面ローカル/手動ゲート）。
+        legacy を停止した状態でも <code>parityTest</code> がコミット済み golden とのみ比較して green になる（legacy 起動が要るのは <code>captureGolden</code> のみ）。
+      </div>
+    </div>
+
+    <div class="ac-card">
+      <div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC-neg2</div><div class="ac-text">legacy 無改変 — 採取後の後始末</div></div>
+      <div class="ac-body">採取のために legacy のソース・WAR・<code>run/</code> 配下は一切変更しない。DBデータ操作は可とするが、採取後は復元する（下記「実装メモ」参照）。</div>
+    </div>
+  </section>
+
+  <!-- AC-neg1 実証 -->
+  <section>
+    <h2>AC-neg1 実証 — 台帳に無い不一致は失敗する</h2>
+    <p class="lead">golden <code>order-single-item.json</code> の <code>unitPrice</code> を <code>"16.50"</code> → <code>"16.99"</code> へ一時的に書き換え、<code>parityTest</code> を実行した実際の失敗出力。</p>
+    <div class="poc-terminal">
+<span class="poc-line">$ ./gradlew parityTest --tests "*OrderParitySpec"</span>
+<span class="poc-line">&nbsp;</span>
+<span class="poc-line poc-bad">Condition not satisfied:</span>
+<span class="poc-line">&nbsp;</span>
+<span class="poc-line">result.pass</span>
+<span class="poc-line">|      |</span>
+<span class="poc-line">|      <span class="poc-bad">false</span></span>
+<span class="poc-line poc-note">scenario=order-single-item: EQUIVALENT宣言だが差分あり(台帳に無い差分=欠陥候補) -></span>
+<span class="poc-line poc-note">  field=lines[EST-1].unitPrice golden(legacy)="16.99" actual(new)="16.50"</span>
+<span class="poc-line">&nbsp;</span>
+<span class="poc-line poc-good">BUILD FAILED</span>
+    </div>
+    <div class="poc-caption">どのシナリオのどのフィールドが食い違ったかが出力から一目で判別できる。goldenを <code>"16.50"</code> へ戻すと再び green になることも確認済み。</div>
+  </section>
+
+  <!-- 実装メモ -->
+  <section>
+    <h2>実装メモ（仕様外の判断・変更・妥協点）</h2>
+
+    <div class="note-box">
+      <div class="note-title">CSRFヘルパの罠（spikeで4回踏んだ落とし穴の実機再現）</div>
+      <p><code>NewHttpClient.ensureCsrfToken()</code> の初版は Groovy の <code>(1..N).each { ... return token }</code> でリトライしていたが、<b>Groovyのクロージャ内 <code>return</code> は <code>.each{}</code> を抜けず continue 相当にしかならない</b>ため、トークンが早期に取れてもループが最後まで回り成否が不安定になる不具合だった。<code>OrderParitySpec</code> 実行時に以下の試行履歴つき例外で実際に検出できた:</p>
+      <div class="poc-terminal" style="margin-top:8px;">
+<span class="poc-line poc-bad">XSRF-TOKEN Cookieが10回のGET /api/pingでも取得できなかった:</span>
+<span class="poc-line poc-note">attempt 1: present, attempt 2: absent, attempt 3: present, attempt 4: absent,</span>
+<span class="poc-line poc-note">attempt 5: present, attempt 6: absent, attempt 7: present, attempt 8: absent,</span>
+<span class="poc-line poc-note">attempt 9: present, attempt 10: absent</span>
+      </div>
+      <p>この出力自体が「トークンCookieの有無が交互にトグルする」という新側CSRFの仕様の実機再現になっている。素の <code>for</code> ループ（トークン取得次第でメソッド自体を <code>return</code>）へ書き換えて解消した。</p>
+    </div>
+
+    <div class="note-box">
+      <div class="note-title">legacy HSQLDBスキーマの実機確認</div>
+      <p><code>jpetstore-legacy</code> コンテナへ <code>INFORMATION_SCHEMA</code> をJDBCで問い合わせ、推測ではなく実機でテーブル構造を確認した。</p>
+      <table class="mini-table">
+        <tr><th>テーブル</th><th>主な列</th></tr>
+        <tr><td>INVENTORY</td><td>ITEMID VARCHAR, QTY INTEGER</td></tr>
+        <tr><td>ORDERS</td><td>ORDERID, TOTALPRICE, SHIP*/BILL*/COURIER/CREDITCARD/EXPRDATE/CARDTYPE/LOCALE（比較除外列）</td></tr>
+        <tr><td>LINEITEM</td><td>ORDERID, LINENUM, ITEMID, QUANTITY, UNITPRICE</td></tr>
+        <tr><td>SEQUENCE</td><td>NAME（linenum/ordernum）, NEXTID</td></tr>
+      </table>
+    </div>
+
+    <div class="note-box">
+      <div class="note-title">golden採取・復元の実証（AC-neg2）</div>
+      <p>一時コンテナ <code>jpetstore-legacy-parity</code>（<code>-p 8081:8080 -p 9002:9002</code>）でW1を採取し、<code>docker stop -t 30</code>（graceful）→ <code>docker rm</code> で後始末。legacy DBが採取前と完全同一状態へ復元されたことをJDBCで確認した。</p>
+      <table class="mini-table">
+        <tr><th>項目</th><th>採取前</th><th>採取後</th></tr>
+        <tr><td>EST-1 在庫</td><td>10000</td><td>10000</td></tr>
+        <tr><td>ORDERS件数</td><td>2</td><td>2</td></tr>
+        <tr><td>SEQUENCE(linenum/ordernum)</td><td>1000/1002</td><td>1000/1002</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <!-- golden実例 -->
+  <section>
+    <h2>golden 実例（W1: order-single-item）</h2>
+    <p class="lead">EST-1 を2個注文する縦切りシナリオの canonical スナップショット。正規化済み（scale(2)）の値でコミットされている。</p>
+    <div class="file-label">src/test/resources/parity/golden/order-single-item.json</div>
+    <div class="code-block">{
+  "scenario" : "order-single-item",
+  "expectation" : "EQUIVALENT",
+  "divergenceId" : null,
+  "divergentFields" : [ ],
+  "capturedFrom" : {
+    "legacyCommit" : "9bdb187ef6de092e02f85687a9b44331899d4f83",
+    "capturedAt" : "2026-08-20T06:49:38.774555800Z"
+  },
+  "snapshot" : {
+    "outcome" : "SUCCESS",
+    "inventoryDelta" : { "EST-1" : -2 },
+    "ordersCreated" : 1,
+    "orderTotal" : "33.00",
+    "lines" : [ { "itemId" : "EST-1", "quantity" : 2, "unitPrice" : "16.50" } ],
+    "entries" : [ ]
+  }
+}</div>
+  </section>
+
+  <!-- 検証結果 -->
+  <section>
+    <h2>検証結果</h2>
+    <div class="stat-grid">
+      <div class="stat-box"><div class="num">3 Spec</div><div class="lbl">parityTest（legacy停止状態）green</div></div>
+      <div class="stat-box"><div class="num">26 / 26</div><div class="lbl">既存IT green（取りこぼし・二重実行なし）</div></div>
+      <div class="stat-box"><div class="num">無改変</div><div class="lbl">jpetstore-legacy イメージ</div></div>
+    </div>
+  </section>
+
+  <!-- 動作確認ポイント -->
+  <section>
+    <h2>動作確認ポイント（ユーザー確認用）</h2>
+    <ul class="verify-list">
+      <li class="verify-item">
+        <div class="verify-num">1</div>
+        <div class="verify-content">
+          <strong>legacyを起動していない状態でも <code>./gradlew parityTest</code> が green になること</strong>
+          <span>コミット済み golden とのみ比較するため、legacyの起動は capture 時（<code>captureGolden</code>）だけで良い</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">2</div>
+        <div class="verify-content">
+          <strong>既存の統合テスト26本が従来どおり全て通ること</strong>
+          <span><code>./gradlew integrationTest</code> の実行結果ファイルが従来どおり26件・全てfailures 0であること</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">3</div>
+        <div class="verify-content">
+          <strong>golden を1フィールド書き換えると parityTest が失敗し、原因箇所が特定できること</strong>
+          <span>「AC-neg1実証」節の失敗出力どおりに再現できるか</span>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- 改修スコープ確認 -->
+  <section>
+    <h2>改修スコープ確認</h2>
+    <table class="scope-table">
+      <tr><th>対象</th><th>変更</th><th>内容</th></tr>
+      <tr><td><code>jpetstore-backend/src/test/groovy/.../parity/**</code></td><td><span class="tag-new">新規</span></td><td>canonical / comparator / capture / verify 一式（すべて test scope）</td></tr>
+      <tr><td><code>jpetstore-backend/src/test/resources/parity/golden/order-single-item.json</code></td><td><span class="tag-new">新規</span></td><td>W1 の golden</td></tr>
+      <tr><td><code>jpetstore-backend/build.gradle</code></td><td><span class="tag-changed">変更あり</span></td><td><code>parityLegacyJdbc</code> configuration・<code>captureGolden</code>/<code>parityTest</code> タスク追加</td></tr>
+      <tr><td><code>jpetstore-backend/src/main/**</code>（プロダクトコード）</td><td><span class="tag-unchanged">変更なし</span></td><td>本Storyはテスト基盤の構築のみ</td></tr>
+      <tr><td><code>jpetstore-frontend</code> / <code>jpetstore-database</code></td><td><span class="tag-unchanged">変更なし</span></td><td>対象外</td></tr>
+      <tr><td><code>legacy-jpetstore</code>（ソース・WAR・<code>run/</code>配下）</td><td><span class="tag-unchanged">変更なし</span></td><td>起動のみ・無改変原則を維持（AC-neg2で実証）</td></tr>
+    </table>
+  </section>
+
+</div>
+</body>
+</html>
