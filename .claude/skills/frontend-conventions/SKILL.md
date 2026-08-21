@@ -144,6 +144,7 @@ src/
 - テストコードは Vitest で記述する
 - `it` の第一引数（テスト名）およびコード内のコメントは日本語で記述する
 - カバレッジは `npm run test:unit -- --coverage` で確認し、限りなく100%を目指す
+  - ⚠️ **`test:unit` は hw-hub-frontend の script 名。`jpetstore-frontend` には存在しない**（実体は `npm run test` = `vitest run`）。§7「テスト実行コマンド」参照
 
 ### テスト対象の分類
 
@@ -173,6 +174,23 @@ parent.member1@example.com 〜 parent.member4@example.com
 
 jpetstore-frontendはVue 3 + TypeScript + Pinia + Vue Router + Vite + Vitest + vue-i18n。
 backend（Spring Security 7・JWT httpOnly Cookie認証）との連携で必要な参照知識・実装パターンをまとめる。
+
+### テスト実行コマンドは `npm run test`（`test:unit` は存在しない）
+
+`jpetstore-frontend/package.json` の scripts は以下がすべて。**hw-hub-frontend 由来の `test:unit` は無い**ので、
+指示や他ドキュメントに `npm run test:unit` と書かれていても、そのまま実行するとエラーになる。
+
+| script | 実体 | 用途 |
+| --- | --- | --- |
+| `test` | `vitest run` | **ユニットテスト一括実行（これを使う）** |
+| `format` | `prettier --write "src/**/*.{ts,vue,json,css}"` | コミット前フォーマット |
+| `type-check` | `vue-tsc --build` | 型チェック |
+| `build` | `run-p type-check build-only` | 型チェック＋ビルド |
+| `dev` / `preview` / `build-only` | `vite` 系 | 開発サーバ・プレビュー・ビルドのみ |
+
+- 実行結果は `Test Files N passed (N)` / `Tests N passed (N)` の行を読む。**skipped があれば `Tests N passed | M skipped` の形で出る**ので、その表記が無ければ skipped=0。
+- カバレッジを取る場合は `npx vitest run --coverage`（`test:unit -- --coverage` は使えない）。
+- **コマンド名は実行前に `package.json` で実在確認する**（`developer-workflow`「数値・判定を成果物に書くときは…」参照）。
 
 ### CSRF cookie-to-header は非XOR・生値をそのまま送る（マスク処理を書かない）
 
