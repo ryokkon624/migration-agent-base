@@ -281,3 +281,118 @@ AC7暫定目標（BRANCH ≥ 24/34・PO合意済み）は実測28/34で達成。
 ID-24関連Story）・`spec/l2-parity-design.md`（§2に8行・§6未決事項2を解決済みに更新）・
 `tools/legacy-jacoco/report.sh`（3本出し）・`reports/after/l2-parity-coverage.md`（Sprint22追記S1〜S9）
 をいずれも更新済み。SMへ完了報告済み（コミットハッシュ等は報告メッセージ参照）。
+
+---
+
+## 7. `#30-sprint-review` へ投稿予定（Forum 新規スレッド）
+
+> Discord MCP 未接続のため投稿できず。再起動後に本文をそのまま投稿する。
+
+**スレッドタイトル**: `[JPS] Sprint 22 Review`
+
+```
+[SM] Sprint 22 Review
+
+## スプリントゴール
+L2 パリティのシナリオをアカウント系（W4/W5）・注文履歴照会へ広げ、
+未踏として名指しされている分岐を実際に踏んで、ゲート値を再合意する。
+
+## AC達成状況（#51）
+| AC | 内容 | 結果 |
+|----|------|------|
+| AC1 | W4 アカウント新規登録 | ✅ |
+| AC2 | W5 アカウント編集（**3ケース**・SM-1で2→3へ訂正） | ✅ |
+| AC3 | R7 / R8a / R8b ＋ ID-14 台帳追記 | ✅（※R8a は意図的逸脱あり・下記） |
+| AC4 | カート境界値 | ✅ |
+| AC5 | バリデータ2クラスの配線調査 | ✅ 両クラスとも到達不能と確定・§3の誤記述も訂正 |
+| AC6 | 先例規約の踏襲（仕組み無変更） | ✅ |
+| AC7 | ゲート値の再合意 | ✅ 実測ベースで再合意案を提示（PO判断待ち） |
+| AC8 | legacy 停止状態で parityTest green | ✅ SMが独立に --rerun で再実行し確認 |
+| AC-neg1〜5 | 宣言不一致fail／legacy無改変・後始末／除外の機構担保／ID-2案A担保／Testcontainersフィクスチャ | ✅ すべて充足 |
+
+## コードレビュー結果
+- 規約: 指摘なし
+- セキュリティ: 指摘なし
+- パフォーマンス: 指摘なし
+- SM独立verification: 2件検出 → 1件是正（R8bの前提assertが新側に無く旧側と非対称だった）・
+  1件はSMの誤検出と判明（(a)/(b)は手計算ではなく機構出力だった）
+
+## parityTest（legacy 停止状態・SM が --rerun で強制再実行）
+23 tests / failures 0 / errors 0
+（AccountParitySpec 6・CatalogParitySpec 6・OrderHistoryParitySpec 3・OrderParitySpec 3・
+ CartParitySpec 1・NewHttpClientSpec 3・ParityIntegrationTestBaseSmokeSpec 1）
+23 = シナリオSpec 19（＝17シナリオ＋AC-neg4の独立検証2）＋インフラSpec 4
+
+## 計測結果（(a)/(b) を機構出力で分離）
+|  | gate（3除外・分母1588） | gate-v2（5除外・分母1424） |
+|---|---|---|
+| 旧9シナリオ（#50 exec） | 1144/1588 = 72.0%・BRANCH 16/34 | 1138/1424 = 79.9% ←(a)除外のみ |
+| 新17シナリオ（今回 exec） | 1366/1588 = 86.0%・BRANCH 28/34 = 82.4% | 1360/1424 = 95.5% ←(a)+(b) |
+
+(b) 追加シナリオの効果 = 1360 − 1138 = +222 instruction（+15.6pt）
+BRANCH の 16→28（+12）はすべて (b)（両除外クラスとも総分岐数0のため除外の影響なし）
+実測 28/34 は到達可能な理論上限ちょうど。残る6＝SqlMapItemDao 3・SqlMapSequenceDao 1（スコープ外）／
+Cart 1・CartItem 1（構造的に到達不能）
+
+## ★ PO へ明示報告する2件
+
+### (1) R8a の expectation 変更＝Issue スコープ表からの意図的逸脱
+Issue の表では R8a = EQUIVALENT だったが、Q6（ユーザー判断）で
+INTENDED_DIVERGENCE(ID-24) へ変更した。理由＝productName は平文PW vs ハッシュ（ID-2・確定2）と違い
+値として比較可能で、除外すると台帳 ID-24 が観測点を持たないまま残るため（design §5 の狙いに反する）。
+旧の実体も裏取り済み（LineItem.xml の getLineItemsByOrderId が LineItem.item を埋めないため
+ViewOrder.jsp の description セルが空）。
+
+### (2) ゲート値の再合意案
+| 指標 | #50 合意フロア | 提案フロア |
+|---|---|---|
+| BRANCH | ≥ 16/34（47.1%） | ≥ 28/34（82.4%） |
+| INSTRUCTION | ≥ 1144/1588（72.0%・gate） | ≥ 1360/1424（95.5%・gate-v2 へ分母切替） |
+絶対数を正・%は可読形（#50 と同じ作法）。#50 の暫定目標 BRANCH ≥24/34 は達成済み。
+分母を gate → gate-v2 に切り替える提案なので、#50 §5-2「分母の変更自体が再合意のトリガ」に該当する。
+
+## 今スプリントで訂正された事実（5件）
+| 項目 | 誤 | 正 | 検出 |
+|---|---|---|---|
+| W5 のケース数 | 2 | 3 | SM（Planning・実コード） |
+| R8b の新側ステータス | 404 | 403 | DEV |
+| AC-neg4 のログインパス | /api/login | /api/auth/login | DEV |
+| 到達可能上限 | 30/34→29/34 | 28/34 | DEV（2段階とも・初出値はSM） |
+| 「(a)/(b) が手計算」 | — | SM の誤検出（機構出力だった） | DEV |
+※ Issue #51 本文そのものの訂正（上3件）は PO が次回 Refinement で一括対応する方針。
+
+## Pull Request
+https://github.com/ryokkon624/jpetstore-backend/pull/22 （closes #51・未マージ）
+※ migration-agent-base 側は step12（Retro後）で PR を作成する。
+
+## Sprint Review ファイル
+backlog/sprint_22/review-#51.html
+
+## ユーザーへ
+Sprint Review ファイルをブラウザで開いて確認をお願いします。
+指摘がある場合はこのスレッドにコメントをお願いします。指摘対応は次のスプリントで実施します。
+確認完了後、Claude Code を再起動して Retro の指示をお願いします。
+（再起動は Discord MCP の復旧も兼ねます。）
+```
+
+---
+
+## 8. Discord バックフィル完了記録（2026-08-21・Retro セッション）
+
+セッション再起動により Discord MCP の疎通が回復（`scrum-agent#2250` でログイン・読み書きとも成功）したため、
+本ファイルに退避していた §1 / §2 / §7 の内容を**事後バックフィル投稿**した（各投稿に「事後投稿である」旨を明記）。
+
+| 退避元 | 投稿先 | スレッドタイトル | スレッドID |
+| --- | --- | --- | --- |
+| §1 | `#10-planning` | `[JPS] Planning完了報告 Sprint 22` | `1540233360960524322` |
+| §2 | `#20-sprint` | `[JPS] Sprint 22 作業スレッド` | `1540233513008369674` |
+| §7 | `#30-sprint-review` | `[JPS] Sprint 22 Review` | `1540233566749720646` |
+| （Retro） | `#40-retrospective` | `[JPS] Sprint 22 Retrospective` | `1540234475059941406` |
+
+**判明した制約**:
+- **1メッセージ 2000 文字上限**。§1 / §7 / Retro はいずれも超過したため、新規スレッド作成＋`discord_reply_to_forum` で分割投稿した。
+- `discord_get_forum_channels`（ギルド単位のチャンネル一覧）は権限エラーになるが、**チャンネルID直指定の投稿・返信には影響しない**。
+
+**未対応の潜在バグ（ユーザー判断待ち）**: `discord` MCP が2箇所で定義され env 変数名が食い違う。
+プロジェクト `.mcp.json`=`DISCORD_TOKEN`（正・パッケージが読む名前）／ユーザー `~/.claude.json`=`DISCORD_BOT_TOKEN`（誤）。
+ユーザースコープが優先されるとトークン無しで起動し、投稿前に `discord_login` が必須になる。

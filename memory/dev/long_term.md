@@ -60,6 +60,22 @@ convention reviewerの提案1件（`captureCookies`の`.each{}`内`return`も`fo
 未検査」「[SM verification] 推測の確定事項化」（本セクション）・「習得したこと」「技術的なハマりポイント」
 参照。
 
+**Sprint22（#48/#49に続く#51・L2パリティのアカウント系/注文履歴照会拡張）でも、tier分離クリーン記録は
+回復しなかった（3スプリント連続でSM verificationが実質的な指摘を出す結果になった）。** 一方で3観点reviewer
+（規約/セキュリティ/パフォーマンス）は全観点「指摘なし」で、Sprint20/21から続く「reviewerはクリーン・
+SM verificationのみが実質指摘を出す」構図がさらに1回積み上がった。SM verificationは2件検出し、1件
+（`NewScenarioRunner.orderDetailMissing()`の前提assertが新側に無く旧側と非対称＝Sprint21所見①「検証資産の
+耐久性」と同型の**2回目**）を是正、もう1件（「(a)/(b)の分離は手計算」という指摘）はDEVが実コード
+（`report.sh`の3本出し機構）で反証しSMの誤検出と判明した。2回目のR8b是正は`backend-conventions`§9の
+既存エントリへ症状追加assertの一般原則として反映済み（詳細は「Skills更新履歴」）。
+**加えて本スプリントは、SM→DEV（W5ケース数2→3・Planning時点）とDEV→SM（R8b新側ステータス404→403／
+AC-neg4ログインパス／到達可能上限30→29→28の3訂正）の双方向で反証が効いた初めてのスプリントだった。**
+一次データに当たる検算プロセス（SMの一次データ検算・DEVの実コード裏取り）が、役割を問わず機能している
+実例として記録する。
+発生スプリント: Sprint22（#51、3reviewer指摘0件・SM verification 2件（1件是正・1件誤検出）。R8b是正の
+背景は`backend-conventions`§9「検証資産（golden/フィクスチャ）は前提条件を実機で検査し...」節の
+Sprint22追記参照）。
+
 **Sprint12（#29・初のRepository層導入PoC）は、3観点reviewer自体は全員クリア（Conv/Sec/Perfとも指摘0件）
 だったが、SMがコア精読で3reviewer全員が見落としたperf純増（書込4操作の`findByUserId`二重呼び・+2クエリ/
 操作）を独立発見し、同スプリントで是正した。** reviewerのクリア判定を鵜呑みにせずSMが実コードを読む
@@ -1674,20 +1690,63 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   されるパターン」（jpetstore-backend）に記録した。
 - `#skills-changelog` へ `[DEV]` で投稿済み。
 
+### Sprint 22（#51・Phase 4 L2パリティ検証基盤・アカウント系/注文履歴照会拡張・Sprint21に続くtest scope専用スプリント）
+
+- **`backend-conventions`**: `## 9. jpetstore-backend 固有の注意事項`の
+  「L2パリティ検証ハーネス（`parity`パッケージ）のtest scope実装パターン」セクション（見出しを
+  「Sprint21 #48/#49・Sprint22 #51」へ更新）に以下2点を反映した:
+  1. **既存項目への追記（2回ルール対象外）**: 「検証資産（golden/フィクスチャ）は前提条件を実機で検査し、
+     満たさなければ書き出さずfailする」節へ、**旧新両側の前提assertを対称に用意する**という要件を追加した
+     （Sprint21所見①「検証資産の耐久性」の**2回目**の顕在化。今回は旧側にのみ前提assertがあり新側に対が
+     無く、旧新の応答形が同一〔403〕に正規化されるため片側防御にしかならなかった＝`NewDbReader.orderExists`
+     新設で是正）。原則自体は既にSkill化済み（Sprint21・知らないと書けない参照知識の即時反映扱い）のため、
+     再発防止チェックリストとしての新規昇格ではなく既存項目の強化として反映した。
+  2. **初出だが「知らないと書けない参照知識・実装パターン」の2回ルール例外として即時反映**: HSQLDB
+     （legacy）が列エイリアスをUPPERCASEへ正規化して返すため、汎用DB読み出しヘルパーの列名lowercase方式を
+     新規canonicalフィールドに流用するとMySQL（新側）のcamelCaseキーと一致せず偽の不一致を起こす問題と、
+     ordinal位置での組み立てへの是正方針。
+- **`backend-conventions`へ反映しなかったもの**: `Cart.addItem()`のfalse側も`CartItem`と同型の理由で構造的に
+  到達不能という発見（理論上限30→29→28の3段階訂正のうち3段階目・DEV自己発見）は、`CartItem`の発見と**同一
+  スプリント内の2件目**であり「異なるレビュー時点で2回」という2回ルールの昇格要件を満たさないと判断した
+  （Sprint20の`{@link}`宙吊り参照2件と同型の判断）。`memory/dev/long_term.md`「繰り返し指摘されるパターン」
+  （jpetstore-backend）に記録済み。
+- 3reviewer全観点指摘0件・SM verification 2件（1件是正・1件誤検出）・SM↔DEV双方向反証が効いた点は、
+  チェックリスト項目ではなくプロセス上の記録のため`memory/dev/long_term.md`「繰り返し指摘されるパターン」
+  （jpetstore-backend）に記録した。
+- `frontend-conventions`/`rules/database.md`は本スプリント`jpetstore-frontend`/`jpetstore-database`無変更の
+  ため対象外。
+- チェックリスト棚卸し（卒業判定）: 「卒業済みルール」セクション参照。今回は卒業候補なし。
+- `#skills-changelog` へ `[DEV]` で投稿済み。
+
 ## 卒業済みルール
 
-（該当なし。棚卸し対象となるルールが直近15スプリント基準に達していない。
-  jpetstore-backendはSprint2・3・4・6・7・8・9・10・11・12・13・14・15・16・17・18・19・20・21の19スプリント、
-  jpetstore-databaseはSprint1・3・6・14・16・18・19・20の8スプリント（Sprint21はdatabase無変更のため不算入）、
-  jpetstore-frontendはSprint5・6・7・8・10・11・14・15・16・17・18・19の12スプリント（Sprint20・21はいずれも
-  frontend無変更のため不算入）のみのため、いずれも対象外。§9/§7昇格済みルールの昇格後経過スプリント数
-  （直近15スプリント基準の分子）は、catch-all例外横取り（Sprint7昇格）が14スプリント（Sprint8〜21。Sprint21は
-  `src/main`無変更のためcatch-all自体の新規棚卸し機会は無かったが、Sprint20の§9追記のみの扱いと同様「未発生」
-  継続としてカウント）・Spockの`given:`裸stub×`then:`引数一致（Sprint12昇格）が9スプリント（Sprint13〜21。
-  Sprint21はGroovy/Spockのtest scope実装が中心だったがMock()のgiven:/then:併用パターン自体の再発は無し）・
-  DB-backedレート制限（Sprint16昇格）が5スプリント（Sprint17〜21。Sprint21は`src/main`無変更のため新規逸脱の
-  機会自体が無く、Sprint20と同様の理由で「未発生」継続としてカウント）・frontend CRLFノイズ選択add
-  （Sprint18昇格）が1スプリント（Sprint19のまま据え置き。Sprint20・21ともfrontend無変更のため不算入）・
-  frontend共通レイアウトへの新規要素追加時のfind('button')/find('form')衝突確認（Sprint19昇格）が0スプリント
-  （昇格直後のまま据え置き。Sprint20・21ともfrontend無変更のため不算入）で、いずれも15スプリントに満たない。
-  Sprint4〜Sprint20 Retroに続きSprint21 Retroでも棚卸しを実施したが同様の理由で卒業候補なし）
+（Sprint22 Retro時点でも該当なし。棚卸し対象ルールのうち1件（catch-all例外横取り）が直近15スプリント
+  基準の分子に到達したが、卒業の十分条件（未発生の理由を説明できること）を満たせないため今回は見送った。
+
+  リポジトリ別の実施スプリント数: jpetstore-backendはSprint2・3・4・6・7・8・9・10・11・12・13・14・15・16・
+  17・18・19・20・21・**22**の**20スプリント**（本Retroで#51を追加）、jpetstore-databaseはSprint1・3・6・14・
+  16・18・19・20の8スプリント（Sprint21・**22**ともdatabase無変更のため不算入）、jpetstore-frontendは
+  Sprint5・6・7・8・10・11・14・15・16・17・18・19の12スプリント（Sprint20・21・**22**はいずれもfrontend
+  無変更のため不算入）。
+
+  §9/§7昇格済みルールの昇格後経過スプリント数（直近15スプリント基準の分子）:
+  - **catch-all例外横取り（Sprint7昇格）が15スプリント（Sprint8〜22）に到達**。Sprint21・22は`src/main`
+    無変更のため新規棚卸し機会自体が無く「未発生」継続としてカウントしたが、実際に新規エンドポイント/
+    例外経路を追加した「機会あり」スプリントはこの15本のうち8本（Sprint8・10・11・14・16・17・19・20）
+    あり、いずれでも再発は無かった。**卒業は見送る**: 十分条件（モデルの一般知識化／コード構造変化での
+    構造的消滅／lint等での機械的防止）のいずれにも明確に該当しない。既知5例外への専用ハンドラは実装済みだが、
+    `@ExceptionHandler(Exception.class)`のcatch-all自体は撤去しておらず、未知の新規フレームワーク例外が
+    将来のエンドポイント追加で同じ穴を再現する構造的余地は残る（「機会があるたびに毎回確認して防げている」
+    状態であり「そもそも起きなくなった」わけではない）。次回Retro以降も直近の「機会ありスプリント」の
+    実績を注視し、機械的防止（lint/静的解析でのcatch-all検出等）が導入されれば卒業を再検討する。
+  - Spockの`given:`裸stub×`then:`引数一致（Sprint12昇格）が10スプリント（Sprint13〜22。Sprint22は
+    Runner/Spec中心の実装でMock()のgiven:/then:併用パターン自体の再発は無し）。
+  - DB-backedレート制限（Sprint16昇格）が6スプリント（Sprint17〜22。Sprint22は`src/main`無変更のため
+    新規逸脱の機会自体が無く「未発生」継続としてカウント）。
+  - frontend CRLFノイズ選択add（Sprint18昇格）が1スプリント（Sprint19のまま据え置き。Sprint20・21・22とも
+    frontend無変更のため不算入）。
+  - frontend共通レイアウトへの新規要素追加時のfind('button')/find('form')衝突確認（Sprint19昇格）が
+    0スプリント（昇格直後のまま据え置き。Sprint20・21・22ともfrontend無変更のため不算入）。
+
+  catch-all以外はいずれも15スプリントに満たない。Sprint4〜Sprint21 Retroに続きSprint22 Retroでも棚卸しを
+  実施したが、上記の理由により卒業候補なし）

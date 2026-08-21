@@ -1057,7 +1057,7 @@ new ApplicationContextRunner()
 > `conversionService` bean明示登録で解消した。詳細は`memory/dev/long_term.md`「習得したこと」
 > （jpetstore-backend）参照。
 
-### L2パリティ検証ハーネス（`parity`パッケージ）のtest scope実装パターン（Sprint21 #48/#49）
+### L2パリティ検証ハーネス（`parity`パッケージ）のtest scope実装パターン（Sprint21 #48/#49・Sprint22 #51）
 
 コードベース初の「プロダクトコード（`src/main`）を一切変更しないtest scope専用スプリント」（旧新パリティ
 検証基盤）で確立した、test-only実装パターン。今後のR系/W系シナリオ追加・同種の特性化テスト
@@ -1181,8 +1181,35 @@ golden/フィクスチャのような「実測値を記録して以後の比較�
   前提が分かる状態にする。
 - fail-pathの動作は、実際に前提を崩す入力（存在しないitemId等）を注入して**「本当にfailすること」を実証**
   する（`captureGolden`実行 → 例外・golden未書き出しを確認 → 元に戻す）。
+- **旧側にだけ前提assertを置いて満足しない。新側（比較対象）にも対になる前提assertを必ず用意し、
+  「前提が崩れたときに新側だけが素通りしてparityTestがgreenのまま観測点が失われる」経路を潰す。**
+  旧新でスナップショットの見え方が同じ（例: 不存在も非所有も同一の403に正規化される）場合、旧側の前提が
+  崩れても新側の応答形は変化しないため、旧側assertだけでは片側防御にしかならない。
 
 > **背景（Sprint21 #48/#49、SM verification確定所見）**: W3（在庫不足）シナリオで、前処理UPDATE
 > （`restoreInventoryQty`）がaffected rowsを検査しない裸のUPDATEだったため、itemId不一致等でUPDATEが黙って
 > 0行になってもgolden自体は変化せず、観測ポイント（ID-1の実証）だけが静かに失われる欠落があった。上記4点で
 > 是正し、実際にitemIdを差し替えてfail-pathを実証した。
+> **Sprint22 #51（SM verification確定所見・同型2回目）**: `NewScenarioRunner.orderDetailMissing()`
+> （R8b＝存在しないorderIdの注文詳細照会）は旧側`LegacyDbReader#orderExists`の前提assertのみを持ち、新側に
+> 対になるassertが無かった。`GET /api/orders/{id}`は不存在・非所有のいずれも同一403（ID-4/SBD-8）に正規化
+> されるため、前提（orderIdが実在しないこと）が崩れてもスナップショットの見え方は変わらず、parityTestは
+> green のまま観測点（ID-14の実証）だけが失われる経路が残っていた。`NewDbReader#orderExists`を新設し
+> `orderDetailMissing()`冒頭でassertする形で両側対称化し、999999999を強制的に実在させたシナリオでfail-pathも
+> 実証した。上記の対症箇条書きへ反映した。
+
+#### DB間でcamelCaseキーを突合する場合、列ラベルの大文字小文字はDBドライバ依存で信用できない
+
+HSQLDB（legacy）はSQLの列エイリアスをUPPERCASEへ正規化して返す。`ResultSetMetaData.getColumnName()`を
+`toLowerCase()`する汎用DB読み出しヘルパーをそのまま使うと、`AS firstName`のようなcamelCaseエイリアスが
+`firstname`に潰れ、MySQL（新側）のcamelCaseキーと文字列が一致せず**偽の不一致**でfailする。
+
+- 新規にDB直読みcanonicalフィールドを追加する際は、列ラベルに頼らず**SELECT列順とordinal位置**で
+  camelCaseキー名を組み立てる（旧新両側で同じ設計に揃える＝ドライバ非依存の防御的設計）。
+- captureGolden実行直後は必ずgolden JSONの中身を目視確認し、意図したキー名で値が入っているか確認する
+  （偽の不一致は`captureGolden`自体は正常終了するため気づきにくい）。
+
+> **背景（Sprint22 #51）**: 新設`accountRow`（アカウント系canonical読取）で既存の`queryRow`/`queryRows`
+> ヘルパー（`orderRow`等が前提とする列名lowercase方式）を流用したところ、旧側キーが`firstname`等の全小文字に
+> 潰れ、新側（camelCaseのまま）と一致せずアカウント系シナリオ全件が偽の不一致でfailする状態になった
+> （golden JSON出力後の目視確認で発覚）。両側の`accountRow`をordinal位置での組み立てに是正した。
