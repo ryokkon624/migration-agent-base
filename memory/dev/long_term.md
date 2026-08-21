@@ -242,6 +242,21 @@ Sprint4のセキュリティ非ブロッキング2件（`AuthApplicationService.
   到達不能クラスの実カバレッジを検査しdriftを機械的に検出する構成へ変更）。
   発生スプリント: Sprint21（#50、SM verification・PO指摘。初出のため2回ルールに従い本セクション止まり）。
 
+- [DEV自己発見・実装フェーズ・#51] **計画フェーズで確定した「到達可能分岐の理論上限」の見積りが、実装フェーズで
+  実コード精読と実測の両方によりさらに1件訂正された（30→29→28の3段階訂正）。** Sprint22（#51）計画フェーズで
+  DEVが最初に見積もった30/34は、SMが一次データで`CartItem.getTotalPrice()`の`item != null`false側の
+  構造的到達不能を発見し29/34に訂正済みだったが、実装フェーズでDEV自身が`Cart.addItem()`の
+  `cartItem != null`false側も**同型の理由**（呼び出し元`AddItemToCartAction`/`AddItemToCartController`が
+  いずれも`containsItemId`で事前ガードしてから`addItem()`を呼ぶため、内部の`cartItem == null`判定は常に
+  trueになる）で構造的に到達不能であることをコードリーディングで発見し、実測（`Cart`のbranch coverage
+  5/6・missed=1のまま不変）でも裏取りした。**28/34が正**。「シナリオ設計時に想定したHTTP経路が実際に
+  どの内部メソッド/分岐を通るかは、呼び出し元の事前ガード条件まで含めて実コードで確認しないと、表面的な
+  『2回リクエストを送れば両方のアウトカムを踏める』という直感だけでは誤る」という教訓（`CartItem`と全く
+  同型のパターンが2件連続で発生＝同一クラス群〔`Cart`/`CartItem`〕内での再発）。同種の「未踏分岐から
+  シナリオを逆算する」設計をレビュー/実装する際は、対象メソッドの**全呼び出し元**を洗い出し、呼び出し元側の
+  事前ガードで特定の分岐が構造的に迂回されていないか確認する必要がある。
+  発生スプリント: Sprint22（#51、DEV自己発見・実測裏取り。初出のため2回ルールに従い本セクション止まり）。
+
 ### jpetstore-frontend
 Sprint5（#24）が初のフロントエンド実装スプリント。3観点レビューでパフォーマンス1件・セキュリティ1件の
 指摘があった（規約は指摘なし）。いずれも初出（1回目）のため、2回ルールに従いSkillのチェックリストへは
@@ -556,6 +571,33 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   是正）。
   発生スプリント: Sprint21（#49、golden採取直後の目視確認で自己発見。初出だが具体的な実機事実のため2回ルール
   例外で`backend-conventions`へ即時反映）
+- **HSQLDBはSQLの列エイリアスをUPPERCASEへ正規化して返すため、`ResultSetMetaData.getColumnName()`を
+  `toLowerCase()`する既存の汎用DB読み出しヘルパーを使うと、`AS firstName`のようなcamelCaseエイリアスが
+  `firstname`に潰れる。** `LegacyDbReader`の既存`queryRow`/`queryRows`（`orderRow`等が前提とする列名
+  lowercase方式）をそのまま新設の`accountRow`に流用したところ、legacy側canonicalのキーが
+  `firstname`/`lastname`/`postalcode`等の全小文字になり、新側（MySQL・`NewDbReader#accountRow`は
+  camelCaseのままキーが返る）と一致せず、アカウント系シナリオ全件が`account[firstName]`/
+  `account[firstname]`という**別キー扱いの偽の不一致**でfailする状態だった（captureGoldenで実際に
+  golden JSONを出力してから発覚。目視確認で即座に検出できた）。**列ラベルの大文字小文字はDB実装/JDBC
+  ドライバ依存で信用できないため、camelCaseのキー名をSQLの結果セットから直接組み立てたい場合は、
+  列ラベルに頼らずSELECT列順とordinal位置で対応づける**方式に是正した（旧新両側の`accountRow`に同じ
+  設計を適用＝ドライバ非依存の防御的設計。両側とも列名でなくインデックスでcanonicalキーを組み立てる）。
+  新しいDB直読みcanonicalフィールドを追加する際は、列エイリアスの大文字小文字がDB間で素通しされる保証が
+  無いことを前提に設計する必要がある。
+  発生スプリント: Sprint22（#51、golden出力直後の目視確認でDEV自己発見。初出だが具体的な実機事実のため
+  2回ルール例外で本エントリに記録。次に同種のDB間camelCaseキー突合が必要になった際はordinal方式を
+  第一候補とする）。
+- **Git Bash（MSYS）から`docker run -v <host>:/jacoco ...`を実行すると、MSYSのパス変換機構が`-v`引数中の
+  コンテナ側絶対パス（`/jacoco`）を誤ってホストパスとして解釈し、ボリュームが正しくバインドされない。**
+  `docker run`コマンド自体はエラーにならず正常に起動して見えるため気づきにくいが、`docker inspect`の
+  `Mounts[].Destination`が`\Program Files\Git\jacoco`のような壊れたWindowsパスになっており、
+  JaCoCoエージェントが書き出す`jacoco.exec`がホスト側に一切現れない（コンテナを`docker stop -t 30`で
+  graceful停止しても出力先ディレクトリが空のまま）。`tools/legacy-jacoco/README.md`の既存手順（`-v
+  "$(pwd)/...:/jacoco"`）はPowerShell/cmdでの実行を前提にしており、Git Bashでは`MSYS_NO_PATHCONV=1`を
+  コマンド先頭に付けて回避する必要がある（`docker run`単体だけでなく、コンテナ側の絶対パスを含む`-v`
+  引数を使うdocker系コマンド全般に当てはまる）。
+  発生スプリント: Sprint22（#51、JaCoCo計測用コンテナ起動時にDEV自己発見。初出だが環境依存の落とし穴の
+  ため`tools/legacy-jacoco/README.md`へ即時反映（2回ルール対象外＝ドキュメント修正のため））。
 
 ### jpetstore-frontend
 - **vue-i18n（v11・Composition API）のメッセージ文字列中の`@`はlinked message構文（`@:key`形式）として
