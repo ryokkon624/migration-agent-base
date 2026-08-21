@@ -1,0 +1,517 @@
+<title>言える範囲と言えない範囲</title>
+<style>
+  :root {
+    --ground:      #F1F4F3;
+    --surface:     #FFFFFF;
+    --surface-2:   #E9EEEC;
+    --ink:         #101819;
+    --ink-2:       #4B5A5D;
+    --ink-3:       #77878A;
+    --rule:        #D3DCDA;
+    --rule-strong: #A9B9B6;
+    --accent:      #0E5E5C;
+    --accent-soft: #DBEAE8;
+    --warn:        #855C0E;
+    --warn-soft:   #F3E7CD;
+    --gap:         #98301F;
+    --gap-soft:    #F5DCD7;
+    --shadow:      0 1px 2px rgba(16,24,25,.06), 0 8px 24px -16px rgba(16,24,25,.22);
+
+    --display: "Hiragino Mincho ProN", "Yu Mincho", YuMincho, "Noto Serif JP", "Times New Roman", Georgia, serif;
+    --body: "Hiragino Kaku Gothic ProN", "Yu Gothic", YuGothic, Meiryo, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #0D1315;
+      --surface:     #141D1F;
+      --surface-2:   #1B2628;
+      --ink:         #E4ECEA;
+      --ink-2:       #9CADAE;
+      --ink-3:       #748688;
+      --rule:        #253335;
+      --rule-strong: #3A4C4E;
+      --accent:      #5CB5B0;
+      --accent-soft: #16302F;
+      --warn:        #D8A64C;
+      --warn-soft:   #322715;
+      --gap:         #E37763;
+      --gap-soft:    #33201C;
+      --shadow:      0 1px 2px rgba(0,0,0,.4), 0 10px 28px -18px rgba(0,0,0,.8);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:      #0D1315;
+    --surface:     #141D1F;
+    --surface-2:   #1B2628;
+    --ink:         #E4ECEA;
+    --ink-2:       #9CADAE;
+    --ink-3:       #748688;
+    --rule:        #253335;
+    --rule-strong: #3A4C4E;
+    --accent:      #5CB5B0;
+    --accent-soft: #16302F;
+    --warn:        #D8A64C;
+    --warn-soft:   #322715;
+    --gap:         #E37763;
+    --gap-soft:    #33201C;
+    --shadow:      0 1px 2px rgba(0,0,0,.4), 0 10px 28px -18px rgba(0,0,0,.8);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.75;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px 96px; }
+  .prose { max-width: 68ch; }
+
+  /* ---------- masthead ---------- */
+  header.mast {
+    padding: 72px 0 40px;
+    display: flex; flex-direction: column; gap: 20px;
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--ink-3);
+    display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: baseline;
+  }
+  .eyebrow b { color: var(--accent); font-weight: 600; }
+  h1 {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: clamp(2rem, 5.2vw, 3.25rem);
+    line-height: 1.22;
+    letter-spacing: .01em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  .standfirst {
+    font-size: 1.0625rem; color: var(--ink-2); margin: 0; max-width: 62ch;
+  }
+
+  /* ---------- gates ---------- */
+  .gates {
+    display: grid; gap: 1px;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 8px 0 0;
+  }
+  .gate { background: var(--surface); padding: 18px 20px 20px; display: flex; flex-direction: column; gap: 6px; }
+  .gate .k { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; color: var(--ink-3); text-transform: uppercase; }
+  .gate .v { font-family: var(--display); font-size: 1.5rem; line-height: 1.1; color: var(--accent); font-weight: 600; }
+  .gate .v.cond { color: var(--warn); font-size: 1.25rem; }
+  .gate .n { font-size: .8125rem; color: var(--ink-2); font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+  /* ---------- boundary ---------- */
+  .boundary {
+    margin: 72px 0 40px;
+    display: flex; align-items: center; gap: 18px;
+  }
+  .boundary::before, .boundary::after {
+    content: ""; height: 1px; background: var(--rule-strong); flex: 1;
+  }
+  .boundary span {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .18em;
+    text-transform: uppercase; color: var(--ink-3); white-space: nowrap;
+  }
+
+  h2 {
+    font-family: var(--display); font-weight: 600;
+    font-size: clamp(1.375rem, 2.6vw, 1.75rem); line-height: 1.3;
+    margin: 56px 0 4px; text-wrap: balance;
+  }
+  h2:first-of-type { margin-top: 0; }
+  h2 .num {
+    font-family: var(--mono); font-size: .625em; color: var(--accent);
+    letter-spacing: .1em; margin-right: .7em; vertical-align: .18em;
+  }
+  h3 { font-family: var(--body); font-size: 1rem; font-weight: 700; margin: 32px 0 4px; letter-spacing: .01em; }
+  p { margin: 12px 0; }
+  .lede { color: var(--ink-2); margin-top: 6px; }
+  code, .m { font-family: var(--mono); font-size: .875em; }
+  code { background: var(--surface-2); padding: .1em .35em; border-radius: 2px; }
+  a { color: var(--accent); text-underline-offset: 3px; }
+
+  /* ---------- headline stats ---------- */
+  .stats { display: grid; gap: 20px 32px; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); margin: 28px 0 8px; }
+  .stat { border-top: 2px solid var(--accent); padding-top: 10px; }
+  .stat .big { font-family: var(--display); font-size: 2.125rem; line-height: 1; font-variant-numeric: tabular-nums; }
+  .stat .lbl { font-size: .8125rem; color: var(--ink-2); margin-top: 6px; display: block; }
+  .stat.warn { border-top-color: var(--warn); }
+  .stat.gap  { border-top-color: var(--gap); }
+
+  /* ---------- ledger ---------- */
+  .filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 24px 0 14px; align-items: center; }
+  .filters .lbl { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); margin-right: 4px; }
+  button.f {
+    font: inherit; font-size: .8125rem; cursor: pointer;
+    background: var(--surface); color: var(--ink-2);
+    border: 1px solid var(--rule); border-radius: 999px; padding: 4px 14px;
+    transition: background .12s, color .12s, border-color .12s;
+  }
+  button.f:hover { border-color: var(--rule-strong); color: var(--ink); }
+  button.f[aria-pressed="true"] { background: var(--ink); color: var(--ground); border-color: var(--ink); }
+  button.f:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .tablewrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 3px; background: var(--surface); box-shadow: var(--shadow); }
+  table { border-collapse: collapse; width: 100%; min-width: 720px; font-size: .875rem; }
+  thead th {
+    text-align: left; font-weight: 700; font-size: .6875rem; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--ink-3); font-family: var(--mono);
+    padding: 12px 16px; border-bottom: 1px solid var(--rule-strong); background: var(--surface);
+    position: sticky; top: 0; z-index: 1;
+  }
+  tbody td { padding: 11px 16px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: 0; }
+  tbody tr[hidden] { display: none; }
+  td.id { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--ink-2); }
+  td.change { color: var(--ink); min-width: 22rem; }
+  td.change .old { color: var(--ink-3); }
+  .chip {
+    display: inline-block; font-family: var(--mono); font-size: .6875rem; letter-spacing: .06em;
+    padding: 2px 8px; border-radius: 2px; white-space: nowrap; font-weight: 600;
+  }
+  .chip.l1 { background: var(--accent-soft); color: var(--accent); }
+  .chip.l2 { background: var(--ink); color: var(--ground); }
+  .chip.l3 { background: var(--surface-2); color: var(--ink-2); }
+  .chip.none { background: var(--gap-soft); color: var(--gap); }
+  .v-ok   { color: var(--accent); }
+  .v-part { color: var(--warn); }
+  .v-gap  { color: var(--gap); font-weight: 700; }
+  td.verdict { white-space: nowrap; font-size: .8125rem; }
+  .note { display: block; color: var(--ink-3); font-size: .75rem; line-height: 1.55; margin-top: 3px; }
+  .count { font-family: var(--mono); font-size: .8125rem; color: var(--ink-3); margin-left: auto; font-variant-numeric: tabular-nums; }
+
+  /* ---------- callout ---------- */
+  .callout {
+    border-left: 2px solid var(--accent); background: var(--surface);
+    padding: 18px 22px; margin: 24px 0; border-radius: 0 3px 3px 0;
+  }
+  .callout.gapc { border-left-color: var(--gap); }
+  .callout.warnc { border-left-color: var(--warn); }
+  .callout p:first-child { margin-top: 0; }
+  .callout p:last-child { margin-bottom: 0; }
+  .callout .h { font-weight: 700; }
+
+  ol.cant { counter-reset: c; list-style: none; padding: 0; margin: 24px 0 0; display: flex; flex-direction: column; gap: 2px; }
+  ol.cant li {
+    counter-increment: c; background: var(--surface); border: 1px solid var(--rule);
+    padding: 14px 18px 14px 52px; position: relative; font-size: .9375rem;
+  }
+  ol.cant li::before {
+    content: counter(c, decimal-leading-zero);
+    position: absolute; left: 18px; top: 15px;
+    font-family: var(--mono); font-size: .75rem; color: var(--gap); font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  ol.cant li:first-child { border-radius: 3px 3px 0 0; }
+  ol.cant li:last-child { border-radius: 0 0 3px 3px; }
+  ol.cant li + li { border-top: 0; }
+
+  .findings { display: grid; gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 3px; overflow: hidden; margin: 24px 0; }
+  .finding { background: var(--surface); padding: 16px 20px; display: grid; grid-template-columns: 96px 1fr; gap: 4px 18px; align-items: baseline; }
+  .finding .tag { font-family: var(--mono); font-size: .75rem; color: var(--accent); font-weight: 600; }
+  .finding .body { font-size: .9375rem; }
+  .finding .body b { font-weight: 700; }
+  @media (max-width: 620px) { .finding { grid-template-columns: 1fr; } }
+
+  footer.foot { margin-top: 80px; padding-top: 28px; border-top: 1px solid var(--rule); color: var(--ink-3); font-size: .8125rem; }
+  footer.foot p { margin: 6px 0; }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="wrap">
+
+  <header class="mast">
+    <div class="eyebrow">
+      <span>Phase 4 · L4 意図差分台帳の照合</span>
+      <span>Sprint 23</span>
+      <span><b>#52</b> / <b>#53</b></span>
+      <span>2026-08-21</span>
+    </div>
+    <h1>言える範囲と、言えない範囲</h1>
+    <p class="standfirst">
+      Struts 1 の JPetStore を Vue 3 + Spring Boot へ作り直した。「何も変わっていないと証明しろ」への回答は、
+      <strong>すべてが同じだと言い切ること</strong>ではなく、<strong>どこまで同じだと言えて、どこから言えないかの境界線を引くこと</strong>にある。
+      これはその境界線の記録である。
+    </p>
+
+    <div class="gates">
+      <div class="gate">
+        <span class="k">L1 &nbsp;AC 準拠</span>
+        <span class="v">PASS</span>
+        <span class="n">951 tests · 0 failures</span>
+      </div>
+      <div class="gate">
+        <span class="k">L2 &nbsp;旧同値</span>
+        <span class="v">PASS</span>
+        <span class="n">parityTest 23/23 · BRANCH 28/34</span>
+      </div>
+      <div class="gate">
+        <span class="k">L3 &nbsp;脆弱性回帰</span>
+        <span class="v">PASS</span>
+        <span class="n">S1–S21 &nbsp;21/21 解消</span>
+      </div>
+      <div class="gate">
+        <span class="k">L4 &nbsp;台帳照合</span>
+        <span class="v cond">是正後 PASS</span>
+        <span class="n">未台帳 2 件を追記して解消</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="boundary"><span>ここから上 — 言える範囲</span></div>
+
+  <section>
+    <h2><span class="num">01</span>再現できたと言える範囲</h2>
+    <p class="lede prose">
+      意図差分台帳の 33 項目それぞれについて、L1（AC 準拠テスト）・L2（旧の実測値との特性化比較）・L3（脆弱性回帰）の
+      どれが実際にその項目を見ているかを、<strong>実在するテスト名で名指しできたときだけ</strong>「観測点あり」とした。
+    </p>
+
+    <div class="stats">
+      <div class="stat">
+        <span class="big">31<span style="font-size:.55em;color:var(--ink-3)"> / 33</span></span>
+        <span class="lbl">観測点がある台帳項目</span>
+      </div>
+      <div class="stat warn">
+        <span class="big">6</span>
+        <span class="lbl">うち部分観測（宣言より狭い範囲しか見ていない）</span>
+      </div>
+      <div class="stat gap">
+        <span class="big">2</span>
+        <span class="lbl">穴（観測点が一つも無い）</span>
+      </div>
+      <div class="stat">
+        <span class="big">4<span style="font-size:.55em;color:var(--ink-3)"> / 33</span></span>
+        <span class="lbl">旧新の<strong>直接比較</strong>が成立している項目</span>
+      </div>
+    </div>
+
+    <div class="callout">
+      <p><span class="h">最後の数字がこの報告書の要点である。</span>
+      旧の実測値と突き合わせて「旧と同じ結果になる」と示せているのは、台帳 33 件のうち <strong>4 件</strong>（ID-1・ID-14・ID-24・ID-29）だけだ。
+      残りは L1（新側が仕様どおり動くこと）と L3（旧の脆弱性が消えたこと）で見ている。</p>
+      <p>これは L2 の欠陥ではない。この移行は 1:1 再現ではなく<strong>仕様源からの作り直し</strong>なので、
+      「旧と完全一致」を品質基準に置けない／置くべきでない部分がある——その帰結が、この 4 という数字である。</p>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">02</span>台帳 33 項目 × 検証手段</h2>
+    <p class="lede prose">
+      L1 = 新側の AC テスト。L2 = 旧を実測した golden との比較。L3 = before の PoC が after で失敗すること。
+    </p>
+
+    <div class="filters">
+      <span class="lbl">絞り込み</span>
+      <button class="f" data-f="all" aria-pressed="true">すべて</button>
+      <button class="f" data-f="ok" aria-pressed="false">観測点あり</button>
+      <button class="f" data-f="part" aria-pressed="false">部分観測</button>
+      <button class="f" data-f="gap" aria-pressed="false">穴</button>
+      <button class="f" data-f="l2" aria-pressed="false">旧新の直接比較（L2）</button>
+      <span class="count" id="count">33 件</span>
+    </div>
+
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>ID</th><th>何をどう変えたか</th><th>手段</th><th>判定</th></tr>
+        </thead>
+        <tbody id="tb"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="boundary"><span>ここから下 — 言えない範囲</span></div>
+
+  <section>
+    <h2><span class="num">03</span>この報告書が主張しないこと</h2>
+    <p class="lede prose">
+      4 本のゲートが PASS したことは、「何も変わっていない」ことを意味しない。
+    </p>
+
+    <ol class="cant">
+      <li><strong>台帳の網羅性は保証されていない。</strong> 台帳が 31 → 33 件になったのは L4 が 2 件見つけたからであって、全数走査をした訳ではない。<strong>3 件目が無いとは言えない。</strong></li>
+      <li><strong>「観測点あり」31 件のうち 6 件は部分観測。</strong> 宣言の全体を見ているわけではない。</li>
+      <li><strong>穴が 2 件残っている（ID-30・ID-33）。</strong> 今スプリントでは埋めていない。起票しただけである。</li>
+      <li><strong>旧新の直接比較が成立しているのは 33 件中 4 件。</strong> 「旧と同じ結果になる」を旧の実測値と突き合わせて示せている範囲は狭い。</li>
+      <li><strong>L2 が踏んでいる legacy の分岐 28/34 は「理論上限」ではない。</strong> <code>SqlMapItemDao</code> の 3 分岐はシナリオを足せば踏める。正しくは「現行シナリオ集合のスコープ内での上限」。</li>
+      <li><strong>比較モデルが最初から外しているフィールドがある。</strong> カード列（ID-8）・courier/locale（ID-21）・orderstatus/linenum（ID-22）・採番 ID（ID-23）・password（ID-2）・mylist/banner（ID-7）・配色（ID-31）。<strong>除外は「そこに差分がある」という宣言であって、差分の観測ではない。</strong></li>
+      <li><strong>L3 の PASS は before の findings に対するもの。</strong> after 側には Low 4 件が残っており（#42–#47 で起票済み）、当該レポート自身が「完全な clean とは書けない」と書いている。</li>
+      <li><strong>L1 の 951 テストは AC 準拠を見ている。</strong> 「仕様どおりに動く」と「旧と同じに動く」は別である。</li>
+      <li><strong>注文の二重送信は未決着。</strong> 旧新差分でない公算が高いという判定に基づく保留であり、実測していない。「起きない」証拠も「起きる」反証もテスト資産に存在しない。</li>
+      <li><strong>これは検証結果の突き合わせであって、受入テストではない。</strong> ライブ PoC 以外に、旧新を同時に動かして人が比べた記録は含まれない。</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2><span class="num">04</span>L4 が台帳自体に見つけたもの</h2>
+    <p class="lede prose">
+      L4 は「台帳どおりか」を確認する工程だが、その過程で<strong>台帳そのものの誤り</strong>が見つかった。
+      台帳が判定の分母である以上、これは L4 の一次成果である。
+    </p>
+
+    <div class="findings">
+      <div class="finding">
+        <span class="tag">ID-27 訂正</span>
+        <span class="body">as-is「日英 JSP 同梱」は誤り。<b>legacy に日本語資産は 1 つも存在しない</b>。<code>langpref</code> は保存されるだけで描画に一切影響しない。</span>
+      </div>
+      <div class="finding">
+        <span class="tag">ID-28 訂正</span>
+        <span class="body">as-is「在庫状況表示なし」は誤り。<b>旧は生の在庫数をそのまま画面に出していた</b>（<code>Item.jsp:37-43</code>）。差分は「表示の有無」ではなく<b>「生の在庫数の露出 → status のみ」</b>——as-is が誤っていると、差分の性格そのものを読み違える。</span>
+      </div>
+      <div class="finding">
+        <span class="tag">ID-10 訂正</span>
+        <span class="body">after「セッション再生成」は新の構成と字義上かみ合わない。新は STATELESS でセッション自体を作らない。趣旨（固定化が成立しない）は不変だが、字義どおりに観測点を作ると空振りする。</span>
+      </div>
+      <div class="finding">
+        <span class="tag">ID-32 追記</span>
+        <span class="body"><b>未台帳の差分</b>。認証状態の保持方式（HTTP セッション → 完全ステートレス）。セッションに<i>同居していた個別状態</i>は各々宣言されていたが、<b>方式そのものが宣言されていなかった</b>。</span>
+      </div>
+      <div class="finding">
+        <span class="tag">ID-33 追記</span>
+        <span class="body"><b>未台帳の差分</b>。カート一覧のページング廃止（旧 4 件/頁 → 全件表示）。ID-20 が「カタログ一覧」限定だったため、<b>カート側がどの ID の担当でもなくなっていた</b>。</span>
+      </div>
+      <div class="finding">
+        <span class="tag">18 → 17</span>
+        <span class="body">引用元レポートの「全 18 シナリオ」は <b>17 が正</b>（off-by-one）。一次データ 3 系統がすべて 17。ゲート値は機構出力なので影響なし。</span>
+      </div>
+      <div class="finding">
+        <span class="tag">SM の誤り</span>
+        <span class="body">「台帳 ID-26 の CVE 根拠が L3 と食い違う」という SM の指摘は<b>取り下げ</b>。台帳＝<code>jpetstore-database</code> の 8.0.33、L3＝<code>jpetstore-backend</code> の 9.5.0 で<b>対象アーティファクトが別</b>だった。座標まで一次データで確認してから「食い違い」と呼ぶこと。</span>
+      </div>
+    </div>
+
+    <div class="callout gapc">
+      <p><span class="h">ID-33 が穴なのは偶然ではない。</span>
+      ID-33 は L4 が今回はじめて台帳に載せた差分である。<strong>台帳に載っていなかったものに観測点が作られているはずがない</strong>——
+      「台帳に載せる」と「観測点を作る」が同じ駆動から出ている以上、これは自然な因果である。
+      <strong>逆に言えば、台帳の抜けは観測点の抜けとして必ず現れる。</strong></p>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">05</span>次の一手を、台帳から導いた</h2>
+    <p class="lede prose">
+      L2 のカバレッジ軸は枯れていた（28/34）。そこで「カバレッジが低いから足す」ではなく
+      「<strong>台帳 ID に観測点が無いから足す</strong>」へ駆動を入れ替えた。その結果——
+    </p>
+
+    <div class="callout">
+      <p><span class="h">L2 のカバレッジの穴と、L4 の観測点の穴が同一だった。</span></p>
+      <p><code>item-detail-missing</code>（不存在 itemId で <code>viewItem.do</code>）を 1 本足すと、
+      <strong>ID-14 の 2 本目の観測点</strong>になり（台帳が挙げる 3 経路のうち、L2 で見ているのは今 1 本だけ）、
+      同時に <strong><code>SqlMapItemDao.getItem</code> の未踏分岐</strong>をちょうど踏む。</p>
+      <p>駆動を入れ替えても、カバレッジ面で失うものが無い。これが「観測点の質へ軸を移す」という提起に対する、実測での回答である。</p>
+    </div>
+
+    <div class="findings">
+      <div class="finding">
+        <span class="tag">#54</span>
+        <span class="body">観測点の<b>穴</b>を埋める — ID-30（下書きがリロードで消えること）・ID-33（カートが全件表示であること）。どちらも「無いこと」を固定する assert が存在しない。</span>
+      </div>
+      <div class="finding">
+        <span class="tag">#55</span>
+        <span class="body"><b>部分観測</b>の補強と退行検知器の追加 — <code>item-detail-missing</code>・<code>item-out-of-stock-add</code>・<code>STATELESS</code> の assert（現状 0 件＝設定を戻しても赤くならない）・<code>t_order.order_id</code> の AUTO_INCREMENT assert。</span>
+      </div>
+    </div>
+    <p class="prose" style="color:var(--ink-2);font-size:.9375rem">
+      いずれも今スプリントでは実装していない。<strong>起票までがスコープ</strong>とした。
+      #55 はカバレッジ数値を達成判定に使わないことを否定 AC に明記している——駆動を戻さないため。
+    </p>
+  </section>
+
+  <footer class="foot">
+    <p><strong>Phase 4 は完走した。</strong>ただし「完走」とは、検証 4 層をすべて実施し、その結果として「どこまで言えて、どこから言えないか」を確定させたということであって、「すべてが検証された」ということではない。</p>
+    <p>成果物: <code>reports/after/verification-report.md</code> ／ 台帳: <code>spec/intended-diff-ledger.md</code>（33 件・訂正履歴つき） ／ 検算記録: <code>backlog/sprint_23/sm-verification.md</code></p>
+    <p>ゲート値（BRANCH 28/34・INSTRUCTION 1360/1424）と残存未踏分岐の内訳は、DEV と SM が互いの結果を見ずに <code>jacoco.csv</code> を合算し、同じ値に着地している。</p>
+  </footer>
+
+</div>
+
+<script>
+  const ROWS = [
+    ["ID-1","在庫ガード無し減算（売り越し可）","ガード付きアトミック減算・在庫不足で注文失敗","L2","ok"],
+    ["ID-2","パスワード平文保存・平文比較","ハッシュ＋ソルト保存・照合","L3","ok"],
+    ["ID-3","金額が <code>double</code>","<code>BigDecimal</code> / <code>decimal</code>","L1","ok"],
+    ["ID-4","連番 orderId で他人の注文を参照できる（IDOR）","サービス層認可＋不存在/非所有を同一応答","L3","ok"],
+    ["ID-5","Hessian/Burlap/HttpInvoker/Axis の remoting 面","廃止（REST・認証必須のみ）","L3","ok"],
+    ["ID-6","JSP / サーバサイドレンダリング","Vue 3 SPA＋REST","L3","part","旧 SSR 面の<b>消滅</b>は観測。「新＝SPA+REST」の<b>肯定側</b>を固定する観測点は無い"],
+    ["ID-7","banner 広告 / MyList（bannerdata への INNER JOIN 依存）","廃止（JOIN 依存も解消）","L1","ok"],
+    ["ID-8","実カード列を永続化・カード欄を必須","カード列/入力欄/必須検証を撤去","L1","ok"],
+    ["ID-9","注文確定が GET リンクで成立・CSRF 全域不在","非冪等 POST＋CSRF トークン","L3","ok"],
+    ["ID-10","ログイン成功時にセッション ID を再生成しない","STATELESS（実体は新規 JWT 発行）・固定化が成立しない","L3","ok"],
+    ["ID-11","GET でも資格情報を受理・<code>j2ee/j2ee</code> プリフィル・ロックアウト無し","POST body 限定・プリフィル廃止・DB-backed ロックアウト","L3","ok"],
+    ["ID-12","<code>forwardAction</code> を無検証 <code>sendRedirect</code>","allowlist / 相対のみ","L3","ok"],
+    ["ID-13","現在パスワード未確認でパスワード変更","現在パスワード確認／再認証を必須","L3","ok"],
+    ["ID-14","stale-session／不正 ID で 500＋スタックトレース露出（3 経路）","404／403 へ正規化・trace 非露出","L2","part","<b>L2 の観測点は注文詳細経路の 1 本だけ</b>。台帳が挙げる 3 経路は L2 で 1 本も見ていない（L1 では 3 経路とも観測済み）"],
+    ["ID-15","<code>product.description</code> の HTML を <code>escapeXml=false</code> で描画","plaintext 化＋商品画像は新規アセット","L3","ok"],
+    ["ID-16","入力検証は非空＋パスワード一致のみ","email 形式・最大長・パスワード強度を検証","L1","ok"],
+    ["ID-17","数量 0/負で <code>itemMap</code> が desync（幽霊行）","map/list 一貫の単一削除に正規化","L1","ok"],
+    ["ID-18","在庫切れでもカート追加可・数量上限なし","在庫切れは追加不可・上限＝在庫数","L1","ok"],
+    ["ID-19","未ログインのカートはセッションのみ（離脱で消失）","クライアント保持＋ログイン時に加算マージ・在庫でクランプ","L1","ok"],
+    ["ID-20","カタログ一覧 4 件/頁・セッション保持ページング","12 件/頁・API ページングパラメータ","L1","ok"],
+    ["ID-21","<code>courier=UPS</code> / <code>locale=CA</code> を保持","撤去（プレースホルダ）","L1","ok"],
+    ["ID-22","<code>orderstatus</code> に固定 1 行","固定プレースホルダ＋状態変更を監査ログへ記録","L1","part","<b>成功系監査の fail-open 化</b>という「無言の後退」を Low で受容済み（#47）。観測点はあるが完全には守られていない"],
+    ["ID-23","orderId 採番が select→+1→update（非アトミック）","DB 原子採番","L1","part","<code>t_order.order_id</code> の AUTO_INCREMENT を assert するテストが無い（検査しているのは <code>m_account.user_id</code> のみ）"],
+    ["ID-24","注文詳細（履歴経由）で明細の商品名が空","商品名を表示（非等価改善）","L2","ok"],
+    ["ID-25","秘密をソースに平文・HTTP 平文・Cookie フラグ欠落","シークレットストア・Cookie 属性・JWT 鍵の 3 段 fail-fast","L3","ok"],
+    ["ID-26","EOL／脆弱依存・版レンジ未固定","保守された現行版・版固定","L3","part","台帳が名指しする <code>jpetstore-database</code> 側の更新を観測している行が無い。版乖離（9.5.0 / 26.7.0）の据え置き理由も未記録"],
+    ["ID-27","言語は選べるが、選んでも描画は変わらない","i18n 基盤＋日本語ローカライズ（#25 で完了）","L1","ok"],
+    ["ID-28","アイテム詳細が<b>生の在庫数</b>をそのまま表示","3 段階バッジ表示・qty 自体はレスポンス非露出","L1","ok"],
+    ["ID-29","検索語の <code>%</code>/<code>_</code> がワイルドカードとして機能","リテラル一致（ESCAPE 併用）","L2","ok"],
+    ["ID-30","チェックアウト下書きを HTTP セッションに保持","Pinia（メモリのみ）・<b>リロードで消失</b>","なし","gap","「リロードで消える」ことを観測しているテストが無い。<code>reset()</code> の観測はあるが、それは別のこと"],
+    ["ID-31","テーマ/配色の切替機能なし","ライト/ダーク/システム連動の切替 UI・DB 権威で追従","L1","ok","旧に比較対象概念が存在しないため、観測しているのは<b>新側の AC のみ</b>。L2 化は構造的に不能"],
+    ["ID-32","認証状態をサーバサイド HTTP セッションで保持","完全ステートレス（httpOnly JWT Cookie）","L3","part","<code>STATELESS</code> を assert する自動テストが <b>0 件</b>＝設定を戻しても赤くならない。退行検知器になっていない"],
+    ["ID-33","カート一覧を 4 件/頁でページング","全件表示（ページング無し）","なし","gap","<code>CartController</code>・<code>CartControllerSpec</code>・<code>CartView.vue</code>・<code>cart.spec.ts</code> のすべてでページングの言及が 0 件。再導入しても赤くならない"]
+  ];
+  const VERDICT = {
+    ok:   ['観測点あり','v-ok'],
+    part: ['観測点あり（部分）','v-part'],
+    gap:  ['穴','v-gap']
+  };
+  const CHIP = { "L1":"l1", "L2":"l2", "L3":"l3", "なし":"none" };
+
+  const tb = document.getElementById('tb');
+  tb.innerHTML = ROWS.map(function (r) {
+    var id = r[0], oldB = r[1], neu = r[2], means = r[3], v = r[4], note = r[5];
+    var vd = VERDICT[v];
+    return '<tr data-v="' + v + '" data-m="' + means + '">' +
+      '<td class="id">' + id + '</td>' +
+      '<td class="change"><span class="old">' + oldB + '</span><br>→ ' + neu +
+        (note ? '<span class="note">' + note + '</span>' : '') + '</td>' +
+      '<td><span class="chip ' + CHIP[means] + '">' + means + '</span></td>' +
+      '<td class="verdict ' + vd[1] + '">' + vd[0] + '</td>' +
+    '</tr>';
+  }).join('');
+
+  var countEl = document.getElementById('count');
+  var buttons = Array.prototype.slice.call(document.querySelectorAll('button.f'));
+  function apply(f) {
+    var shown = 0;
+    Array.prototype.forEach.call(tb.rows, function (tr) {
+      var v = tr.dataset.v, m = tr.dataset.m;
+      var on = f === 'all' || (f === 'l2' ? m === 'L2' : v === f);
+      tr.hidden = !on;
+      if (on) shown++;
+    });
+    countEl.textContent = shown + ' 件';
+    buttons.forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.f === f)); });
+  }
+  buttons.forEach(function (b) {
+    b.addEventListener('click', function () { apply(b.dataset.f); });
+  });
+  apply('all');
+</script>
