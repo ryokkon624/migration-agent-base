@@ -1,25 +1,28 @@
 # SM 短期記憶（今スプリント）
 
-Sprint 20（#38 JWT署名鍵 fail-fast / #39 監査抑止＋未認証write増幅 / #40 注文失敗監査＋入力制約 / #41 レート制限 TOCTOU・13SP・2-repo）完了。Retro 済み。次スプリント開始時にリセット済み。
+Sprint 21（#48 L2 パリティ検証基盤・縦切り1本 W1 ／ #49 読み取り系＋W2/W3 の横展開 ／ #50 legacy カバレッジ計測＋ゲート値 PO 合意・11SP）完了。Retro 済み。次スプリント開始時にリセット済み。
 
-- **性格**: Phase 4 L3（セキュリティ回帰）の Find-and-Fix の **Fix 半分**＝機能追加ゼロのセキュリティ修正スプリント（新種）。主成果物は**否定AC の回帰テスト**＝SEC が手で実証した PoC の CI 資産化。
-- **実装**: backend `fix/38-l3-security-fixes`（7コミット・PR #20 で `closes #38/#39/#40/#41`）／database 同名（1コミット・PR #10 `Related:`）。**両 PR マージ済・4 Issue クローズ確認済・local main 両 repo 同期済**（backend `73c8d13` / database `17c40de`）。frontend 無変更。**AC 26/26**。
-- **レビュー**: 初回＝conv/sec 指摘なし・perf 1件（`LoginAttemptService` の tx 非対称）／**SM verification 確定所見1件**（quota チェックが best-effort 境界の外＝#39 が直している N2 と同一失敗モードの残存・**sec は false negative**）。デルタ再レビュー＝perf/sec クリーン・conv suggestion 1件（javadoc）→ **docs のみのため4回目ラウンドは省略し SM 現物確認でクローズ**。**Sprint Review 指摘ゼロ**。
-- **C2 成功**: SEC が自粛したライブ・バーストPoC（L3 §3 残件1）を `RateLimitBurstConcurrencySpec`（Testcontainers＋20並列）で資産化 → **L3 残件1 クローズ**。
-- **Skills 昇格2件**（詳細は long_term「Skills更新履歴 Sprint 20」）: `scrum-master-workflow` ④＝reviewer 全クリアでも SM 独立 verification 必須／⑥＝push フォールバックのはしご＋merge は MCP。
+- **性格**: **プロダクトコードを1行も変えない「検証基盤」スプリント**（新種）。`jpetstore-backend` の test スコープ単独＋`migration-agent-base`（overlay 定義・レポート）。**cross-repo なし**・`legacy-jpetstore` は起動のみで**無改変を維持**。
+- **実装**: backend `feature/48-l2-parity-foundation`（10コミット・**PR #21 マージ済＝#48/#49 クローズ**・local main `cb860a4` 同期済）。agent-base は `docs/sprint-21-l2-parity`（step12 で PR）。**AC 30/30**。
+- **レビュー**: 初回＝conv 1件（**SM verification で却下**＝`.each{} + return` は continue の意味で正しく `ensureCsrfToken` とは意味論が逆）・sec/perf 0。デルタ＝conv/sec とも 0（perf は観点を絞り N/A 判定）。**Sprint Review 指摘ゼロ**。
+- **SM verification の確定所見2件**（いずれも是正済み）: ①**W3 の ID-1 証拠が資産に固定されていない**（前処理が将来0行になっても golden はバイト同一で green のまま観測点が失われる）②**カバレッジレポートの因果分析が推測のまま下流で確定扱い**。
+- **【SM 自身の誤り】** PO へ渡した「到達可能分母 36」が誤り（正しくは **34**）。**PO が jacoco.xml を直接パースして検出**。是正＝`report.sh` の2本出し＋除外反証 fail（機構で担保）。
+- **#50 ゲート値 PO 合意**: **BRANCH ≥ 16/34（47.0%）・INSTRUCTION ≥ 1144/1588（72.0%）**の非退行フロア。分母は二層（AC1＝計測／ゲート＝AC1−到達不能3クラス・**両方併記必須**）。CLASS はゲートにしない。評価契機は**シナリオ集合が変わったとき**・自動ラチェットなし。
+- **Skills 昇格3件**（詳細は long_term「Skills更新履歴 Sprint 21」）: `scrum-master-workflow` ④＝検証資産の耐久性＋**数値は一次データで検算（SM が下流へ渡す数値も含む）**／⑥＝**push 代行前に規約上の正当性を確認**／step12＝**capstone が agent-base にある Story は `closes` を置く**。
 
-## 要フォロー（次回）
-- (1) **teammate 完了は idle≠完了**。成果物直接確認（memory/Discord/Issue/branch）。**副作用を伴う最終化の nudge は冪等指示**（「完了済みなら再実行せず Message ID を返答」）＝Sprint20 で有効性実証・二重投稿ゼロ。
-- (2) **teammate のツール可否は個体差あり**（Sprint19 DEV=github MCP 不可／Sprint20 DEV=`discord_get_messages` 不可）。**SM の成果物確認は teammate の完了報告受領後に行う**と観測ずれが出ない。
-- (3) **push はセッション単位で揺れる** → ⑥ に昇格済（①タイムアウト付き `git push origin` →②token URL →③別セッション代行）。**agent-base も同様**。マージは `mcp__github__merge_pull_request`。
-- (4) **javadoc `{@link}` 宙吊り参照**が Sprint20 で2件（同一スプリント内＝2回ルール未達で見送り）。**3件目が出たら `backend-conventions §9` に「`{@link}` 先の実在確認」を追加 → それでも再発ならビルド設定（`-Xdoclint`）を Issue 起票**、の順で判定する（DEV 申し送りへの SM 判定）。
-- (5) frontend EOL(CRLF) ノイズは #35 `.gitattributes` 済。**Sprint20 は frontend 無変更のため観測機会なし**（要フォロー継続）。
+## 次スプリントへの申し送り
+
+- (1) **teammate 完了は idle≠完了**。成果物直接確認（memory/Discord/Issue/branch）。**副作用を伴う最終化の nudge は冪等指示**。Sprint21 では idle 通知が実作業完了より**先に**届くケースを確認（stale read ではない・時系列の差）。
+- (2) **push はセッション単位で揺れる**（⑥ のはしご）。ただし**代行前に `rules/git.md` 上の正当性を確認**（Sprint21 で昇格）。マージは `mcp__github__merge_pull_request`。
+- (3) **teammate に「ブランチを切らず直接書いてよい」と指示しない**。**SM が先に作業ブランチを切って渡す**（Sprint21 の main 直コミットの誘因）。
+- (4) **javadoc `{@link}` 宙吊り参照**は Sprint20 の2件から**追加発生なし**（Sprint21 は該当なし）。3件目が出たら `backend-conventions §9` へ追加を判定。
+- (5) frontend EOL(CRLF) ノイズ（#35 `.gitattributes` 済）。**Sprint20/21 とも frontend 無変更のため観測機会なし**（要フォロー継続）。
+- (6) **PO 申し送り**: `l2-parity-design.md` の R2/F5 内部矛盾は **SM が Retro で是正済み**（R2 を「集合」に統一＋§2 に比較単位の規約を明記）。
+- (7) **PO の傾向候補α**（設計書内の記述どうしの矛盾が PO に確定要求として回る）は**初出継続**・次回同種発生で昇格判定。
+- (8) **台帳の残タスク**: #47(C) 完了後に **ID-22 の関連Story欄拡張の要否**を判定（#47 は現状 NotReady）。
 
 ## 次スプリント候補
-- open Issue は **#42 / #43 / #44 / #45（いずれも L3 Low 束・Ready=Draft）** と **#32（メール検証・NotReady/deferred）**。
-- #42〜#45 はすべて Phase 4 L3 由来で **Sprint 20 と同じ「PoC → 回帰テスト」枠組みがそのまま使える**。Sprint 21 対象は Planning 時に Projects の Sprint フィールドで特定する。
-- **Retro 積み残し**: PO が #44(B)（`languagePreference` allowlist）を保持中。Sprint20 では allowlist を実装せず**データ衛生（dev DB の正規化）のみ**実施した。
 
-## agent-base 成果物（step12）
-- 対象: `backlog/sprint_20/`（sprint_backlog・implementation-notes・review-#{38,39,40,41}.html）／`memory/{sm,dev,po}/{short,long}_term.md`／`.claude/skills/{scrum-master-workflow,backend-conventions}/SKILL.md`／`spec/intended-diff-ledger.md`（ID-11・ID-25 強化）／**`reports/after/l3-security-regression-{backend,frontend}.md`（SEC の L3 レポート・未追跡だったので今回追加）**。
-- ブランチ `docs/sprint-20-l3-security-fixes`・PR body は `Related: #38/#39/#40/#41`（`closes` にしない）。
+- **#51**（[L2] W4/W5・注文履歴照会・カート境界値・`OrderValidator` 配線調査／**SP 5・NotReady**）＝Sprint21 Retro で起票。**Ready 昇格の条件**＝Refinement で①旧新アカウント系テーブルの対応づけ（**#13/#14 の entity/mapper を一次情報源に**）②**ID-2 の宣言方法**（**PO 推奨＝案A＝password を canonical 比較から除外し、新側ログイン成功は独立の機能検証**。平文とハッシュは値として比較不能で `divergentFields` 完全一致の枠組みと整合しないため）を確定すること。
+- その他の open Issue: **#32**（メール検証・NotReady/deferred）・**#42〜#47**（L3 Low 束・すべて NotReady 塩漬け）。#42〜#47 の Ready 昇格トリガは本番デプロイ基盤の整備決定／Phase 4 完了後の容量。**#44/#46/#47 は `AuditLogRecorder` 周辺を共通で触るため束ねるのが自然**。
+- **#50 は open のまま**（agent-base PR の `closes #50` でクローズ予定）。

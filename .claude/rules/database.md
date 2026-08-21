@@ -81,6 +81,13 @@ V00_001_015__add_column_theme.sql   ← 例
 
 > 背景: Sprint 1 で AC-neg1 フィクスチャを versioned（`V01_000_001`）で採番し out-of-order 破綻の懸念があったため、repeatable（`R__test_user.sql`）へ是正した（Sprint 1 Retro）。
 
+### R__ は Testcontainers ベースの自動テスト実行経路に届かない
+
+- `jpetstore-backend` の統合テスト（`IntegrationTestBase` 系・Testcontainers）は `syncTestSchema` Gradle タスクで `../jpetstore-database/flyway/sql`（**`V__` のみ**）を `src/test/resources/flyway/sql` へ同期する。**`flyway/sql-test`（`R__` repeatable seed）はこの経路に含まれない**（`build.gradle` の `syncTestSchema` 定義を参照）。
+- したがって `R__test_user.sql` 等で登録した seed アカウント（例: `demo_user`）は、ローカル開発 DB（`seedDevData` 適用済み）には存在するが、**Testcontainers 上の自動テスト DB には存在しない**。
+- **Story の AC が具体的な既存シードアカウント名を実行環境の前提として指定する場合**（例: parity テストが `demo_user`/`Sprint3-DemoLogin!26` でログインする、等）は、起票/Refinement 時点で対象の実行系（Testcontainers か、ローカル DB か）にそのアカウントが実際に存在するかを裏取りすること。Testcontainers 経路の場合は `R__` の同期を待たず、**テスト側フィクスチャで対象データを直接 INSERT する**（`R__` を test resources に同期する運用は導入しない）。
+- 背景: Sprint 19（#36・スキーマ変更に伴う `R__` の更新漏れ）と Sprint 21（#48 AC5・`demo_user` が Testcontainers 経路に存在しない前提誤り）で、「`R__` が届くべき場所に届かない」という同型の構造的制約が異なる文脈で2度表面化したため、本節として明文化した（Sprint 21 Retro）。
+
 ---
 
 ## WHO カラム規約（全業務テーブル共通）

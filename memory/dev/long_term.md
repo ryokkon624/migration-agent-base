@@ -50,6 +50,16 @@ best-effort保護境界の呼び出し元遡り漏れ」参照。convention・se
 ではなく「習得したこと」「技術的なハマりポイント」に記録する。ただし一部は参照知識/実装パターンとして
 初出からSkillへ即時反映した（詳細は「Skills更新履歴」）。
 
+**Sprint21（#48/#49/#50・Phase 4 L2パリティ検証基盤。`src/main`を1行も変更しないtest scope専用スプリント）でも、
+tier分離クリーン記録は回復しなかった**（2スプリント連続でSM verificationが実質的な指摘を出す結果になった）。
+convention reviewerの提案1件（`captureCookies`の`.each{}`内`return`も`for`へ統一すべき）はSM verificationで
+「意味論が逆＝機械的統一は新バグを招く」として却下、security/performanceは対象コードが`src/main`に無いため
+実質対象外。一方でSM verificationは、W3(ID-1)シナリオでgoldenの前提条件・結果が実機検証なしに書き出されうる
+欠落（AC-neg1の趣旨違反）と、#50レポートの推測の確定事項化・到達可能分母の数値誤り（後者はPOがCSVを直接
+パースして発見）の計3件を検出し、2ラウンドの往復で解消した。詳細は下記「[SM verification] 検証資産の前提
+未検査」「[SM verification] 推測の確定事項化」（本セクション）・「習得したこと」「技術的なハマりポイント」
+参照。
+
 **Sprint12（#29・初のRepository層導入PoC）は、3観点reviewer自体は全員クリア（Conv/Sec/Perfとも指摘0件）
 だったが、SMがコア精読で3reviewer全員が見落としたperf純増（書込4操作の`findByUserId`二重呼び・+2クエリ/
 操作）を独立発見し、同スプリントで是正した。** reviewerのクリア判定を鵜呑みにせずSMが実コードを読む
@@ -201,6 +211,36 @@ Sprint4のセキュリティ非ブロッキング2件（`AuthApplicationService.
   チェックリスト項目ではなくビルド設定の変更（SM/インフラ判断）にあたるため、DEV側Skillへは反映せず
   SMへ申し送り事項として提起する。
   発生スプリント: Sprint20（#38・#41、DEV自己発見。同一スプリント内2回のため2回ルール未充足と判定）。
+
+- [SM verification・#48/#49 AC-neg1の趣旨] **検証資産（golden）の前処理UPDATEがaffected rowsを検査しない
+  裸のUPDATEだったため、対象行に当たらず黙って0行になっても検出されず、golden自体は変化しないまま観測ポイント
+  だけが静かに失われる欠落があった。** `LegacyScenarioRunner.orderInsufficientStock()`（W3・ID-1の実証シナリオ）
+  は在庫を1にしてから2個注文する設計だが、goldenに残るのはdelta`-2`と`outcome: SUCCESS`のみで、前提
+  （在庫<注文数）も結果の絶対値（在庫がマイナス化したこと）も記録・検証されていなかった。加えて
+  `LegacyDbReader.restoreInventoryQty`（前処理の在庫復元UPDATE）はaffected rowsを検査しない裸のUPDATEで、
+  itemId不一致等でUPDATEが対象行に当たらなくても気づけない構造だった（AC-neg1「台帳に無い不一致・台帳の
+  形骸化を検知する」の趣旨に反する欠落。SMのコア精読で発見）。**(a)** 前処理/後処理のUPDATEはaffected rowsを
+  検査し0行なら即fail、**(b)** シナリオの前提条件・結果の意味を実際にDBへ問い合わせて検証し満たさなければ
+  goldenを書き出さずfail、**(c)** 検証した実測値を比較対象外の付随情報としてgolden自体（`preconditions`）に
+  残す、の3点で是正し、実際にitemIdを差し替えてfail-pathが機能することも実証した。この「テストが今回たまたま
+  通ったかではなく、前提が将来崩れたときに気づけるか」という設計原則は`backend-conventions`§9へ即時反映した
+  （詳細は「Skills更新履歴」）。
+  発生スプリント: Sprint21（#48/#49、SM verification確定所見。設計原則は参照知識のため2回ルール例外で即時
+  反映したが、「golden前処理のaffected rows未検査」という指摘そのものは初出のため本エントリはlong_term.md
+  止まり）。
+
+- [SM verification・PO・#50レポート] **調査で得た推測を、同一レポート内の下流セクションで確定事項として扱って
+  しまい、加えて実データ検証を経ずに手計算した集計値に誤りがあった。** `reports/after/l2-parity-coverage.md`
+  初出版は§3因果分析で「メールサーバ接続不能の可能性が高い」という**推測**を述べていたが、直後の§4「次に
+  足すべきシナリオ」・§5「PO申し送り」ではこの推測を確定した前提として扱う記述になっていた（SM指摘）。実際は
+  `legacy-jpetstore/src/main/webapp/WEB-INF/applicationContext.xml`を確認すればbean定義とadvisor設定が両方
+  コメントアウトされ一度もインスタンス化されないこと（メールサーバの接続可否とは無関係）が実コードで即座に
+  分かる状態だった。加えて、到達可能分母を手計算（36）で報告したところ、POが`jacoco.csv`を直接パースして
+  `MsSqlOrderDao`のBRANCH 0/2を報告から見落としていたこと（正しくは34）を発見した。分析レポートで推測を
+  書く際は同一文書内の下流セクションへ推測をそのまま確定事項として持ち越していないかを見直し、手計算の
+  派生値は`report.sh`側の機構的な検査（除外反証チェック）に置き換えることで是正した（`report.sh`が
+  到達不能クラスの実カバレッジを検査しdriftを機械的に検出する構成へ変更）。
+  発生スプリント: Sprint21（#50、SM verification・PO指摘。初出のため2回ルールに従い本セクション止まり）。
 
 ### jpetstore-frontend
 Sprint5（#24）が初のフロントエンド実装スプリント。3観点レビューでパフォーマンス1件・セキュリティ1件の
@@ -479,6 +519,43 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   事前に見積もる必要がある。
   発生スプリント: Sprint20（#41、`RateLimitBurstConcurrencySpec`実装時。初出のため2回ルールに従い本Skillには
   未反映）
+- **Groovyの`.each{}`クロージャ内の`return`はループを抜けず、`continue`相当にしかならない。**
+  `NewHttpClient.ensureCsrfToken()`の初版実装は`(1..N).each { ... return token }`でリトライを早期終了させる
+  つもりだったが、実際には`.each{}`のループは常に最後まで回り続け、直近の反復結果でしか成否が決まらない
+  実バグになっていた（`OrderParitySpec`実行で`IllegalStateException`として顕在化。試行履歴つきの診断
+  メッセージで検出できた）。素の`for`ループ（`return`でメソッド自体を抜ける）へ書き換えて解消した。**同じ
+  `.each{}`内`return`でも、continueとして正しく使われている既存コード（例: 不正なCookieヘッダ1件を
+  スキップする`captureCookies`）と混同し機械的に「`return`は全部`for`へ統一すべき」と直してはならない**
+  （同じ字面でも意味論が逆であり、統一するとむしろ「不正ヘッダ1件でCookie取り込みが全停止する」新バグを
+  招く。実際にconvention reviewerがこの統一を提案したが、SM verificationで却下された）。Groovyのクロージャ内
+  `return`を書く際は、ループを抜ける意図か次の要素へ進む(continue)意図かをコメントで明示し、抜ける意図なら
+  `.each{}`ではなく素の`for`/`while`を使うこと。
+  発生スプリント: Sprint21（#48、DEV自身のTDD・実機検証中に自己発見。初出だがGroovy言語仕様の参照知識のため
+  2回ルール例外で`backend-conventions`へ即時反映）
+- **`jwt.cookie.secure=true`（本番相当設定）のまま平文HTTP（RANDOM_PORT等）へ接続すると、JDK標準の
+  `java.net.CookieManager`はSecure属性付きCookie（JWT access/refresh・XSRF-TOKEN）を一切送信しない。**
+  `ParityIntegrationTestBase`のRANDOM_PORT環境で気づいた。プロパティを上書きして`secure=false`にするテスト用
+  ハックは本番相当設定でのe2e検証という目的自体を損なうため避け、Set-Cookieヘッダを自前でパースし後続
+  リクエストへ手動で付与する独自Cookie jarを実装して解消した（空値／`Max-Age=0`は削除として扱う）。
+  発生スプリント: Sprint21（#48、計画フェーズで新発見・実装で確認。初出だが「知らないと書けない参照知識」の
+  ため2回ルール例外で`backend-conventions`へ即時反映）
+- **MySQLの`AUTO_INCREMENT`カウンタは行の`DELETE`後もリセットされないため、複数シナリオを同一プロセス内で
+  連続実行する検証ハーネスで「新規作成件数」を`MAX(id)`の前後差分で算出すると、2番目以降のシナリオで実際の
+  作成件数と一致しなくなる。** legacy側（HSQLDBの`sequence`テーブル）はシナリオごとにJDBCで明示的に復元して
+  いたため単体では問題化しなかったが、新側（MySQL `t_order.order_id`）は復元手段が無く、`order-multi-item`
+  実行時に`ordersCreated`が実測`2`（golden期待値`1`）という不一致で検出された。`MAX(id)`差分ではなく
+  `COUNT(*)`の前後差分に統一して解消した。
+  発生スプリント: Sprint21（#49、DEV自身のTDD中に自己発見。初出だが「知らないと書けない参照知識」のため
+  2回ルール例外で`backend-conventions`へ即時反映）
+- **legacyのJSP（`Product.jsp`/`Item.jsp`）が`<fmt:formatNumber pattern="$#,##0.00">`を指定していても、実機の
+  応答では実際にフォーマットが適用されない場合がある（`$`無し・末尾ゼロ無しの生数値がそのまま出力される）。**
+  design.md（spike由来の記述）を鵜呑みにして`$`前提の正規表現でHTML抽出を実装したところ、golden採取直後の
+  目視確認で`items-by-product`のentriesが空・`item-detail`のlistPriceがnullという欠陥として即座に検出できた。
+  設計ドキュメントに書かれたフォーマット仕様であっても、実際にcurl等で叩いた生の応答を確認してから抽出
+  ロジックを書く必要がある（`<td>数値のみ</td>`という「セル内容が数値のみ」の形で価格セルを識別する方式へ
+  是正）。
+  発生スプリント: Sprint21（#49、golden採取直後の目視確認で自己発見。初出だが具体的な実機事実のため2回ルール
+  例外で`backend-conventions`へ即時反映）
 
 ### jpetstore-frontend
 - **vue-i18n（v11・Composition API）のメッセージ文字列中の`@`はlinked message構文（`@:key`形式）として
@@ -931,6 +1008,16 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
   発生スプリント: Sprint20（#38/#39/#40/#41。原子化イディオム・fail-open/fail-closed判断軸・
   ApplicationContextRunner分離はいずれも「知らないと書けない参照知識・実装パターン」の2回ルール例外として
   即時反映。`@MockitoSpyBean`単発例外注入技法は発生頻度未知のため今回はlong_term.md止まり）
+- **コードベース初の`@SpringBootTest(webEnvironment = RANDOM_PORT)`利用を、既存の共有test基底
+  （`IntegrationTestBase`・`webEnvironment`未指定＝MOCK環境）を無変更のまま実現できた。**
+  `ParityIntegrationTestBase extends IntegrationTestBase`で`@SpringBootTest(webEnvironment = RANDOM_PORT)`を
+  **サブクラス側で再宣言**するだけで、Testcontainers MySQL 8.4＋Flywayの共有設定はそのまま継承しつつ実サーバ
+  （Tomcat）が実ポートで起動することを、`ParityIntegrationTestBaseSmokeSpec`（実行ログの`Tomcat started on
+  port <port> (http)`＝MOCK環境では出力されない実サーバ起動の証跡）で実証した。事前に用意していたフォール
+  バック（独立基底＋同一Singletonコンテナ）は不要だった。既存の共有基底クラスを変更せず一部specだけを実HTTP
+  （MockMvc卒業）へ切り替えたい場合、まずサブクラスでの`@SpringBootTest`再宣言を試す価値がある。
+  発生スプリント: Sprint21（#48、SM申し送り①のD1スモーク確認で実証。初出だが「知らないと書けない参照知識・
+  実装パターン」のため2回ルール例外で`backend-conventions`へ即時反映）
 
 ### jpetstore-frontend
 - **backendのSpring Security 7 CSRF設定（非XOR `CsrfTokenRequestAttributeHandler`・consume-then-
@@ -1507,17 +1594,58 @@ Sprint5（#24）が初のフロントエンド実装スプリント。3観点レ
 - `frontend-conventions`は本スプリントfrontend無変更のため対象外。
 - `#skills-changelog` へ `[DEV]` で投稿済み。
 
+### Sprint 21（#48/#49/#50・Phase 4 L2パリティ検証基盤・`src/main`無変更のtest scope専用スプリント）
+
+- **`backend-conventions`**: `## 9. jpetstore-backend 固有の注意事項`の末尾に新規サブセクション
+  「L2パリティ検証ハーネス（`parity`パッケージ）のtest scope実装パターン（Sprint21 #48/#49）」を新設し、
+  以下7点を反映した。**いずれも初出だが「知らないと書けない参照知識・実装パターン」の2回ルール例外として
+  即時反映**（本スプリントがtest scope専用のため、内容もtest scope寄りの参照知識に偏っている）:
+  1. Groovyの`.each{}`クロージャ内`return`はループを抜けない（`continue`相当）。同じ字面でも意味論が
+     逆転しうるため機械的な書き換え統一をしない（convention reviewerの統一提案をSM verificationが却下した
+     実例つき）。
+  2. 既存の共有test基底（MOCK環境）を無変更のまま、サブクラス側の`@SpringBootTest`再宣言で実HTTP
+     （RANDOM_PORT）へ切り替えられる（コードベース初のRANDOM_PORT利用）。
+  3. `jwt.cookie.secure=true`環境でのRANDOM_PORT e2eテストは、プロパティ上書きではなく独自Cookie jarで
+     対応する（`java.net.CookieManager`がSecure Cookieを平文HTTPへ送らない制約の回避）。
+  4. CSRFトークンの交互ローテーション（あれば削除・無ければ発行）への対処＝トークンが取れるまでGETを
+     繰り返すリトライヘルパ。
+  5. グローバル採番（AUTO_INCREMENT）列への「新規作成件数」はCOUNT差分で測る（MAX(id)差分は複数シナリオ
+     連続実行で誤差が出る）。
+  6. 設計ドキュメントのフォーマット仕様（legacy JSPの`fmt:formatNumber`等）は実機の生応答で裏取りする。
+  7. 検証資産（golden/フィクスチャ）は前提条件を実機で検査し、満たさなければ書き出さずfailする設計原則
+     （SM verification確定所見・W3のAC-neg1趣旨違反の是正から確立）。
+- **`backend-conventions`へ反映しなかったもの**: `reports/after/l2-parity-coverage.md`での「推測の確定
+  事項化・到達可能分母の数値誤り」（SM/PO指摘）は、実装パターンではなくレポート執筆時の記述規律の問題
+  であり、かつ初出（1回目）のため、2回ルールに従い今回はSkillに反映せず`memory/dev/long_term.md`
+  「繰り返し指摘されるパターン」（jpetstore-backend）に留めた。次に同種（分析の推測を下流セクションで
+  無検証のまま確定事項として扱う）の指摘が発生した場合、2回目としてSkill昇格（例:
+  `developer-workflow`のレポート作成チェックリストへの追記）を検討する。
+- **`developer-workflow`**: 本スプリントの学びを見直したが、ワークフロー手順自体（計画→TDD→レビュー対応の
+  進め方）に変更を要する発見は無かった。上記「推測の確定事項化」は将来2回目が発生した場合の昇格先候補として
+  検討対象に残すが、今回は変更なし。
+- `frontend-conventions`/`rules/database.md`は本スプリント`jpetstore-frontend`/`jpetstore-database`無変更の
+  ため対象外。
+- 3reviewer・SM verificationの結果は、**Sprint20に続きtier分離クリーン記録が回復しなかった**（convention
+  reviewerの非ブロッキング提案1件はSM verificationで却下、SM verificationがW3の検証資産不備1件・#50レポート
+  の推測確定事項化＋数値誤り1件の計2件を検出し2ラウンドで解消。security/performanceは`src/main`無変更のため
+  実質対象外）。チェックリスト項目ではなくプロセス上の記録のため`memory/dev/long_term.md`「繰り返し指摘
+  されるパターン」（jpetstore-backend）に記録した。
+- `#skills-changelog` へ `[DEV]` で投稿済み。
+
 ## 卒業済みルール
 
 （該当なし。棚卸し対象となるルールが直近15スプリント基準に達していない。
-  jpetstore-backendはSprint2・3・4・6・7・8・9・10・11・12・13・14・15・16・17・18・19・20の18スプリント、
-  jpetstore-databaseはSprint1・3・6・14・16・18・19・20の8スプリント、jpetstore-frontendはSprint5・6・7・8・
-  10・11・14・15・16・17・18・19の12スプリント（Sprint20はfrontend無変更のため不算入）のみのため、いずれも
-  対象外。§9/§7昇格済みルールの昇格後経過スプリント数（直近15スプリント基準の分子）は、catch-all例外横取り
-  （Sprint7昇格）が13スプリント（Sprint8〜20）・Spockの`given:`裸stub×`then:`引数一致（Sprint12昇格）が
-  8スプリント（Sprint13〜20）・DB-backedレート制限（Sprint16昇格）が4スプリント（Sprint17〜20。Sprint20は
-  §9追記のみで新規逸脱ではないため「未発生」継続としてカウント）・frontend CRLFノイズ選択add（Sprint18昇格）
-  が1スプリント（Sprint19。Sprint20はfrontend無変更のため不算入・据え置き）・frontend共通レイアウトへの
-  新規要素追加時のfind('button')/find('form')衝突確認（Sprint19昇格）が0スプリント（昇格直後のまま・
-  Sprint20はfrontend無変更のため不算入）で、いずれも15スプリントに満たない。
-  Sprint4〜Sprint19 Retroに続きSprint20 Retroでも棚卸しを実施したが同様の理由で卒業候補なし）
+  jpetstore-backendはSprint2・3・4・6・7・8・9・10・11・12・13・14・15・16・17・18・19・20・21の19スプリント、
+  jpetstore-databaseはSprint1・3・6・14・16・18・19・20の8スプリント（Sprint21はdatabase無変更のため不算入）、
+  jpetstore-frontendはSprint5・6・7・8・10・11・14・15・16・17・18・19の12スプリント（Sprint20・21はいずれも
+  frontend無変更のため不算入）のみのため、いずれも対象外。§9/§7昇格済みルールの昇格後経過スプリント数
+  （直近15スプリント基準の分子）は、catch-all例外横取り（Sprint7昇格）が14スプリント（Sprint8〜21。Sprint21は
+  `src/main`無変更のためcatch-all自体の新規棚卸し機会は無かったが、Sprint20の§9追記のみの扱いと同様「未発生」
+  継続としてカウント）・Spockの`given:`裸stub×`then:`引数一致（Sprint12昇格）が9スプリント（Sprint13〜21。
+  Sprint21はGroovy/Spockのtest scope実装が中心だったがMock()のgiven:/then:併用パターン自体の再発は無し）・
+  DB-backedレート制限（Sprint16昇格）が5スプリント（Sprint17〜21。Sprint21は`src/main`無変更のため新規逸脱の
+  機会自体が無く、Sprint20と同様の理由で「未発生」継続としてカウント）・frontend CRLFノイズ選択add
+  （Sprint18昇格）が1スプリント（Sprint19のまま据え置き。Sprint20・21ともfrontend無変更のため不算入）・
+  frontend共通レイアウトへの新規要素追加時のfind('button')/find('form')衝突確認（Sprint19昇格）が0スプリント
+  （昇格直後のまま据え置き。Sprint20・21ともfrontend無変更のため不算入）で、いずれも15スプリントに満たない。
+  Sprint4〜Sprint20 Retroに続きSprint21 Retroでも棚卸しを実施したが同様の理由で卒業候補なし）

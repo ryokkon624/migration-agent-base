@@ -1,40 +1,36 @@
 # PO 短期記憶（今スプリント）
 
-## Sprint 20 Retro（2026-08-20）で棚卸し済み
+## Sprint 21 Retro（2026-08-21）で棚卸し済み
 
-Sprint 19 Retro以降の文脈（#38〜#41 SEC L3是正4件のRefinement2回・Sprint20計画フェーズQ&A中継12件・Sprint20 Retro本体）は本Retroで棚卸し済み。要点は `memory/po/long_term.md`（Sprint20セクション追記・傾向1〜4整理・SM verification所見等3件のPO傾向対象外判定・チェックリスト引用リストへ〔Sprint20 #39〕追記・意思決定ログ7件追記）に反映済み。
+Sprint20 Retro以降の文脈（#42〜#47 SEC Low束2セットのRefinement塩漬け確定・#48〜#50 Phase4 L2起票+AC5ゲート値合意・Sprint21計画フェーズQ&A中継7件〔D1〜D3・Q1〜Q4〕）は本Retroで棚卸し済み。要点は`memory/po/long_term.md`（Sprint21セクション追記・候補α/β判定・チェックリスト一般化・D3のrules/database.md firmup・Q4のl2-parity-design.md明文化・意思決定ログ6件追記）に反映済み。
 
-**台帳（`spec/intended-diff-ledger.md`）更新（本Retroで実施・2件）**:
-- ID-25の関連Storyへ#38を追加（`#23, #24` → `#23, #24, #38`）。JWT署名鍵のdenylist（既知placeholder恒久収録）→最小鍵長32byte→ユニーク文字数24以上の3段fail-fast検証を「新」列へ追記。
-- ID-11の関連Storyへ#41を追加（`#20, #13` → `#20, #13, #41`）。照合前スロット確保方式により成功ログインも枠を消費する意味論（高並行時の一過性401・`recordSuccess`のDELETEで自己回復）を「新」列へ追記。
-- いずれも新規ID起票は不要（既存宣言の未達是正／実装詳細の明確化にとどまる）と判定。
+**台帳（`spec/intended-diff-ledger.md`）更新（本Retroで実施・4件）**:
+- ID-1の関連Storyへ#49を追加（`#8`→`#8, #49`）。#49のW3シナリオが`INTENDED_DIVERGENCE(ID-1)`として直接検証。
+- ID-29の関連Storyへ#49を追加（`#2`→`#2, #49`）。#49のR6シナリオが`INTENDED_DIVERGENCE(ID-29)`として直接検証。
+- ID-5の関連Storyへ#50を追加（`#11, #23`→`#11, #23, #50`）。JaCoCo分母設計（§4.1）が`service`/`service.client`除外の根拠として引用。
+- ID-6の関連Storyへ#50を追加（`全ドメイン(#1–#24)`→`全ドメイン(#1–#24), #50`）。JaCoCo分母設計が`web.struts`/`web.spring`除外の根拠として引用。
+- ID-20は見送り（L2の読み取り系シナリオはEQUIVALENT判定のみでID-20自体を直接検証するシナリオがないため）。
 
-**GitHub Issueクローズ状況**: #38・#39・#40・#41は実装完了・PRマージ済み・クローズ済みを確認（`mcp__github__get_issue`で個別確認）。Sprint Reviewはユーザー確認でOK・指摘ゼロ（クリーンパス）。
+**文書firmup（本Retroで実施・2件）**:
+- `.claude\rules\database.md`に「R__はTestcontainersベースの自動テスト実行経路に届かない」節を新設（D3対応。Sprint19 #36とSprint21 #48 AC5の2度の表面化を受けた直接firmup。PO内チェックリスト昇格は見送り）。
+- `spec/l2-parity-design.md`§2に`INTENDED_DIVERGENCE(ID-x)`判定の受入基準（`divergentFields`完全一致）を明文化（Q4対応。#50 AC6の次期シナリオ追加が踏襲する先例規約）。
 
-### 未解決の判断事項
+**チェックリスト一般化（本Retroで実施）**: 「セキュリティ対策の新規追加要否は既存機構充足を先に確認する」項目を、Sprint19 #25→Sprint21 #48/#49（候補β・2回目の発生）を受けてセキュリティ限定から「新規実装（テスト基盤含む）vs既存資産充足」全般へ一般化。
+
+**申し送り（SM/DEVへ・未実施）**: `spec/l2-parity-design.md`§2 R2「productId順序つきリスト」と§7.4 F5「集合で比較」の内部矛盾（候補α）は、#48 AC3/#49 AC1の決定（canonical キー昇順ソート後に比較・並び順は比較対象外）を未反映のまま残っている。design doc自体の訂正はDEV/SM側での対応を推奨（PO傾向としては初出のため昇格見送り。doc訂正自体はPO判断の範囲外と判断し、SMへ申し送り済み）。
+
+## 未解決の判断事項
 
 - 確認メール（#8備考。注文確定完了時の受領メール送付）を独立の将来Feature Issue として NotReady で track するか（現状は#8備考に記録のみ。#8自体はクローズ済みだが、この将来Feature化の判断自体は未決着のため継続）。
-- **#42〜#45（Phase 4 L3 SEC所見の Low 束・4件）は Ready=Draft のまま未Refinement**。#38〜#41 の Refinement は完了・Sprint 20 で実装・マージ済み。残り4件の優先順位付け・AC詳細化は次回Refinementで実施する。#42(D) は #40 AC4 のハンドラ再利用が確定済み（申し送りコメント投稿済み）。
+- **#42〜#47 は 2026-08-20 の Refinement で NotReady 確定・塩漬け（SP は全件設定済み）**。Ready 昇格のトリガは、#43(B)(E)・#45＝本番デプロイ基盤／本番プロファイルの整備決定、#42・#44・#43(C)(D)・#46・#47＝Phase 4 完了後に容量が空いた時点。**#44／#46／#47 は `AuditLogRecorder` 周辺を共通で触るため、昇格させるなら同時期に束ねるのが自然**（着手順は #47(B)(C) の境界整理 → #46 のキー複合化 → #44 の結線 → #47(A)）。
+- **#46 の重大度は本番デプロイ基盤の整備決定時に再判定**する（quota キーが `getRemoteAddr()` 固定のため、リバースプロキシ/LB 配下では全クライアントが単一バケットを共有し「per-IP なので他人の監査は消せない」という Low 格下げ根拠が崩れる）。#45／#43(B)(E) と同じタイミングで見直す。
+- **#47(C) 完了後の Retro で、台帳 ID-22 の関連Story欄拡張の要否を判定する**（#47 は現状 NotReady・未着手のため未実施。Sprint20 の ID-25/ID-11 と同型の運用）。
 - **`reports/after/l3-security-regression-backend.md` §1 回帰表の判定（S10「是正」・S15「消滅＋是正」・S17「消滅」）は、Sprint20で#38/#39/#41が実装・マージされたことにより実効性が回復した見込みだが、正式な回帰再実証（L3再実行）はまだ行っていない**。Phase 4 の合否ゲート（L3・L4）判定および `reports/after/verification-report.md` 作成時に、SEC側での回帰再検証結果と実装内容を突き合わせる必要がある（SM/PO の L4 作業として継続監視）。
+- ~~L2 カバレッジのゲート値は #50 AC5 で PO 合意が必要~~ → **2026-08-20 に決着**。BRANCH ≥ 16/34（47.0%）・INSTRUCTION ≥ 1144/1588（72.0%）を到達可能分母上の非退行フロアとして合意。**残タスク＝DEV によるレポート反映（到達可能分母 36→34・44.4%→47.1% の訂正を含む）と `report.sh` の2本出し＋除外反証 fail の実装**（未実施・継続監視）。
+- **L2 のアカウント系シナリオ（W4 登録・W5 更新）は次イテレーション（1件・SP 5・NotReady）で SM が起票する**。Ready 昇格の前提は (1) 旧 `account`/`profile`/`signon` ↔ 新 `m_account`/`m_profile`/`m_signon` の対応づけ確定（`spec/l2-parity-design.md` §6-2）と (2) ID-2（パスワード平文→ハッシュ）を W4/W5 の期待値としてどう宣言するかの確定。**起票前の PO 補足（本Retroで整理・SMへ伝達済み）**:
+  - (1) は `account`/`profile`/`signon` の DDL から再導出せず、既に実装済みの #13（登録）・#14（アカウント編集）の実装（entity/mapper 定義）を対応づけの一次情報源として参照する。
+  - (2) は password フィールドを `INTENDED_DIVERGENCE(ID-2)` として値比較の対象に含めるのではなく、canonical 比較から**除外**（WHO 列・version 等と同様の正規化除外）した上で、新側ログイン成功を独立の機能検証として確認する方式を推奨する（平文とハッシュは値として比較不能なため、`divergentFields` 完全一致判定＝Q4 の枠組みとも整合しない）。
 - #32（メール検証・Sprint16 Retro新規起票）は現状NotReady（deferred）。実SMTP基盤・検証トークン表の着手判断が出た時点でReady昇格の要否を判断する。
-
-### 次回PO稼働時のTODO
-
-- 振る舞いを変える新判断が出たら都度 `spec/intended-diff-ledger.md` への追記要否を判定する（Sprint6はID-28、Sprint7はID-29、Sprint8はID-19具体化、Sprint10はID-30を追記済み・Sprint9は追記なし・Sprint11はID-22の説明強化のみ追記・Sprint12は台帳追記なし・Sprint13は台帳追記なし・Sprint14は追記なし・Sprint15はID-8の説明強化のみ追記・Sprint16はID-11の拡張のみ追記・Sprint17は台帳追記なし・Sprint18はID-26の関連Story拡張＋CVE具体化のみ追記・Sprint19はID-27を更新＋ID-31を新規追加・**Sprint20（本Retroで実施）はID-25関連Story拡張〔#38・denylist+entropy実装詳細〕とID-11関連Story拡張〔#41・S1トレードオフ〕の2件を追記（新規ID起票なし）**）。
-- architecture-conventionsのPO判断委譲パターン（§3.1区分値のm_code採用・§4.3更新系エンティティのversion列・§9集約深度・§4.2 account/profileのversion単一/二重トークン）は4セクションで再発しチェックリストへ正式昇格済み（Sprint8 Retro。Sprint13 #30・§9で3件目、Sprint16 #14・§4.2で4件目の実例追加）。architecture-conventions文書自体の一般原則firmup要否は、さらなる再発またはユーザーとの次回接点で判断する。
-- Sprint7傾向3（specがPOへ確定を委譲した論点の計画フェーズ確認）は初出のため、次回以降の同種発生時に正式昇格を判断する。
-- Sprint11傾向2（監査ログACの成功/失敗粒度未定義）は初出のため、次回以降の同種Story（監査ログを扱うStory）で再発した場合、正式昇格を判断する。
-- Sprint15傾向3（intended-diff-ledgerとの整合確認対象をUI表示文言のニュアンスへ拡張できないか）は初出のため、次回以降の同種発生時に正式昇格を判断する。
-- Sprint16傾向5（DTO optionalフィールドの登録画面UI表示要否が未定義）は初出のため、次回以降の同種発生時に正式昇格を判断する。
-- Sprint17傾向1（1エンドポイント内の複数エラー系統のステータス配分＋既存クロスカット処理との衝突確認）は再発なし判定のため、次回以降の同種発生時に正式昇格を判断する。
-- Sprint18傾向「SPA保護ルートの実機到達性」は初出（Sprint19・Sprint20では未再発）のため、次回以降のSPA保護ルート系Storyで再発した場合、正式昇格を判断する。
-- Sprint19傾向候補X（i18n/フォーマット系Storyの実装レベルAC未定義）は初出のため、次回以降の同種発生時に正式昇格を判断する。
-- Sprint19傾向候補Y（新規UX追加時の既存編集導線との整合未定義）は初出のため、次回以降の同種発生時に正式昇格を判断する。
-- Sprint19 Sprint Review指摘（#36 seed drift）はPO傾向としては追加なしと判定済み（詳細はlong_term.md参照）。次回スキーマ変更Story（既存テーブルへの列追加を伴うfeature/refactor Story）で同種のseed/fixture同期漏れが再発した場合、rules/database.md直接firmup（Sprint14型）の要否を改めて判断する。
-- **Sprint20傾向候補（Q3・#38計画フェーズQ&A中継）「既存機構での充足確認判定（既存チェックリスト項目）は、Sprintの主眼がPoCトレーサビリティ資産化の場合は例外とすべき」は初出のため、次回以降の同種発生時に正式昇格を判断する。**
-- **Sprint20傾向候補（B1/B2・#38/#41、同一Sprint内2件）「セキュリティ強化ACの実装が既存テスト資産〔fixture・白箱Spec〕へ波及することがAC/見積りに未織込み」は、Sprint9型の判断枠組み（同一Sprint内の複数発生は2回ルールを満たさない）により正式昇格を見送る。次回以降、別Sprintでの同種発生時に判断する。**
-- **Sprint20傾向候補（S3・#40）「ACが要求する防御が別ACの入口検証によって到達不能になり検証経路が変わる」は初出のため、次回以降の同種発生時に正式昇格を判断する。**
-- **Sprint20（SM verification所見・#39 AC2/AuditLogRecorder quotaチェックのbest-effort境界外配置）はPO傾向対象外と判定済み（実装完全性の問題。詳細はlong_term.md参照）。SM/DEV側のトレンド系譜での扱いに委ねる。**
 
 ## SMやDevから受けた質問ログ
 

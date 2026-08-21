@@ -66,12 +66,16 @@ canonical の例（＝golden の実体）:
 **各シナリオは期待を宣言する**: `EQUIVALENT`（旧同値）か `INTENDED_DIVERGENCE(ID-x)`（台帳どおり違う）。
 → これにより **L4（台帳照合）が機械的に検証可能**になる。台帳に無い不一致＝欠陥候補。
 
+> **`INTENDED_DIVERGENCE(ID-x)` 判定の受入基準**: 旧新の差分が非空であることに加え、**当該 ID が宣言する `divergentFields` との完全一致**を要求する（宣言外のフィールドに差分が混ざれば fail）。単なる非空判定より厳格化する理由は、想定外の追加差分を「意図済み」として見逃さないため。将来シナリオ追加（W4/W5 等）でもこの厳格化を踏襲する（Sprint21 #48/#49 Q4 決定）。
+>
+> **読み取り系 canonical の比較単位は「集合」で統一する**（Sprint21 #48 AC3／#49 AC1 決定・**当初 R2 のみ「順序つきリスト」と書かれていた内部矛盾を是正**）。比較前に canonical キーで昇順ソートして正規化し、**表示順そのものは比較対象にしない**。理由＝ページング仕様を **ID-20** で変えている（旧 4件/頁・新 12件/頁）以上、並び順は「保存すべき業務ロジック」に含まれない。あわせて **F5 のとおり全ページを辿ってから**比較する（1頁目だけ比べると偽の不一致になる）。
+
 ### A. 読み取り系（DB書き込みなし・件数を稼ぐ）
 
 | ID | シナリオ | canonical | 期待 |
 | --- | --- | --- | --- |
 | R1 | カテゴリ一覧 | categoryId の集合 | EQUIVALENT |
-| R2 | カテゴリ配下の商品一覧（FISH/DOGS/CATS/REPTILES/BIRDS の5本） | productId 順序つきリスト | EQUIVALENT |
+| R2 | カテゴリ配下の商品一覧（FISH/DOGS/CATS/REPTILES/BIRDS の5本） | productId 集合 | EQUIVALENT |
 | R3 | 商品配下のアイテム一覧 | itemId＋listPrice | EQUIVALENT |
 | R4 | アイテム詳細 | itemId/productName/listPrice | EQUIVALENT |
 | R5 | 検索（複数語・部分一致・0件） | productId 集合 | EQUIVALENT |

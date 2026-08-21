@@ -1056,3 +1056,133 @@ new ApplicationContextRunner()
 > `Duration`型`@Value`の変換が常に失敗しAC-neg1/AC-neg2が別理由の起動失敗で偽陽性GREENになる罠があり、
 > `conversionService` bean明示登録で解消した。詳細は`memory/dev/long_term.md`「習得したこと」
 > （jpetstore-backend）参照。
+
+### L2パリティ検証ハーネス（`parity`パッケージ）のtest scope実装パターン（Sprint21 #48/#49）
+
+コードベース初の「プロダクトコード（`src/main`）を一切変更しないtest scope専用スプリント」（旧新パリティ
+検証基盤）で確立した、test-only実装パターン。今後のR系/W系シナリオ追加・同種の特性化テスト
+（characterization test）新設で再利用できる。
+
+#### Groovyの`.each{}`クロージャ内`return`はループを抜けない（`continue`相当）
+
+Groovyのクロージャ内`return`は、そのクロージャ呼び出し（＝1反復分）だけを終了させ、`.each{}`自体のループは
+最後まで回り続ける（Javaの`for`ループの`return`とは意味が異なる）。
+
+```groovy
+// NG: 早期終了のつもりが実際には最後まで回り続ける（.each{}内returnは"continue"相当）
+(1..maxAttempts).each { attempt ->
+    if (tokenPresent()) { return token }  // 抜けない。ループは10回とも実行される
+}
+
+// OK: ループ自体を抜けたい場合は素のforループ + return（メソッドを抜ける）
+for (attempt in 1..maxAttempts) {
+    if (tokenPresent()) { return token }  // メソッド自体を抜けるので意図通り
+}
+```
+
+**`.each{}`内`return`が「意図どおりcontinue相当」として正しく使われている既存コード（例: 不正なCookieヘッダ
+1件をスキップする`captureCookies`）を、この罠と混同して機械的に`for`へ統一してはならない。** 同じ`return`でも
+「早期終了のつもりが抜けていない実バグ」と「continueとして正しい実装」は意味論が逆であり、統一的な書き換えは
+むしろ新しいバグ（例: 不正ヘッダ1件でCookie取り込み処理が全停止する）を招く。ループを抜ける意図の`return`か、
+次の要素へ進む意図の`return`かをコメントで明示すること。
+
+> **背景（Sprint21 #48）**: `NewHttpClient.ensureCsrfToken()`の`(1..N).each { ... return token }`が実際には
+> 最後まで回り続ける実バグとして`OrderParitySpec`実行時に`IllegalStateException`で顕在化した。素の`for`
+> ループへ書き換えて解消。convention reviewerが「`captureCookies`の`return`も同様に`for`へ統一すべき」と
+> 提案したが、SM verificationで「意味論が逆（continueとして正しい実装）であり機械的統一は新バグを招く」として
+> 却下された。
+
+#### 既存の共有test基底（MOCK環境）を無変更のまま、実HTTP（RANDOM_PORT）が必要なspecだけ切り替える
+
+`@SpringBootTest`の`webEnvironment`はサブクラス側で再宣言すると上書きできる。既存の共有基底
+（`IntegrationTestBase`。`webEnvironment`未指定＝MOCK・Testcontainers MySQL 8.4＋Flyway共有）を変更せず、
+実HTTPが必要な一部のspecだけに`@SpringBootTest(webEnvironment = RANDOM_PORT)`を再宣言したサブクラス基底
+（`ParityIntegrationTestBase extends IntegrationTestBase`）を新設するだけで、Testcontainers/Flyway等の共有
+設定を継承しつつ実サーバ（Tomcat）を実ポートで起動できる。独立した基底クラス＋別コンテナを新設するより
+変更範囲が小さい。
+
+```java
+// 既存の共有基底（無変更）
+@SpringBootTest // webEnvironment未指定=MOCK
+abstract class IntegrationTestBase { /* Testcontainers MySQL + Flyway */ }
+
+// 実HTTPが必要なspec専用のサブクラス基底（新設）
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT) // 再宣言で上書き
+abstract class ParityIntegrationTestBase extends IntegrationTestBase { ... }
+```
+
+実サーバ起動の確認は、テスト実行ログの`Tomcat started on port <port> (http)`（MOCK環境では出力されない）で
+裏取りできる。
+
+> **背景（Sprint21 #48・コードベース初のRANDOM_PORT利用）**: `ParityIntegrationTestBaseSmokeSpec`でこの構成が
+> 機能することをスモーク確認した（SM申し送り①）。想定していたフォールバック（独立基底＋同一Singleton
+> コンテナ）は不要だった。
+
+#### Secure Cookie環境（`jwt.cookie.secure=true`）でのRANDOM_PORT e2eテストは独自Cookie jarで対応する
+
+`jwt.cookie.secure=true`（本番相当設定）のまま`@SpringBootTest(webEnvironment = RANDOM_PORT)`で平文HTTP
+（`http://localhost:<port>`）へ接続する場合、JDK標準の`java.net.CookieManager`はSecure属性付きCookieを平文
+HTTPへ送信しないため、サーバーが発行したCookie（JWT access/refresh・XSRF-TOKEN）が一切クライアント側に
+保持されない。
+
+- **`application.yml`の`jwt.cookie.secure`を上書きするプロパティハックは避ける**（本番相当設定でのe2e検証
+  という目的自体が損なわれる）。
+- 代わりに、Set-Cookieヘッダを自前でパースしCookie値を保持・後続リクエストへ手動で`Cookie`ヘッダとして付与
+  する薄い自作Cookie jarを実装する（`NewHttpClient`）。
+- 空値または`Max-Age=0`の`Set-Cookie`は「削除」として扱い、保持中のトークンをクリアする（下記CSRF
+  ローテーション対応と合わせて必要）。
+
+> **背景（Sprint21 #48・計画フェーズで新発見）**: `application.yml:51`の`jwt.cookie.secure: true`が原因で、
+> `ParityIntegrationTestBase`のRANDOM_PORT環境で`CookieManager`がCookieを一切保持しないことが判明した。
+
+#### CSRFトークンの交互ローテーション（あれば削除・無ければ発行）への対処
+
+Spring SecurityのCSRF Cookie（`XSRF-TOKEN`）はGETリクエストのたびに「トークンCookieが存在すれば削除・
+無ければ発行」という交互ローテーションで動く（連続GETで有無がトグルする）。e2eクライアント側で「トークンが
+取れるまで`GET`を繰り返す」リトライヘルパを用意し、上限到達時は試行履歴つきで明示的にfailさせる
+（`XSRF-TOKEN Cookieが10回のGET /api/pingでも取得できなかった: attempt 1: present, attempt 2: absent, ...`
+のような診断出力にする）。非GETリクエストの直前に必ずこのヘルパを呼び、取得したトークンを`X-XSRF-TOKEN`
+ヘッダへ載せる。
+
+> **背景（Sprint21 #48）**: `NewHttpClient.ensureCsrfToken()`として実装。spike段階でも4回踏んだ落とし穴。
+
+#### グローバル採番（AUTO_INCREMENT）列への「新規作成件数」はCOUNT差分で測る（MAX(id)差分にしない）
+
+MySQLの`AUTO_INCREMENT`はDELETE後もリセットされないため、同一プロセス内で複数のwriteシナリオを連続実行する
+テストハーネスで「シナリオ実行による新規作成件数」を求める場合、`MAX(id)`の前後差分ではなく**`COUNT(*)`の
+前後差分**を使う。`MAX(id)`差分は、対象テーブルの行が復元不可（DELETE後もカウンタが戻らない）の環境では
+2番目以降のシナリオで実際の作成件数と一致しなくなる。
+
+> **背景（Sprint21 #49）**: `LegacyDbReader#orderCount`/`NewDbReader#orderCount`で採用。新側（MySQL
+> `t_order.order_id`）が`DELETE`後もAUTO_INCREMENTをリセットしないため、`order-multi-item`実行時に
+> `ordersCreated`が誤って`2`（正しくは`1`）と算出される不一致で発覚した。
+
+#### 設計ドキュメントのフォーマット仕様は実機の生応答で裏取りする（legacy JSPの`fmt:formatNumber`の実例）
+
+design.mdやJSPソースに`<fmt:formatNumber pattern="$#,##0.00">`のような記述があっても、実際のHTTP応答でその
+フォーマットが適用されるとは限らない（本プロジェクトのlegacy実機では`$`無し・末尾ゼロ無しの生数値がそのまま
+出力された）。HTML抽出の正規表現・パーサをドキュメント記載のフォーマット仕様だけから組み立てず、**必ず
+`curl`等で実機の生応答を確認してから実装する**こと。
+
+> **背景（Sprint21 #49）**: `Product.jsp`/`Item.jsp`の`fmt:formatNumber`を前提に`$`付き正規表現で実装した
+> ところ、golden採取直後の目視確認でentries/listPriceが空・nullになる欠陥として即座に検出された。
+> `<td>数値のみ</td>`という「セル内容が数値のみ」で価格セルを識別する方式へ是正した。
+
+#### 検証資産（golden/フィクスチャ）は前提条件を実機で検査し、満たさなければ書き出さずfailする
+
+golden/フィクスチャのような「実測値を記録して以後の比較基準にする」検証資産は、**「テストが今回たまたま
+通ったか」ではなく「前提が将来崩れたときに気づけるか」**を設計原則にする。
+
+- 前処理・後処理のUPDATE（在庫復元等）はaffected rowsを検査し、0行なら即座にfailする（黙って0行のまま処理が
+  進み、観測ポイントが静かに失われることを防ぐ）。
+- シナリオの前提条件（例: 在庫<注文数）と結果の意味（例: 在庫がマイナス化）を実際にDBへ問い合わせて検証し、
+  **満たさなければgoldenを書き出さずfail**する。
+- 検証した実測値は、比較対象外の付随情報としてgolden自体（例: `preconditions`フィールド）に残し、人が読んでも
+  前提が分かる状態にする。
+- fail-pathの動作は、実際に前提を崩す入力（存在しないitemId等）を注入して**「本当にfailすること」を実証**
+  する（`captureGolden`実行 → 例外・golden未書き出しを確認 → 元に戻す）。
+
+> **背景（Sprint21 #48/#49、SM verification確定所見）**: W3（在庫不足）シナリオで、前処理UPDATE
+> （`restoreInventoryQty`）がaffected rowsを検査しない裸のUPDATEだったため、itemId不一致等でUPDATEが黙って
+> 0行になってもgolden自体は変化せず、観測ポイント（ID-1の実証）だけが静かに失われる欠落があった。上記4点で
+> 是正し、実際にitemIdを差し替えてfail-pathを実証した。
