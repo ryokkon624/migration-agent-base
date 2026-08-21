@@ -286,9 +286,18 @@ PO合意§5-5への対応として、`tools/legacy-jacoco/report.sh`を変更し
 # Sprint 22 追記（#51 — アカウント系・注文履歴照会への拡張・ゲート値再合意）
 
 > **担当**: DEV（Sprint 22・#51）／**日付**: 2026-08-21／**計測対象**: 上記9シナリオ + 本Storyで追加した
-> 8シナリオ（W4/W5a/W5b/W5c・R7・R8a・R8b・cart-boundary）の全18シナリオ実行後のlegacyカバレッジ。
+> 8シナリオ（W4/W5a/W5b/W5c・R7・R8a・R8b・cart-boundary）の全17シナリオ実行後のlegacyカバレッジ。
 > `#50`のexec（`tools/legacy-jacoco/out2/jacoco.exec`）は**変更・削除していない**（(a)/(b)分離の再計測に
-> そのまま使用）。今回の18シナリオexecは`tools/legacy-jacoco/out3/jacoco.exec`。
+> そのまま使用）。今回の17シナリオexecは`tools/legacy-jacoco/out3/jacoco.exec`。
+
+> **【訂正 2026-08-21・Sprint 23 #52 DEV】** 本 Sprint 22 追記部は当初「全18シナリオ」と 7 箇所で書いていたが、
+> **17 が正**（off-by-one）。DEV が一次データ3系統で確認: `ParityScenarios.groovy` の `ALL` の `new Scenario(` が **17**／
+> `jpetstore-backend/src/test/resources/parity/golden/*.json` が **17ファイル**／内訳の足し算が #48+#49 の **9** ＋ #51 の **8** ＝ **17**。
+> **ゲート値そのもの（BRANCH 28/34・INSTRUCTION 1360/1424）は実 exec に対する `report.sh` の機構出力なので影響しない**
+> （DEV が `out3/report/gate-v2/jacoco.csv` を再合算して 28/34・1360/1424 を検算済み）。
+> なお下記 **S9 の「計19件」はシナリオ数ではなく Spock のテストケース数**（`AccountParitySpec` 6 + `OrderHistoryParitySpec` 3 +
+> `CartParitySpec` 1 + `OrderParitySpec` 3 + `CatalogParitySpec` 6 = 19。2026-08-21 の `./gradlew parityTest` 実測で再確認）
+> のため **19 のまま正しい**（17シナリオ ≠ 19テストケース）。
 
 ## S1. §3の訂正: `AccountValidator`は「アカウント系シナリオ未実装のため未踏」ではない
 
@@ -305,7 +314,7 @@ PO合意§5-5への対応として、`tools/legacy-jacoco/report.sh`を変更し
 | `applicationContext.xml` L42（`orderValidator`）/ L45（`accountValidator`） | 両バリデータはroot contextのbean定義＝**インスタンス化はされる** |
 | `petstore-servlet.xml` L37・L98・L108 | 唯一の呼び出し元はSpring MVCの`AccountFormController`×2・`OrderFormController`。全リポジトリgrepで他に呼び出し元なし |
 
-**実測による裏取り**: 本Storyで18シナリオ（W4/W5含む）に拡張した後も、`OrderValidator`/
+**実測による裏取り**: 本Storyで17シナリオ（W4/W5含む）に拡張した後も、`OrderValidator`/
 `AccountValidator`とも`instruction_covered=3`・`branch_covered=0`のまま**#50実測時点から一切変化しなかった**
 （`tools/legacy-jacoco/out3/report/ac1/jacoco.csv`実測。下記S4のAC-neg3ベースラインと同一値）。
 これは「シナリオを足せば踏めるようになる」という仮説を実測で反証した形であり、AC5の結論（除外対象）を
@@ -339,7 +348,7 @@ PO合意§5-5への対応として、`tools/legacy-jacoco/report.sh`を変更し
 | シナリオ集合 | `gate/`（3除外・分母1588） | `gate-v2/`（5除外・分母1424） |
 | --- | --- | --- |
 | 旧9シナリオ（`#50`のexec＝`out2/jacoco.exec`） | **1144 / 1588 = 72.0%**（`out2/report/gate/jacoco.csv`＝#50実測そのまま・drift無し） | **1138 / 1424 = 79.9%**（`out2/report/gate-v2/jacoco.csv`・機構生成） ← **(a) 除外だけの効果**（+7.9pt。絶対数は1144→1138に−6＝除外した2クラス自身の被覆分3+3を差し引いた分） |
-| 新18シナリオ（本Storyのexec＝`out3/jacoco.exec`） | **1366 / 1588 = 86.0%**（`out3/report/gate/jacoco.csv`） | **1360 / 1424 = 95.5%**（`out3/report/gate-v2/jacoco.csv`） ← (a)+(b) |
+| 新17シナリオ（本Storyのexec＝`out3/jacoco.exec`） | **1366 / 1588 = 86.0%**（`out3/report/gate/jacoco.csv`） | **1360 / 1424 = 95.5%**（`out3/report/gate-v2/jacoco.csv`） ← (a)+(b) |
 
 **(b) 追加シナリオの効果 = 同一分母（`gate-v2`）での「新−旧」= 1360 − 1138 = +222 instruction（+15.6pt）。**
 除外だけで上がった7.9ptと、シナリオ追加で上がった15.6ptを混同しない（AC7の要求）。
@@ -353,12 +362,12 @@ PO合意§5-5への対応として、`tools/legacy-jacoco/report.sh`を変更し
 | シナリオ集合 | `gate/`（分母34） | `gate-v2/`（分母34・**同一**） |
 | --- | --- | --- |
 | 旧9シナリオ | 16 / 34 = 47.1%（`out2/report/gate/jacoco.csv`） | 16 / 34 = 47.1%（`out2/report/gate-v2/jacoco.csv`。除外2クラスとも総分岐数0のため**gate/gate-v2で分母・実測とも変化なし**） |
-| 新18シナリオ | **28 / 34 = 82.4%**（`out3/report/gate/jacoco.csv`） | **28 / 34 = 82.4%**（`out3/report/gate-v2/jacoco.csv`） |
+| 新17シナリオ | **28 / 34 = 82.4%**（`out3/report/gate/jacoco.csv`） | **28 / 34 = 82.4%**（`out3/report/gate-v2/jacoco.csv`） |
 
 BRANCHは除外の影響を一切受けないため、16→28の増分（+12）は**全て(b)追加シナリオの効果**と言い切れる
 （(a)除外効果はBRANCHに関してはゼロ）。
 
-残存未踏BRANCH6の内訳（新18シナリオ・`out3/report/gate-v2/jacoco.csv`実測）: `SqlMapItemDao`3・
+残存未踏BRANCH6の内訳（新17シナリオ・`out3/report/gate-v2/jacoco.csv`実測）: `SqlMapItemDao`3・
 `SqlMapSequenceDao`1・`Cart`1（S5の新発見分）・`CartItem`1（S5参照）＝6。28+6=34で整合を確認済み。
 
 ## S4. AC-neg3: `report.sh`のBASELINE方式・除外反証チェックの実測根拠
@@ -501,7 +510,7 @@ else {
   （`tools/legacy-jacoco/README.md`に追記した）。
 - `tools/legacy-jacoco/out2/jacoco.exec`（#50の実測exec）は変更・削除していない（(a)/(b)分離の
   再計測にそのまま使用。上記S3参照）。
-- 新18シナリオのexecは`tools/legacy-jacoco/out3/jacoco.exec`として保存済み。
+- 新17シナリオのexecは`tools/legacy-jacoco/out3/jacoco.exec`として保存済み。
 
 ## S9. `AC8`実行確認
 

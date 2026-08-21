@@ -98,6 +98,25 @@ gate/gate-v2を同一execに対して出すことで、(a)除外による分母�
 （`web.struts`/`web.spring`/`service`はID-5/ID-6により分母から除外＝`report.sh`が自動的にこの2パッケージ
 のみ抽出する）。
 
+## 採取事故と回避策（#53）
+
+Sprint 21/22 の採取で、**中身が空のゴミディレクトリが2種類**できた。どちらも一次データを含まないので、
+見つけたら消してよい（`.gitignore` で追跡対象からも外してある）。
+
+| 事故ディレクトリ | 再現条件 | 回避策 |
+| --- | --- | --- |
+| `tools/legacy-jacoco/out3;C` | **Git Bash(MSYS) のパス変換**。`docker cp` / `docker run -v` などコンテナ側の絶対パス（`/jacoco` 等）を含む引数を渡すと、MSYS が `C:\...` へ変換しようとして引数の末尾に `;C` が付いた別ディレクトリが生まれる（上の手順の `MSYS_NO_PATHCONV=1` を付け忘れた場合に起きる） | **コマンド先頭に `MSYS_NO_PATHCONV=1` を付ける**（`docker run -v` だけでなく、コンテナ側絶対パスを引数に含む docker 系コマンド全般）。PowerShell/cmd では不要 |
+| `tools/legacy-jacoco/tools/legacy-jacoco/out/report`（入れ子） | **ホスト側パスの二重解決**。`report.sh` / `docker cp` のホスト側出力先を `tools/legacy-jacoco/out/report` のような**リポジトリルート基準の相対パス**で渡したまま、カレントディレクトリが既に `tools/legacy-jacoco/` だった場合に、`tools/legacy-jacoco/tools/legacy-jacoco/...` が生成される | **`report.sh` は必ずリポジトリルート（`migration-agent-base/`）から実行する**（上の手順のとおり）。別の場所から叩く場合はホスト側パスを絶対パスで渡す |
+
+いずれも `git status` には出ない（`.gitignore` 済み）ため、**気づかず残り続ける**のが唯一の実害。
+掃除は空であることを確認してから `rmdir`（`rm -rf` ではなく `rmdir` を使えば、誤って一次データ入りの
+`out/` `out2/` `out3/` を消す事故を構造的に防げる）。
+
+> **`out/` `out2/` `out3/` は削除しないこと**（2026-08-21 ユーザー判断・#53 AC-neg1）。
+> `reports/after/l2-parity-coverage.md` が BRANCH 28/34・INSTRUCTION 1360/1424 の出典として
+> `out3/report/gate-v2/jacoco.csv` などを**名指しで参照**している一次データで、コミットされていないため
+> 消すとゲート値の裏取り経路がローカルから失われる。
+
 ## 実測結果
 
 `migration-agent-base/reports/after/l2-parity-coverage.md` に記録する（spike時点の初期実測を

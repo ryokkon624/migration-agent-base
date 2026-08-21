@@ -101,6 +101,10 @@ Java(JDK8 想定) / Apache Struts **1.2.9** / Spring 3.1 / iBATIS 2 / JSP / HSQL
 - **再ポイント済（JPetStore 向け）**: `github-issues`（jpetstore-manage + Project #2 + 新フィールドID）／
   `discord-operations`（`[JPS]` スレッドプレフィックス）／`rules/git.md`（jpetstore-manage）／
   `hooks/pre-commit.sh`（jpetstore-frontend/backend）
-- **未調整（Phase 3 実装時に JIT 調整）**: `backend-conventions` / `frontend-conventions` /
-  `developer-workflow` / `scrum-master-workflow` / `product-owner-workflow` / `sprint-review-prep` /
-  `rules/database.md` 内に残る `hw-hub-*` パス参照。実装フェーズで `jpetstore-*` に読み替え・修正する。
+- **調整済（2026-08-21・Sprint 23 Retro で棚卸し）**: `developer-workflow`（パス構成表を JPetStore へ差し替え・
+  存在しないモバイル/バッチを削除・Issue 参照例を `jpetstore-manage` へ）／`scrum-master-workflow` ／
+  `sprint-review-prep` ／`rules/database.md` ／`product-owner-workflow`（Issue ホストが
+  `hw-hub-manage` のままだった**実害あるスタール参照を修正**）。**`hw-hub-*` 参照は 0 件**。
+- **残る `hw-hub-*` 参照は意図的**: `backend-conventions` / `frontend-conventions` は
+  **HwHub と JPetStore の両方に供する共有スキル**で、「§1〜§8 は hw-hub 由来／**§9（backend）・§7（frontend）が
+  jpetstore 固有**」と文書内で明示的に区分されている。読み替えではなく**どちらの節を見るかで解決する**。

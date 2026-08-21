@@ -1057,7 +1057,7 @@ new ApplicationContextRunner()
 > `conversionService` bean明示登録で解消した。詳細は`memory/dev/long_term.md`「習得したこと」
 > （jpetstore-backend）参照。
 
-### L2パリティ検証ハーネス（`parity`パッケージ）のtest scope実装パターン（Sprint21 #48/#49・Sprint22 #51）
+### L2パリティ検証ハーネス（`parity`パッケージ）のtest scope実装パターン（Sprint21 #48/#49・Sprint22 #51・Sprint23 #52）
 
 コードベース初の「プロダクトコード（`src/main`）を一切変更しないtest scope専用スプリント」（旧新パリティ
 検証基盤）で確立した、test-only実装パターン。今後のR系/W系シナリオ追加・同種の特性化テスト
@@ -1213,3 +1213,47 @@ HSQLDB（legacy）はSQLの列エイリアスをUPPERCASEへ正規化して返�
 > ヘルパー（`orderRow`等が前提とする列名lowercase方式）を流用したところ、旧側キーが`firstname`等の全小文字に
 > 潰れ、新側（camelCaseのまま）と一致せずアカウント系シナリオ全件が偽の不一致でfailする状態になった
 > （golden JSON出力後の目視確認で発覚）。両側の`accountRow`をordinal位置での組み立てに是正した。
+
+#### テスト実行結果を成果物として報告する場合は `--rerun-tasks` を付ける（Sprint23 #52）
+
+Gradle の up-to-date チェックにより、入力（`src` とテストコード）が前回実行から変わっていなければ
+`:test` / `:integrationTest` / `:parityTest` は **`UP-TO-DATE` でスキップされ、テストは1件も走らない**。
+ビルドは `BUILD SUCCESSFUL` になるため、**「実行した」と誤認したまま前回の結果を実行結果として報告してしまう**。
+
+- **「合否ゲートの実行結果」「テスト件数・failures を報告せよ」という Story では、必ず `--rerun-tasks` を付ける。**
+
+```bash
+# ✅ 3タスクを強制再実行する（レポート用の実測が要るとき）
+./gradlew test integrationTest parityTest --rerun-tasks --console=plain
+# → "N actionable tasks: N executed" になる（executed が up-to-date と同数なら実行されている）
+```
+
+- **件数はコンソール出力ではなくテスト結果 XML から数える**（コンソールには合計が出ない）。
+
+```bash
+# build/test-results/{test,integrationTest,parityTest}/*.xml の testsuite 属性を合算する
+python -c "
+import glob,xml.etree.ElementTree as ET
+tot=f=e=s=0
+for p in glob.glob('build/test-results/test/*.xml'):
+    r=ET.parse(p).getroot()
+    tot+=int(r.get('tests')); f+=int(r.get('failures')); e+=int(r.get('errors')); s+=int(r.get('skipped'))
+print(tot,f,e,s)"
+```
+
+**3タスクの分担（`build.gradle`）と、どれが何を数えるか**:
+
+| タスク | 対象 | Docker |
+| --- | --- | --- |
+| `test` | `integration` タグを**除外**した plain Spock（UT） | 不要 |
+| `integrationTest` | `integration` タグかつ `parity` タグを**除外** | 要（Testcontainers MySQL） |
+| `parityTest` | `parity` タグ（dual-tag の L2 パリティ spec） | 要（**legacy は不要**。commit 済み golden とだけ比較する） |
+
+> ⚠️ `parityTest` の総件数には**検証ハーネス自身の spec**（`NewHttpClientSpec`・`ParityIntegrationTestBaseSmokeSpec`）が
+> 含まれる。「golden と比較しているテストの数」を報告したい場合は `*ParitySpec` の5本だけを数えること
+> （**シナリオ数 ≠ Spock のテストケース数 ≠ `parityTest` のテスト総数** の3者を混同しない）。
+> `ParityScenariosSpec`（台帳と golden の整合を固定する spec）は plain Spock なので `test` タスク側で走る。
+
+> **背景（Sprint23 #52）**: 合否ゲートの実測を求められて `./gradlew test integrationTest parityTest` を実行したところ、
+> `:test` と `:parityTest` が `UP-TO-DATE` になり `integrationTest` しか走っていなかった。`--rerun-tasks` で再実行して
+> 実数（UT 362 / IT 225 / parity 23・いずれも failures 0）を取り直した。

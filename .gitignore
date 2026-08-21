@@ -22,3 +22,13 @@ build/
 /tools/legacy-jacoco/jacococli.jar
 /tools/legacy-jacoco/out/
 /tools/legacy-jacoco/out*/
+
+# [chore] #53: 採取事故で生成される入れ子ディレクトリ。
+# `docker cp` / report.sh のホスト側パスを相対（tools/legacy-jacoco/...）で渡すと、
+# 既に tools/legacy-jacoco/ にいる状態で二重解決され tools/legacy-jacoco/tools/legacy-jacoco/... が生える。
+# 中身は常に空（一次データではない）ので見つけたら削除してよい。
+/tools/legacy-jacoco/tools/
+# 注: Git Bash(MSYS)のパス変換事故で生まれる `out3;C` のような事故ディレクトリは、
+# 上の `/tools/legacy-jacoco/out*/` が既に捕捉する（#53 AC2・`git check-ignore -v` で確認済み:
+#   .gitignore:24:/tools/legacy-jacoco/out*/	tools/legacy-jacoco/out3;C
+# ）。こちらも中身は空なので削除してよい。
