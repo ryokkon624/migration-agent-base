@@ -324,25 +324,42 @@ PO合意§5-5への対応として、`tools/legacy-jacoco/report.sh`を変更し
 `tools/legacy-jacoco/report.sh`を**3本出し**（`ac1`/`gate`=#50合意の3除外/`gate-v2`=本Story提案の5除外）に
 拡張し、**同一execに対して**gate/gate-v2の両方を機構的に生成することで、手計算ゼロで(a)/(b)を分離した。
 
+> **SM verification対応**: 初出時、`out2`（#50のexec）に対する`gate-v2`は`out2/report-v2/gate-v2/`という
+> 非標準の一時ディレクトリ名で生成しており、`out2/report/gate-v2/`（`out3`と対称な標準配置）には存在
+> しなかった。SMが`ls -d tools/legacy-jacoco/out*/report/*/`で確認した際に見つからず、「1138/1424は
+> report.shの機構出力ではなくRefinementの手計算値（1144−3−3／1588−111−53）の転記ではないか」という
+> 疑義が生じた。**実際には`out2/report-v2/gate-v2/jacoco.csv`として機構的に生成済み**だったが、
+> 標準的な配置場所に無かったため追跡できなかった。`out2/report/gate-v2/`（標準配置）へコピーし直し、
+> 下表の各セルに**生成元ファイルのパス**を明記した。あわせて`out2/report-v2/ac1`・`gate`の`jacoco.csv`が
+> `out2/report/ac1`・`gate`（#50オリジナル）と**バイト同一**であることを`diff`で確認済み
+> （＝`report.sh`の再実行が同一execに対して決定論的にdriftなく同じ結果を再現することの追加傍証）。
+
 ### INSTRUCTION
 
 | シナリオ集合 | `gate/`（3除外・分母1588） | `gate-v2/`（5除外・分母1424） |
 | --- | --- | --- |
-| 旧9シナリオ（`#50`のexec＝`out2/jacoco.exec`） | **1144 / 1588 = 72.0%**（#50実測そのまま・drift無し） | **1138 / 1424 = 79.9%** ← **(a) 除外だけの効果**（+7.9pt。絶対数は1144→1138に−6＝除外した2クラス自身の被覆分3+3を差し引いた分） |
-| 新18シナリオ（本Storyのexec＝`out3/jacoco.exec`） | **1366 / 1588 = 86.0%** | **1360 / 1424 = 95.5%** ← (a)+(b) |
+| 旧9シナリオ（`#50`のexec＝`out2/jacoco.exec`） | **1144 / 1588 = 72.0%**（`out2/report/gate/jacoco.csv`＝#50実測そのまま・drift無し） | **1138 / 1424 = 79.9%**（`out2/report/gate-v2/jacoco.csv`・機構生成） ← **(a) 除外だけの効果**（+7.9pt。絶対数は1144→1138に−6＝除外した2クラス自身の被覆分3+3を差し引いた分） |
+| 新18シナリオ（本Storyのexec＝`out3/jacoco.exec`） | **1366 / 1588 = 86.0%**（`out3/report/gate/jacoco.csv`） | **1360 / 1424 = 95.5%**（`out3/report/gate-v2/jacoco.csv`） ← (a)+(b) |
 
 **(b) 追加シナリオの効果 = 同一分母（`gate-v2`）での「新−旧」= 1360 − 1138 = +222 instruction（+15.6pt）。**
 除外だけで上がった7.9ptと、シナリオ追加で上がった15.6ptを混同しない（AC7の要求）。
+
+（機構出力1138/1424はRefinement確定3-②の手計算値と一致するが、これは**Refinementの見積り自体が
+`out2/report/ac1/jacoco.csv`実測値〔`OrderValidator`111・`AccountValidator`53〕を根拠にした正確な
+事前計算だったため**であり、本レポートの数値がRefinementからの転記であることを意味しない。）
 
 ### BRANCH
 
 | シナリオ集合 | `gate/`（分母34） | `gate-v2/`（分母34・**同一**） |
 | --- | --- | --- |
-| 旧9シナリオ | 16 / 34 = 47.1% | 16 / 34 = 47.1%（除外2クラスとも総分岐数0のため**gate/gate-v2で分母・実測とも変化なし**） |
-| 新18シナリオ | **28 / 34 = 82.4%** | **28 / 34 = 82.4%** |
+| 旧9シナリオ | 16 / 34 = 47.1%（`out2/report/gate/jacoco.csv`） | 16 / 34 = 47.1%（`out2/report/gate-v2/jacoco.csv`。除外2クラスとも総分岐数0のため**gate/gate-v2で分母・実測とも変化なし**） |
+| 新18シナリオ | **28 / 34 = 82.4%**（`out3/report/gate/jacoco.csv`） | **28 / 34 = 82.4%**（`out3/report/gate-v2/jacoco.csv`） |
 
 BRANCHは除外の影響を一切受けないため、16→28の増分（+12）は**全て(b)追加シナリオの効果**と言い切れる
 （(a)除外効果はBRANCHに関してはゼロ）。
+
+残存未踏BRANCH6の内訳（新18シナリオ・`out3/report/gate-v2/jacoco.csv`実測）: `SqlMapItemDao`3・
+`SqlMapSequenceDao`1・`Cart`1（S5の新発見分）・`CartItem`1（S5参照）＝6。28+6=34で整合を確認済み。
 
 ## S4. AC-neg3: `report.sh`のBASELINE方式・除外反証チェックの実測根拠
 
