@@ -80,6 +80,9 @@ canonical の例（＝golden の実体）:
 | R4 | アイテム詳細 | itemId/productName/listPrice | EQUIVALENT |
 | R5 | 検索（複数語・部分一致・0件） | productId 集合 | EQUIVALENT |
 | R6 | 検索（`%` / `_` を含む語） | productId 集合 | **INTENDED_DIVERGENCE(ID-29)**（旧はワイルドカード扱い・新はリテラル） |
+| R7 | 注文一覧（`listOrders.do` / `GET /api/orders`） | 新規作成分の合計金額集合（orderId 自体は ID-23 と同型で比較対象外） | EQUIVALENT（Sprint22 #51 追加） |
+| R8a | 注文詳細（自分の実在注文。`viewOrder.do?orderId=` / `GET /api/orders/{orderId}`） | 明細（itemId/quantity/unitPrice/**productName**）／合計／httpStatus | **INTENDED_DIVERGENCE(ID-24)**（旧は`LineItem.item`が未充填のためproductNameが空・新はJOIN済み実名。Sprint22 #51 Q6で追加） |
+| R8b | 注文詳細（存在しない orderId） | httpStatus／stackTraceExposed | **INTENDED_DIVERGENCE(ID-14)**（旧=500+スタックトレース露出・新=403〔ID-4と重畳〕。Sprint22 #51 追加） |
 
 ### B. 状態変更系（本命）
 
@@ -88,9 +91,15 @@ canonical の例（＝golden の実体）:
 | W1 | 注文確定・単一商品・在庫十分（EST-1 ×2） | 在庫デルタ／明細／合計 | EQUIVALENT |
 | W2 | 注文確定・複数商品 | 同上 | EQUIVALENT |
 | W3 | 注文確定・**在庫不足** | 旧=成功して在庫がマイナス／新=失敗して在庫不変 | **INTENDED_DIVERGENCE(ID-1)** |
+| W4 | アカウント新規登録（`newAccountForm.do`→`newAccount.do` / `POST /api/register`） | アカウント/プロフィールcanonical14項目・accountsCreated | EQUIVALENT（Sprint22 #51 追加） |
+| W5a | アカウント編集・PW変更なし（`account.password=""`） | 同上 | EQUIVALENT（Sprint22 #51 追加。SM-1で3ケースに分割） |
+| W5b | アカウント編集・PW変更あり | 同上（password列は確定2によりcanonical比較対象外・AC-neg4で別途独立検証） | EQUIVALENT（Sprint22 #51 追加） |
+| W5c | アカウント編集・PWフィールド自体を送らない | 同上 | EQUIVALENT（Sprint22 #51 追加。新側に対応概念が無くW5aと同一リクエストになるためカバレッジ専用＝パリティ観測点ではない） |
+| cart-boundary | カート境界値（同一itemIdへの2回追加・2回連続削除） | entries（空） | EQUIVALENT（Sprint22 #51 追加。優先度は最後） |
 
-> カートは legacy がセッション保持で DB に落ちないため、**カート単体をシナリオにせず注文確定に畳む**。
-> アカウント系は次イテレーション（W4 登録・W5 更新）。
+> カートは legacy がセッション保持で DB に落ちないため、**カート単体をシナリオにせず注文確定に畳む**
+> （通常フローはW1〜W3に含める。`cart-boundary`は`Cart`/`CartItem`の未踏分岐を踏むための境界値専用シナリオ）。
+> アカウント系（W4/W5）・注文履歴照会（R7/R8a/R8b）は Sprint22（#51）で追加済み（§6-2 参照）。
 
 ### 2.1 識別子の対応
 
@@ -199,9 +208,17 @@ legacy は軽量なので **毎回「全シナリオを1つの exec に流し直
 
 ## 6. 未決事項
 
-1. **カバレッジのゲート値**: 初回実測後に PO と合意（§4.4）。
-2. **アカウント系シナリオ（W4/W5）**: 次イテレーション。旧 `account`/`profile`/`signon` と新 `m_account`/`m_profile`/`m_signon` の対応づけが必要。
+1. **カバレッジのゲート値**: 初回実測後に PO と合意（§4.4・#50）。**Sprint22（#51）でAC5（`OrderValidator`/
+   `AccountValidator`の追加除外）を反映した分母（`gate-v2`）に対して再合意案を提示済み**（実測
+   BRANCH 28/34=82.4%・INSTRUCTION 1360/1424=95.5%。詳細は
+   [`reports/after/l2-parity-coverage.md`](../reports/after/l2-parity-coverage.md) Sprint 22 追記S6）。
+2. ~~**アカウント系シナリオ（W4/W5）**: 次イテレーション。旧 `account`/`profile`/`signon` と新
+   `m_account`/`m_profile`/`m_signon` の対応づけが必要。~~ → **解決済み（Sprint22・#51）**。対応づけは
+   §2表B（W4/W5a/W5b/W5c）＋Refinement確定1（Issue #51本文）のとおり。あわせて注文履歴照会（R7/R8a/R8b）・
+   カート境界値（cart-boundary）も同Storyで追加した（§2表A/B参照）。
 3. **legacy の read-only 応答の取り出し方**: JSP の HTML から business value を抽出する必要がある（productId 等）。パーサの頑健性は初回実装で見極める。DB 直読みで代替できる範囲は DB を優先する。
+   （Sprint22 #51でR7/R8a/R8bの抽出も同方針で追加済み: `LegacyHtmlExtractor.extractOrderListRows`/
+   `extractOrderLineRows`/`extractOrderTotal`/`extractCartRows`等）。
 4. **CI 昇格**: GitHub Actions 導入時に `parityTest` をゲート化。
 
 ---

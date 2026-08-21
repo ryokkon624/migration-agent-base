@@ -1,4 +1,4 @@
-# legacy-jacoco — L2パリティのカバレッジ計測（#50）
+# legacy-jacoco — L2パリティのカバレッジ計測（#50・#51）
 
 `jpetstore-legacy`（無改変）へJaCoCoエージェントを被せたoverlayイメージ（別タグ
 `jpetstore-legacy-jacoco`）で、L2パリティ（`jpetstore-backend`の`parity`シナリオ）が
@@ -6,6 +6,10 @@ legacyの「保存すべき業務ロジック」をどれだけ踏めている�
 
 設計: [`spec/l2-parity-design.md`](../../spec/l2-parity-design.md) §4・§7.3。
 分母の定義（29クラス・`domain`/`dao`のみ）はAC1参照。
+
+> **#51 Q4確定**: `report.sh`は**3本出し**（`ac1`/`gate`=#50合意の3除外/`gate-v2`=#51提案の5除外
+> ＝`OrderValidator`/`AccountValidator`を追加除外）。実測結果は
+> [`reports/after/l2-parity-coverage.md`](../../reports/after/l2-parity-coverage.md) Sprint 22 追記参照。
 
 ## 前提
 
@@ -43,8 +47,11 @@ docker build -t jpetstore-legacy-jacoco tools/legacy-jacoco
 docker rm -f jpetstore-legacy-jacoco-measure 2>/dev/null || true
 
 # 2. agent付きで起動（採取用は別ポート8081/9002・design.md F2）
+# ★Git Bash(MSYS)特有の罠: `-v host:/jacoco`の`/jacoco`（コンテナ側の絶対パス）をMSYSのパス変換が
+#   誤ってホストパスとして解釈し、ボリュームが正しくバインドされない（jacoco.execが書かれない）。
+#   `MSYS_NO_PATHCONV=1`を先頭に付けて回避する（#51で実際に踏んだ罠。PowerShell/cmdでは不要）。
 mkdir -p tools/legacy-jacoco/out
-docker run -d --name jpetstore-legacy-jacoco-measure \
+MSYS_NO_PATHCONV=1 docker run -d --name jpetstore-legacy-jacoco-measure \
   -p 8081:8080 -p 9002:9002 \
   -v "$(pwd)/tools/legacy-jacoco/out:/jacoco" \
   jpetstore-legacy-jacoco
@@ -65,7 +72,7 @@ cd ../migration-agent-base
 # 5. graceful停止（★ docker stop -t 30 でないとexecが書かれない。強制停止しないこと）
 docker stop -t 30 jpetstore-legacy-jacoco-measure
 
-# 6. レポート生成（AC3手順4・AC5: 2本出し。コンテナはまだ削除しない＝docker cpでclassfilesを取り出すため）
+# 6. レポート生成（AC3手順4・#51 Q4: 3本出し。コンテナはまだ削除しない＝docker cpでclassfilesを取り出すため）
 tools/legacy-jacoco/report.sh jpetstore-legacy-jacoco-measure \
   tools/legacy-jacoco/out/jacoco.exec tools/legacy-jacoco/out/report
 
@@ -73,12 +80,21 @@ tools/legacy-jacoco/report.sh jpetstore-legacy-jacoco-measure \
 docker rm jpetstore-legacy-jacoco-measure
 ```
 
-`report.sh`は**PO合意（AC5）により2本のレポートを出力**する（`tools/legacy-jacoco/out/report/ac1/`＝
-AC1分母＝計測の分母29クラス/解析22・`tools/legacy-jacoco/out/report/gate/`＝ゲート分母＝
-AC1−到達不能3クラス＝判定用。それぞれ`index.html`/`jacoco.xml`/`jacoco.csv`）。あわせて、
-**到達不能3クラス（`SendOrderConfirmationEmailAdvice`/`MsSqlOrderDao`/`OracleSequenceDao`）の
-カバレッジが1つでも0を超えたら即座にfail**する（除外の前提「未配線=構造的に到達不能」が崩れたことを
-検知する反証チェック）。`--classfiles`にはAC1で定義した分母（`domain`/`dao`配下のみ）だけを渡す
+`report.sh`は**#51 Q4確定により3本のレポートを出力**する（`tools/legacy-jacoco/out/report/ac1/`＝
+AC1分母＝計測の分母29クラス/解析22・`tools/legacy-jacoco/out/report/gate/`＝#50合意のゲート分母＝
+AC1−到達不能3クラス（継続性のため維持）・`tools/legacy-jacoco/out/report/gate-v2/`＝#51提案のゲート分母＝
+`gate`−`OrderValidator`/`AccountValidator`＝判定用候補。それぞれ`index.html`/`jacoco.xml`/`jacoco.csv`）。
+gate/gate-v2を同一execに対して出すことで、(a)除外による分母縮小の効果と(b)追加シナリオによる被覆増の
+効果を手計算ゼロで分離できる（詳細は`reports/after/l2-parity-coverage.md` Sprint 22追記S3）。
+
+あわせて除外反証チェックを2方式で行う（#51 Q5確定）:
+- **STRICT**（`SendOrderConfirmationEmailAdvice`/`MsSqlOrderDao`/`OracleSequenceDao`）: カバレッジが
+  1つでも0を超えたら即座にfail（除外の前提「未配線=構造的に到達不能」が崩れたことを検知）。
+- **BASELINE**（`OrderValidator`/`AccountValidator`）: 実測ベースライン（`instruction_covered=3`・
+  `branch_covered=0`）との`!=`でfail（増＝呼び出し元到達不能という前提の崩壊／減＝bean定義自体の変化、
+  でメッセージを書き分ける）。
+
+`--classfiles`にはAC1で定義した分母（`domain`/`dao`配下のみ）だけを渡す
 （`web.struts`/`web.spring`/`service`はID-5/ID-6により分母から除外＝`report.sh`が自動的にこの2パッケージ
 のみ抽出する）。
 

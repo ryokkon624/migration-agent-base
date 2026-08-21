@@ -280,3 +280,249 @@ PO合意§5-5への対応として、`tools/legacy-jacoco/report.sh`を変更し
   レポート生成（`docker cp`でclassfiles抽出。§6）を経てから削除済み。
 - 採取に使用したHSQLDBは計測専用コンテナのボリューム内のみに存在し、`jpetstore-legacy`本体のデータには
   影響しない（採取用コンテナ削除により消滅）。
+
+---
+
+# Sprint 22 追記（#51 — アカウント系・注文履歴照会への拡張・ゲート値再合意）
+
+> **担当**: DEV（Sprint 22・#51）／**日付**: 2026-08-21／**計測対象**: 上記9シナリオ + 本Storyで追加した
+> 8シナリオ（W4/W5a/W5b/W5c・R7・R8a・R8b・cart-boundary）の全18シナリオ実行後のlegacyカバレッジ。
+> `#50`のexec（`tools/legacy-jacoco/out2/jacoco.exec`）は**変更・削除していない**（(a)/(b)分離の再計測に
+> そのまま使用）。今回の18シナリオexecは`tools/legacy-jacoco/out3/jacoco.exec`。
+
+## S1. §3の訂正: `AccountValidator`は「アカウント系シナリオ未実装のため未踏」ではない
+
+上記§3の表（120行目付近）にある**「`AccountValidator`はアカウント系シナリオ未実装（W4/W5）のため未踏」という記述は誤り**。
+実際には`OrderValidator`と同型の**構造的到達不能**（未配線ではなく、URLがそもそも当該コントローラへ
+配送されない）であり、**W4/W5シナリオを追加しても踏めない**。
+
+根拠（実コード・行番号。Sprint22計画フェーズでSMが一次データ確認済み・本Storyで実測によっても裏取り済み）:
+
+| 根拠 | 内容 |
+| --- | --- |
+| `web.xml` L87-91 | `petstore`（Spring MVC DispatcherServlet）は`load-on-startup=2`で宣言されている |
+| `web.xml` L134-145 | しかし`servlet-mapping`はL140-142で`petstore`が**コメントアウト**、L143で`*.do`は`action`（Struts）に割当。**URLが到達しない** |
+| `applicationContext.xml` L42（`orderValidator`）/ L45（`accountValidator`） | 両バリデータはroot contextのbean定義＝**インスタンス化はされる** |
+| `petstore-servlet.xml` L37・L98・L108 | 唯一の呼び出し元はSpring MVCの`AccountFormController`×2・`OrderFormController`。全リポジトリgrepで他に呼び出し元なし |
+
+**実測による裏取り**: 本Storyで18シナリオ（W4/W5含む）に拡張した後も、`OrderValidator`/
+`AccountValidator`とも`instruction_covered=3`・`branch_covered=0`のまま**#50実測時点から一切変化しなかった**
+（`tools/legacy-jacoco/out3/report/ac1/jacoco.csv`実測。下記S4のAC-neg3ベースラインと同一値）。
+これは「シナリオを足せば踏めるようになる」という仮説を実測で反証した形であり、AC5の結論（除外対象）を
+裏付ける。
+
+## S2. AC5結論: `OrderValidator`/`AccountValidator`を除外対象に追加する
+
+- 到達不能の理由は`SendOrderConfirmationEmailAdvice`（一度も生成されない）とは**別型**: こちらは
+  **生成はされるが呼び出し元URLが到達不能**（上記S1表）。
+- BRANCH分母への影響: **無し**（両クラスとも総分岐数0）。
+- INSTRUCTION分母への影響: **有り**（`OrderValidator`111・`AccountValidator`53、計164 instruction減）。
+- よって**AC7の判断はBRANCH/INSTRUCTIONで扱いが分かれる**（S5参照）。
+
+## S3. (a)除外効果 と (b)追加シナリオ効果の分離（2×2表・AC7・R2対策）
+
+`tools/legacy-jacoco/report.sh`を**3本出し**（`ac1`/`gate`=#50合意の3除外/`gate-v2`=本Story提案の5除外）に
+拡張し、**同一execに対して**gate/gate-v2の両方を機構的に生成することで、手計算ゼロで(a)/(b)を分離した。
+
+> **SM verification対応**: 初出時、`out2`（#50のexec）に対する`gate-v2`は`out2/report-v2/gate-v2/`という
+> 非標準の一時ディレクトリ名で生成しており、`out2/report/gate-v2/`（`out3`と対称な標準配置）には存在
+> しなかった。SMが`ls -d tools/legacy-jacoco/out*/report/*/`で確認した際に見つからず、「1138/1424は
+> report.shの機構出力ではなくRefinementの手計算値（1144−3−3／1588−111−53）の転記ではないか」という
+> 疑義が生じた。**実際には`out2/report-v2/gate-v2/jacoco.csv`として機構的に生成済み**だったが、
+> 標準的な配置場所に無かったため追跡できなかった。`out2/report/gate-v2/`（標準配置）へコピーし直し、
+> 下表の各セルに**生成元ファイルのパス**を明記した。あわせて`out2/report-v2/ac1`・`gate`の`jacoco.csv`が
+> `out2/report/ac1`・`gate`（#50オリジナル）と**バイト同一**であることを`diff`で確認済み
+> （＝`report.sh`の再実行が同一execに対して決定論的にdriftなく同じ結果を再現することの追加傍証）。
+
+### INSTRUCTION
+
+| シナリオ集合 | `gate/`（3除外・分母1588） | `gate-v2/`（5除外・分母1424） |
+| --- | --- | --- |
+| 旧9シナリオ（`#50`のexec＝`out2/jacoco.exec`） | **1144 / 1588 = 72.0%**（`out2/report/gate/jacoco.csv`＝#50実測そのまま・drift無し） | **1138 / 1424 = 79.9%**（`out2/report/gate-v2/jacoco.csv`・機構生成） ← **(a) 除外だけの効果**（+7.9pt。絶対数は1144→1138に−6＝除外した2クラス自身の被覆分3+3を差し引いた分） |
+| 新18シナリオ（本Storyのexec＝`out3/jacoco.exec`） | **1366 / 1588 = 86.0%**（`out3/report/gate/jacoco.csv`） | **1360 / 1424 = 95.5%**（`out3/report/gate-v2/jacoco.csv`） ← (a)+(b) |
+
+**(b) 追加シナリオの効果 = 同一分母（`gate-v2`）での「新−旧」= 1360 − 1138 = +222 instruction（+15.6pt）。**
+除外だけで上がった7.9ptと、シナリオ追加で上がった15.6ptを混同しない（AC7の要求）。
+
+（機構出力1138/1424はRefinement確定3-②の手計算値と一致するが、これは**Refinementの見積り自体が
+`out2/report/ac1/jacoco.csv`実測値〔`OrderValidator`111・`AccountValidator`53〕を根拠にした正確な
+事前計算だったため**であり、本レポートの数値がRefinementからの転記であることを意味しない。）
+
+### BRANCH
+
+| シナリオ集合 | `gate/`（分母34） | `gate-v2/`（分母34・**同一**） |
+| --- | --- | --- |
+| 旧9シナリオ | 16 / 34 = 47.1%（`out2/report/gate/jacoco.csv`） | 16 / 34 = 47.1%（`out2/report/gate-v2/jacoco.csv`。除外2クラスとも総分岐数0のため**gate/gate-v2で分母・実測とも変化なし**） |
+| 新18シナリオ | **28 / 34 = 82.4%**（`out3/report/gate/jacoco.csv`） | **28 / 34 = 82.4%**（`out3/report/gate-v2/jacoco.csv`） |
+
+BRANCHは除外の影響を一切受けないため、16→28の増分（+12）は**全て(b)追加シナリオの効果**と言い切れる
+（(a)除外効果はBRANCHに関してはゼロ）。
+
+残存未踏BRANCH6の内訳（新18シナリオ・`out3/report/gate-v2/jacoco.csv`実測）: `SqlMapItemDao`3・
+`SqlMapSequenceDao`1・`Cart`1（S5の新発見分）・`CartItem`1（S5参照）＝6。28+6=34で整合を確認済み。
+
+## S4. AC-neg3: `report.sh`のBASELINE方式・除外反証チェックの実測根拠
+
+`tools/legacy-jacoco/out3/report/ac1/jacoco.csv`実測（Q5確定のとおり`!=`でfailする方式へ拡張済み。
+`report.sh`内に組み込み済み・実行時に自動検査される）:
+
+| クラス | INSTRUCTION_COVERED | BRANCH_COVERED | 判定 |
+| --- | --- | --- | --- |
+| `OrderValidator` | 3 | 0 | ベースライン(3/0)と一致 → OK |
+| `AccountValidator` | 3 | 0 | ベースライン(3/0)と一致 → OK |
+| `SendOrderConfirmationEmailAdvice`（STRICT・`==0`維持） | 0 | 0 | OK |
+| `MsSqlOrderDao`（STRICT・`==0`維持） | 0 | 0 | OK |
+| `OracleSequenceDao`（STRICT・`==0`維持） | 0 | 0 | OK |
+
+`report.sh`実行時の実際の出力（`out3`計測時）:
+
+```
+[report] verifying STRICT-excluded classes remain unreachable (0 coverage) ...
+[report] OK: all STRICT-excluded classes remain at 0 coverage (exclusion premise holds).
+[report] verifying BASELINE-excluded classes (OrderValidator/AccountValidator) match baseline ...
+[report] OK: all BASELINE-excluded classes match their baseline (exclusion premise holds).
+```
+
+## S5. 到達不能だがクラス粒度では除外できない分岐（`CartItem`＋**新発見**`Cart.addItem`）
+
+### 訂正の経緯（30→29→28の3段階訂正）
+
+1. **DEVの初期見積り（Sprint22計画フェーズ）**: 理論上限 = 16 + `Account`4 + `SqlMapAccountDao`4 +
+   `SqlMapOrderDao`2 + `Cart`4 = 30/34。
+2. **SM訂正（同フェーズ・一次データ確認）**: `CartItem`の`getTotalPrice()`の`item != null`false側は
+   `new CartItem()`の唯一の生成箇所（`Cart.java:38`）の直後（L39）が必ず`setItem(非null)`するため
+   構造的に到達不能。**29/34**に訂正。
+3. **★本Story実装フェーズでの新発見（DEV・実コード+実測の両方で確認）**: **`Cart.addItem()`自身の
+   `cartItem != null`false側（＝既存アイテムへの再追加パス）も同型の理由で構造的に到達不能**。
+   **28/34が正**。
+
+### 新発見の根拠（実コード）
+
+`Cart.addItem(Item, boolean)`を呼ぶ箇所は全リポジトリで2箇所のみ:
+
+```java
+// AddItemToCartAction.execute()（Struts・.do経路で到達可能）
+if (cart.containsItemId(workingItemId)) {
+  cart.incrementQuantityByItemId(workingItemId);   // 既存アイテムはこちら
+}
+else {
+  ...
+  cartForm.getCart().addItem(item, isInStock);      // addItem()は「未所持」のときのみ呼ばれる
+}
+
+// AddItemToCartController.handleRequest()（Spring MVC・petstore-servlet.xml L23で/shop/addItemToCart.do
+// にbean名マッピングされているが、AC5と同じ理由で.do経路はStrutsに割り当てられるため到達不能）
+if (cart.containsItemId(workingItemId)) {
+  cart.incrementQuantityByItemId(workingItemId);
+}
+else {
+  ...
+  cart.addItem(item, isInStock);
+}
+```
+
+**両呼び出し元とも`containsItemId`で事前ガードしてから`addItem()`を呼ぶため、`addItem()`内部の
+`cartItem == null`判定は呼び出された時点で常にtrueになる。** `cartItem != null`側（else）は
+構造的に到達不能（`CartItem`の`item != null`false側と全く同じ「呼び出し元が事前に排他している」パターン）。
+
+### 実測による裏取り
+
+`cart-boundary`シナリオ（`addItemToCart.do?workingItemId=EST-1`を同一itemIdへ2回投げる設計）を実行しても、
+`Cart`クラスのbranch coverageは**5/6のまま**（missed=1のまま不変）だった
+（`tools/legacy-jacoco/out3/report/gate-v2/jacoco.csv`実測: `Cart,0,143,1,5,...`）。2回目の
+`addItemToCart.do`は`AddItemToCartAction`側の`containsItemId`分岐で`incrementQuantityByItemId`へ
+迂回し、`Cart.addItem()`自体は呼ばれない（`incrementQuantityByItemId`のinstructionカバレッジは
+新規に0%→到達済みになったが、このメソッドには分岐が無いためBRANCH分母には寄与しない）。
+これは実測が理論（上記根拠）と完全に一致したことを意味する。
+
+**`memory/dev/short_term.md`の「cart-boundaryの2回目がCart.addItem非null側を踏む」という記述は誤り**
+（DEV自身の計画時点の誤解）。実際に踏んだのは`incrementQuantityByItemId`（instructionのみ・分岐無し）。
+
+### 結論
+
+| 対象 | 状態 | 除外できるか |
+| --- | --- | --- |
+| `CartItem.getTotalPrice()`の`item != null`false側 | 構造的に到達不能（Sprint22計画で確認） | クラス粒度では不可（`CartItem`の他1分岐は到達可能で実際に踏まれている） |
+| `Cart.addItem()`の`cartItem != null`false側 | 構造的に到達不能（**本Story新発見**） | クラス粒度では不可（`Cart`の他5分岐は到達可能で実際に踏まれている） |
+
+いずれも`--classfiles`の**クラス粒度**でしか除外できないため、`CartItem`・`Cart`をまるごと除外すると
+実際にカバーされている分岐（`Cart`5/6・`CartItem`1/2）まで分母から消えてしまう。**#50 §5-5が防ごうと
+した「手計算による分母操作のdrift」を再導入することになるため、分母34は据え置く**（Q2確定のとおり）。
+**理論上限は29/34ではなく28/34であり、本Story実測（28/34）は理論上限にちょうど到達している。**
+
+## S6. ゲート値の再合意（PO合意済み・実測ベース）
+
+**AC5の結論（`OrderValidator`/`AccountValidator`を除外対象に追加）を反映した分母（`gate-v2`）に対して、
+実測値をそのまま新しい非退行フロアとする**（#50と同じ「実測値=フロア」方式。S3の(a)/(b)分離表と
+整合させ、除外だけで上がった数値をフロアの根拠にしない）。
+
+> **PO合意（2026-08-21・Sprint 22 Retro）**: 下表の提案フロアをそのまま確定した。PO自身が
+> `tools/legacy-jacoco/out3/report/gate-v2/jacoco.csv`・`out2/report/gate-v2/jacoco.csv`を
+> 直接パースして各列を合算し、本表の数値（1360/1424・28/34・1138/1424等）が`report.sh`の機構出力と
+> 一致すること、および残存未踏BRANCH内訳（`SqlMapItemDao`3・`SqlMapSequenceDao`1・`Cart`1・`CartItem`1＝6、
+> 28+6=34）を一次データで検算済み（Sprint21 AC5合意時に確立した「一次データを自ら確認する」運用を踏襲）。
+
+| 指標 | #50合意フロア（旧） | **本Story確定フロア** | 根拠 |
+| --- | --- | --- | --- |
+| **BRANCH** | ≥ 16/34（47.1%） | **≥ 28/34（82.4%）** | 実測そのもの（gate/gate-v2で同一分母34。除外の影響なし） |
+| **INSTRUCTION** | ≥ 1144/1588（72.0%）（`gate`分母） | **≥ 1360/1424（95.5%）**（`gate-v2`分母へ切替） | 実測そのもの。**分母の変更自体が再合意のトリガ**（#50合意の運用ルールに従う） |
+
+- **`Account`の4分岐・`account-edit-pwfield-absent`（W5c）はいずれも「ID-7由来・カバレッジのみで
+  パリティ観測点ではない」**（Refinement確定3-④・SM-1の判断のとおり）。踏めてはいるが、旧側の
+  `mylistopt`/`banneropt`書き込み専用の分岐であり、パリティの意味的な観測点にはならない。
+- **次イテレーション暫定目標（BRANCH ≥ 24/34・PO合意済み）は実測28/34で達成**（AC7完了）。
+- 引き続き**絶対数を正・%は可読形**とし、**フロアの引き上げはPO確認のうえ手動**（自動ラチェットはしない）。
+- `gate`（3除外・分母1588/34）は#50との継続性のため`report.sh`から削除せず残す。
+
+## S7. `report.sh`の3本出し（Q4確定・実装）
+
+`tools/legacy-jacoco/report.sh`を2本出し（`ac1`/`gate`）から**3本出し**（`ac1`/`gate`/`gate-v2`）へ拡張した。
+併せて除外反証チェックをQ5確定のとおり2方式に分離した:
+
+- **STRICT**（`SendOrderConfirmationEmailAdvice`/`MsSqlOrderDao`/`OracleSequenceDao`）: 従来どおり
+  `INSTRUCTION_COVERED`/`BRANCH_COVERED`が`0`を超えたら即fail。
+- **BASELINE**（`OrderValidator`/`AccountValidator`）: 実測ベースライン（`instruction_covered=3`・
+  `branch_covered=0`・S4根拠）との`!=`でfail。**増**（呼び出し元が到達不能という前提の崩壊）と
+  **減**（bean定義自体の変化）でエラーメッセージを書き分ける。
+
+実行確認（`out3`計測時の実出力）は上記S4のとおり。詳細な使い方は`tools/legacy-jacoco/README.md`参照。
+
+## S8. 採取プロトコルの実施記録・落とし穴（申し送り）
+
+- 採取用legacyは`jpetstore-legacy-jacoco`（別ポート8081/9002）。`jpetstore-legacy`イメージ自体は無改変。
+- `docker stop -t 30`（graceful）で停止（強制停止するとexecが書かれない・SM-6）。
+- **Git Bash特有の落とし穴（新規発見・申し送り）**: `docker run -v <host_path>:/jacoco ...`をGit Bash
+  （MSYS）からそのまま実行すると、MSYSのパス変換機構が`-v`引数中の`/jacoco`（コンテナ側の絶対パス）を
+  誤ってホストパスとして解釈し、`Source`・`Destination`双方が壊れた値になる
+  （実際に発生した壊れ方: `Destination` が `\Program Files\Git\jacoco` のようなWindowsパスになる）。
+  この状態でもコンテナ自体は起動してしまうため`docker run`は成功して見えるが、ボリュームが正しく
+  バインドされておらず`jacoco.exec`がホスト側に一切書き出されない（`docker stop`後に出力先ディレクトリが
+  空のまま）。**`MSYS_NO_PATHCONV=1 docker run ...`を先頭に付けて実行することで回避する**
+  （`tools/legacy-jacoco/README.md`に追記した）。
+- `tools/legacy-jacoco/out2/jacoco.exec`（#50の実測exec）は変更・削除していない（(a)/(b)分離の
+  再計測にそのまま使用。上記S3参照）。
+- 新18シナリオのexecは`tools/legacy-jacoco/out3/jacoco.exec`として保存済み。
+
+## S9. `AC8`実行確認
+
+legacy（`jpetstore-legacy-jacoco-measure`）を`docker rm`で削除・停止済みの状態で
+`./gradlew parityTest`を実行し、**green**を確認した（`AccountParitySpec`6・`OrderHistoryParitySpec`3・
+`CartParitySpec`1・既存`OrderParitySpec`3・`CatalogParitySpec`6、計19件すべてpass）。
+`./gradlew test`（golden整合性チェック`ParityScenariosSpec`含む）もgreen。
+
+## S10. SM verification対応: R8bの前提assertを新側にも追加（Sprint21所見①と同型・両側で対称化）
+
+初出時、R8bの前提（指定orderIdが存在しない）は旧側（`LegacyScenarioRunner#orderDetailMissing`・
+`LegacyDbReader#orderExists`）にしかassertが無く、`NewScenarioRunner#orderDetailMissing`には対になる
+検証が欠けていた。`GET /api/orders/{orderId}`は不在/非所有を同一の403にする（ID-4/SBD-8・訂正A）ため、
+仮に999999999が新側DBで実在するようになっても`snapshot`（403・stackTraceExposed=false）だけでは
+前提崩壊を検知できず、`parityTest`はgreenのままID-14の観測点だけが静かに失われる状態だった
+（Sprint21 SM verification所見①＝W3の証拠固定化と同型のリスク。SM指摘）。
+
+対応: `NewDbReader#orderExists(long)`を新設し、`NewScenarioRunner#orderDetailMissing`の冒頭で
+実行前にDBへ問い合わせ、実在すれば`IllegalStateException`（専用メッセージ）でfailするよう是正した
+（`capture.LegacyDbReader#orderExists`と対称）。fail-pathは999999999を`t_order`へ一時的に強制INSERTする
+使い捨てspecで実証済み（`R8b(order-detail-missing)の前提が不成立: orderId=999999999が新側DBに実在する。
+ID-14の観測点(403がstale-session/不正ID起因であること)が成立しない。`のメッセージでfailすることを確認・
+検証後にspecとINSERT行はいずれも削除済み）。`memory/dev/short_term.md`のSM-3表（R8bの行）も
+「両側でassert」に更新した。

@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint 22 Review — #51 L2パリティをアカウント系・注文履歴照会へ拡張しゲート値を再合意</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #f8f7f5; }
+  .page { max-width: 980px; margin: 0 auto; padding: 48px 24px; }
+
+  .sprint-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin-bottom: 8px; }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px; }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+  .badge-sprint { background: #e8f0fe; color: #1a56db; }
+  .badge-issue { background: #f0fdf4; color: #166534; }
+  .badge-foundation { background: #eef2ff; color: #3730a3; }
+  .badge-sp { background: #f3f4f6; color: #374151; }
+  .badge-noui { background: #1a1a1a; color: #fff; }
+
+  section { margin-bottom: 40px; }
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #888; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e5e5e5; }
+  h3 { font-size: 13px; font-weight: 700; color: #1a1a1a; margin: 16px 0 8px; }
+
+  .lead { font-size: 13px; color: #4b5563; margin-bottom: 16px; }
+  .lead code, p code, li code, td code { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; background: #f3f4f6; padding: 1px 5px; border-radius: 3px; color: #374151; }
+
+  .problem-box { background: #fff8f0; border-left: 3px solid #f59e0b; border-radius: 0 8px 8px 0; padding: 16px 20px; margin-bottom: 16px; }
+  .problem-box .label { font-size: 11px; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .problem-box p { color: #451a03; font-size: 13px; }
+
+  .info-box { background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 0 8px 8px 0; padding: 16px 20px; margin-bottom: 16px; }
+  .info-box .label { font-size: 11px; font-weight: 700; color: #1e40af; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .info-box p { color: #1e3a5f; font-size: 13px; }
+
+  .divergence-box { background: #fdf4ff; border: 1px solid #d8b4fe; border-radius: 10px; padding: 16px 20px; margin-bottom: 16px; }
+  .divergence-box .label { font-size: 11px; font-weight: 700; color: #7e22ce; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .divergence-box p { color: #4a044e; font-size: 13px; margin-bottom: 6px; }
+
+  /* AC cards */
+  .ac-card { background: white; border: 1px solid #e5e5e5; border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
+  .ac-header { display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-bottom: 1px solid #f0f0f0; }
+  .ac-check { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .ac-check.done { background: #dcfce7; color: #166534; }
+  .ac-num { font-size: 11px; font-weight: 700; color: #888; white-space: nowrap; }
+  .ac-text { font-size: 13px; font-weight: 600; flex: 1; }
+  .ac-body { padding: 12px 18px; font-size: 13px; color: #4b5563; }
+  .div-tag { font-size: 10.5px; font-weight: 700; background: #f3e8ff; color: #7e22ce; padding: 2px 7px; border-radius: 4px; margin-left: 6px; }
+
+  /* generic tables */
+  table.g-table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-bottom: 8px; }
+  table.g-table th { text-align: left; padding: 8px 10px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 10.5px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  table.g-table td { padding: 8px 10px; border: 1px solid #e5e5e5; vertical-align: top; color: #374151; }
+  table.g-table .num { font-family: 'SF Mono', monospace; font-weight: 700; }
+  table.g-table tr.hl td { background: #f0fdf4; }
+  table.g-table tr.warn td { background: #fef2f2; }
+
+  .incl-badge { font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 4px; }
+  .incl-yes { background: #dcfce7; color: #166534; }
+  .incl-no { background: #fef2f2; color: #991b1b; }
+  .incl-cov { background: #fef9c3; color: #854d0e; }
+
+  /* Big metric grid */
+  .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 16px 0; }
+  .metric-box { background: white; border: 1px solid #e5e5e5; border-radius: 10px; padding: 16px; text-align: center; }
+  .metric-box .lbl { font-size: 10.5px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+  .metric-box .val { font-size: 22px; font-weight: 700; color: #1a1a1a; }
+  .metric-box .sub { font-size: 11px; color: #6b7280; margin-top: 4px; }
+  .metric-box .delta { font-size: 11px; font-weight: 700; margin-top: 4px; }
+  .delta-up { color: #166534; }
+
+  /* Gate value showcase */
+  .gate-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+  .gate-box { background: #1a1a1a; color: #fff; border-radius: 12px; padding: 20px; }
+  .gate-box .gate-lbl { font-size: 11px; font-weight: 700; color: #a1a1aa; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .gate-box .gate-old { font-size: 13px; color: #d4d4d8; text-decoration: line-through; margin-bottom: 2px; }
+  .gate-box .gate-val { font-size: 26px; font-weight: 700; color: #4ade80; }
+  .gate-box .gate-frac { font-size: 13px; color: #d4d4d8; margin-top: 4px; }
+  .floor-note { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 12px 16px; font-size: 12.5px; color: #78350f; margin-top: 8px; }
+
+  .mech-box { background: white; border: 1px solid #e5e5e5; border-radius: 10px; padding: 16px 18px; margin-bottom: 12px; }
+  .mech-box .note-title { font-size: 12px; font-weight: 700; color: #1a1a1a; margin-bottom: 6px; }
+  .mech-box p { font-size: 13px; color: #4b5563; margin-bottom: 8px; }
+
+  .poc-terminal { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11.5px; background: #1e1e2e; color: #cdd6f4; border-radius: 8px; padding: 12px 14px; line-height: 1.7; overflow-x: auto; margin-bottom: 8px; }
+  .poc-line { display: block; white-space: pre-wrap; word-break: break-word; }
+  .poc-bad { color: #f38ba8; font-weight: 700; }
+  .poc-good { color: #a6e3a1; font-weight: 700; }
+  .poc-note { color: #a6adc8; }
+
+  /* review verdict */
+  .verdict-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+  .verdict-box { background: white; border: 1px solid #86efac; border-radius: 10px; padding: 14px 16px; text-align: center; }
+  .verdict-box .v-lbl { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+  .verdict-box .v-val { font-size: 15px; font-weight: 700; color: #166534; }
+
+  .finding-card { background: white; border: 1px solid #fca5a5; border-radius: 10px; padding: 14px 18px; margin-bottom: 10px; }
+  .finding-card.resolved { border-color: #86efac; }
+  .finding-card .f-title { font-size: 12.5px; font-weight: 700; color: #1a1a1a; margin-bottom: 6px; }
+  .finding-card p { font-size: 12.5px; color: #4b5563; }
+  .f-tag { font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 4px; margin-right: 6px; }
+  .f-tag-fixed { background: #dcfce7; color: #166534; }
+  .f-tag-false { background: #f3f4f6; color: #6b7280; }
+
+  .verify-list { list-style: none; }
+  .verify-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; }
+  .verify-item:last-child { border-bottom: none; }
+  .verify-num { width: 22px; height: 22px; background: #e8f0fe; color: #1a56db; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .verify-content { flex: 1; }
+  .verify-content strong { font-size: 13px; color: #1a1a1a; display: block; margin-bottom: 3px; }
+  .verify-content span { font-size: 12px; color: #6b7280; }
+
+  .scope-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .scope-table th { text-align: left; padding: 8px 12px; background: #f9fafb; border: 1px solid #e5e5e5; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .scope-table td { padding: 10px 12px; border: 1px solid #e5e5e5; color: #374151; vertical-align: top; }
+  .tag-changed { font-size: 11px; font-weight: 600; background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 3px; }
+  .tag-unchanged { font-size: 11px; font-weight: 600; background: #f3f4f6; color: #6b7280; padding: 2px 6px; border-radius: 3px; }
+  .tag-new { font-size: 11px; font-weight: 600; background: #e8f0fe; color: #1a56db; padding: 2px 6px; border-radius: 3px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="sprint-label">Sprint 22 Review · Phase 4 L2（旧新パリティ検証基盤・2周目）</div>
+  <h1>#51 — L2 パリティのシナリオをアカウント系（W4/W5）・<br>注文履歴照会へ広げ、ゲート値を再合意する</h1>
+  <div class="meta">
+    <span class="badge badge-sprint">Sprint 22</span>
+    <span class="badge badge-issue">#51</span>
+    <span class="badge badge-foundation">foundation</span>
+    <span class="badge badge-sp">SP 5</span>
+    <span class="badge badge-noui">画面の変更なし（src/main 変更ゼロ・検証基盤のみ）</span>
+  </div>
+
+  <section>
+    <h2>このスプリントについて</h2>
+    <div class="problem-box">
+      <div class="label">なぜ「画面で確認」できないか</div>
+      <p>本Storyは <code>jpetstore-backend</code> の <b>test スコープ単独</b>（<code>src/main</code> は1行も変更していない）。
+      Sprint 21（#48/#49/#50）で確立した「旧新パリティ検証基盤」を、#50 のゲート値合意で名指しされた未踏分岐
+      （アカウント系・注文履歴照会）へ広げる<b>2周目のループ</b>。プロダクトの挙動は変わらないため、
+      Markdown・コードを読まずにレビューできるよう本HTMLに実測とAC達成状況をまとめた。</p>
+    </div>
+    <p class="lead">対象 Issue: <a href="https://github.com/ryokkon624/jpetstore-backend/pull/22">jpetstore-backend PR #22</a>／
+    ブランチ: <code>feature/51-l2-parity-account-orders</code>（backend・4コミット）／
+    <code>docs/sprint-22-l2-parity-account-orders</code>（agent-base・5コミット）</p>
+  </section>
+
+  <!-- 1. AC達成状況 -->
+  <section>
+    <h2>1. AC 達成状況の一覧</h2>
+
+    <div class="divergence-box">
+      <div class="label">★ AC3 についての重要な注記（意図的逸脱・Q6・ユーザー判断）</div>
+      <p><b>R8a（注文詳細・自分の注文）は Issue スコープ表では <code>EQUIVALENT</code> と書かれていたが、実装の結果 <code>INTENDED_DIVERGENCE(ID-24)</code> として宣言した。</b></p>
+      <p>理由: 旧側 <code>getLineItemsByOrderId</code> は <code>LineItem.item</code> を一切埋めないため、注文詳細画面の商品名セルは常に空になる。新側は JOIN 済みの実名を返す。この差は「値として比較可能」なため、正規化除外ではなく台帳 ID-24 の観測点として明示的に扱うべきとユーザーが判断した。</p>
+      <p>詳細は本表 AC3 のカードを参照。</p>
+    </div>
+
+    <div class="ac-card"><div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC1</div><div class="ac-text">W4: アカウント新規登録シナリオを台帳に追加</div></div>
+      <div class="ac-body"><code>account-register</code> を追加。確定1の canonical 14項目＋<code>accountsCreated</code> で <code>EQUIVALENT</code> を比較。<code>favoriteCategoryId=FISH</code>・25文字以下の username・新側の強い検証を満たすPW（両側で通る値）でフィクスチャを構成。</div></div>
+
+    <div class="ac-card"><div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC2</div><div class="ac-text">W5: アカウント編集シナリオを追加（<span class="div-tag">3ケースへ訂正</span>）</div></div>
+      <div class="ac-body">Issue原文の「2ケース」では <code>SqlMapAccountDao.updateAccount()</code> の4分岐アウトカムを最大3/4しか踏めないことがSM verificationで判明し、<b>3ケース（account-edit-nopw／account-edit-pw／account-edit-pwfield-absent）</b>へユーザー承認済みで訂正した。W5c（password パラメータ自体を送らない）は新側に対応するリクエストが存在しないため「カバレッジ専用・パリティ観測点ではない」と明記している。</div></div>
+
+    <div class="ac-card"><div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC3</div><div class="ac-text">注文履歴照会（R7／R8a／R8b）を追加 <span class="div-tag">R8a は意図的逸脱</span></div></div>
+      <div class="ac-body"><code>orders-list</code>（<code>EQUIVALENT</code>）・<code>order-detail-own</code>（<b><code>INTENDED_DIVERGENCE(ID-24)</code></b>・上記注記のとおり）・<code>order-detail-missing</code>（<code>INTENDED_DIVERGENCE(ID-14)</code>）を追加。<code>spec/intended-diff-ledger.md</code> の ID-14／ID-24 双方の関連Story欄に #51 を追記済み。</div></div>
+
+    <div class="ac-card"><div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC4</div><div class="ac-text">カート境界値シナリオを追加（優先度最後）</div></div>
+      <div class="ac-body"><code>cart-boundary</code> を追加。<code>Cart.removeItemById</code> の2アウトカムを踏む。<code>Cart.addItem</code> の false 側は実装中の新発見（下記§3）により構造的到達不能と判明したため対象から除外。</div></div>
+
+    <div class="ac-card"><div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC5</div><div class="ac-text"><code>OrderValidator</code>／<code>AccountValidator</code> の配線調査</div></div>
+      <div class="ac-body">両クラスとも <code>web.xml</code> の <code>servlet-mapping</code> で Spring MVC 経路（<code>*.do</code>）が到達しないことを実コードで確認し<b>除外対象に追加</b>。§3 の「AccountValidatorはアカウント系シナリオ未実装のため未踏」という旧記述も訂正した。18シナリオへ拡張後も実測は <code>instruction_covered=3・branch_covered=0</code> のまま不変で、除外判断を実測が裏付けた。</div></div>
+
+    <div class="ac-card"><div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC6</div><div class="ac-text">先例規約の踏襲</div></div>
+      <div class="ac-body">canonical モデル・golden スキーマ・コンパレータ・gradle タスクの仕組みは無変更。<code>ParitySnapshot</code> へ <code>account</code>／<code>accountsCreated</code>／<code>httpStatus</code>／<code>stackTraceExposed</code>／<code>Line.productName</code> の5フィールドを追加（許容範囲内）。</div></div>
+
+    <div class="ac-card"><div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC7</div><div class="ac-text">ゲート値の再合意案（AC5と一体）</div></div>
+      <div class="ac-body">下記§4「ゲート値の再合意案」参照。(a)除外効果と(b)追加シナリオ効果を分離して報告。</div></div>
+
+    <div class="ac-card"><div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC8</div><div class="ac-text">legacy 停止状態で <code>parityTest</code> green</div></div>
+      <div class="ac-body">下記§5参照。SMが独立に <code>--rerun</code> で再実行し green を確認済み。</div></div>
+
+    <div class="ac-card"><div class="ac-header"><div class="ac-check done">✓</div><div class="ac-num">AC-neg1〜5</div><div class="ac-text">宣言と実測の不一致検知／legacy無改変＋後始末／除外機構の拡張／新側PW独立検証／Testcontainersフィクスチャ</div></div>
+      <div class="ac-body">
+        AC-neg1: 既存の完全一致判定は無変更のまま機能。<br>
+        AC-neg2: <code>t_register_attempt</code>／<code>t_login_attempt</code>の後始末を追加（ID-11のレート制限対策）。<code>j2ee</code>は不変。<br>
+        AC-neg3: 除外反証チェックを STRICT（<code>==0</code>）＋ BASELINE（<code>!=</code>、増減でメッセージ分離）の2方式へ拡張。<br>
+        AC-neg4: golden外の独立 feature メソッドとして、W4のPWログイン成功／ハッシュ不一致・W5bの新PW成功／旧PW401を検証。<br>
+        AC-neg5: <code>m_profile</code> を含むフィクスチャを直接INSERT（<code>R__</code>非到達の制約に対応）。
+      </div></div>
+  </section>
+
+  <!-- 2. 8シナリオ表 -->
+  <section>
+    <h2>2. 追加した8シナリオ</h2>
+    <table class="g-table">
+      <tr><th>シナリオID</th><th>期待</th><th>旧側の駆動</th><th>新側の駆動</th><th>踏んだ未踏分岐</th></tr>
+      <tr>
+        <td><code>account-register</code></td>
+        <td><span class="incl-badge incl-yes">EQUIVALENT</span></td>
+        <td><code>GET /newAccountForm.do</code> → <code>POST /newAccount.do</code>（listOption/bannerOptionは送らない）</td>
+        <td><code>POST /api/register</code></td>
+        <td><code>Account</code> false側2アウトカム＋<code>SqlMapAccountDao</code> instruction</td>
+      </tr>
+      <tr>
+        <td><code>account-edit-nopw</code></td>
+        <td><span class="incl-badge incl-yes">EQUIVALENT</span></td>
+        <td><code>GET /editAccountForm.do</code> → <code>POST /editAccount.do</code>（password=""）</td>
+        <td><code>PUT /api/account</code></td>
+        <td><code>SqlMapAccountDao</code> 分岐1-true＋分岐2-false</td>
+      </tr>
+      <tr>
+        <td><code>account-edit-pw</code></td>
+        <td><span class="incl-badge incl-yes">EQUIVALENT</span>（password列は比較対象外）</td>
+        <td><code>POST /editAccount.do</code>（password=新PW）</td>
+        <td><code>PUT /api/account</code> → <code>POST /api/account/password</code></td>
+        <td><code>SqlMapAccountDao</code> 分岐2-true＋<code>Account</code> true側2アウトカム</td>
+      </tr>
+      <tr>
+        <td><code>account-edit-pwfield-absent</code></td>
+        <td><span class="incl-badge incl-cov">EQUIVALENT（カバレッジ専用）</span></td>
+        <td><code>POST /editAccount.do</code>（passwordパラメータ自体を送らない）</td>
+        <td><code>PUT /api/account</code>（W5aと同一リクエスト）</td>
+        <td><code>SqlMapAccountDao</code> 分岐1-false</td>
+      </tr>
+      <tr>
+        <td><code>orders-list</code></td>
+        <td><span class="incl-badge incl-yes">EQUIVALENT</span></td>
+        <td><code>GET /listOrders.do</code></td>
+        <td><code>GET /api/orders</code>（全ページ走査）</td>
+        <td><code>getOrdersByUsername</code>（instruction寄与）</td>
+      </tr>
+      <tr class="hl">
+        <td><code>order-detail-own</code></td>
+        <td><span class="incl-badge incl-cov">INTENDED_DIVERGENCE(ID-24)</span> ★逸脱</td>
+        <td><code>GET /viewOrder.do?orderId=&lt;自分の注文&gt;</code></td>
+        <td><code>GET /api/orders/{orderId}</code></td>
+        <td><code>SqlMapOrderDao</code> <code>order != null</code> true側</td>
+      </tr>
+      <tr>
+        <td><code>order-detail-missing</code></td>
+        <td><span class="incl-badge incl-cov">INTENDED_DIVERGENCE(ID-14)</span></td>
+        <td><code>GET /viewOrder.do?orderId=&lt;存在しないID&gt;</code>（500＋スタックトレース）</td>
+        <td><code>GET /api/orders/{orderId}</code>（403）</td>
+        <td><code>SqlMapOrderDao</code> <code>order != null</code> false側</td>
+      </tr>
+      <tr>
+        <td><code>cart-boundary</code></td>
+        <td><span class="incl-badge incl-yes">EQUIVALENT</span></td>
+        <td><code>addItemToCart.do</code>×2 → <code>viewCart.do</code> → <code>removeItemFromCart.do</code>×2</td>
+        <td>対応する新側カートAPI呼び出し</td>
+        <td><code>Cart.removeItemById</code> 2アウトカム</td>
+      </tr>
+    </table>
+    <p class="lead"><b>W5c と <code>Account</code> の4分岐は「カバレッジ専用・パリティ観測点ではない」</b>（ID-7由来＝旧の<code>mylistopt</code>/<code>banneropt</code>書込み専用分岐）。踏んではいるが旧新の意味的な比較対象にはならない。PO判断で分母には残したまま踏みにいく方針（クラス粒度の除外機構では手計算での分母縮小がdriftを再導入するため）。</p>
+  </section>
+
+  <!-- 3. 計測結果 2x2 -->
+  <section>
+    <h2>3. 計測結果 — (a) 除外効果 と (b) 追加シナリオ効果の分離</h2>
+    <p class="lead">絶対数を主・%を従で報告する（#50合意の運用ルール）。同一 <code>jacoco.exec</code> から <code>gate</code>（3除外・分母1588/34）と <code>gate-v2</code>（5除外・分母1424/34）の2つを機構的に生成し、手計算ゼロで分離した。</p>
+
+    <h3>INSTRUCTION</h3>
+    <table class="g-table">
+      <tr><th></th><th><code>gate</code>（3除外・分母1588）</th><th><code>gate-v2</code>（5除外・分母1424）</th></tr>
+      <tr>
+        <td>旧9シナリオ（#50 exec）</td>
+        <td class="num">1144 / 1588 = 72.0%</td>
+        <td class="num">1138 / 1424 = 79.9% ←<b>(a)</b> 除外だけの効果</td>
+      </tr>
+      <tr class="hl">
+        <td>新17シナリオ（今回 exec）</td>
+        <td class="num">1366 / 1588 = 86.0%</td>
+        <td class="num"><b>1360 / 1424 = 95.5%</b> ←(a)+(b)</td>
+      </tr>
+    </table>
+    <p class="lead"><b>(b) 追加シナリオの効果 = 1360 − 1138 = +222 instruction（+15.6pt）。</b>除外だけで上がった7.9ptとシナリオ追加で上がった15.6ptを混同しない。</p>
+
+    <h3>BRANCH（分母34・除外の影響を受けない＝両除外クラスとも総分岐数0）</h3>
+    <table class="g-table">
+      <tr><th></th><th><code>gate</code></th><th><code>gate-v2</code>（同一分母34）</th></tr>
+      <tr><td>旧9シナリオ</td><td class="num">16 / 34 = 47.1%</td><td class="num">16 / 34 = 47.1%（変化なし）</td></tr>
+      <tr class="hl"><td>新17シナリオ</td><td class="num" colspan="2"><b>28 / 34 = 82.4%</b>（gate/gate-v2とも同値）</td></tr>
+    </table>
+    <p class="lead">BRANCHの16→28（+12）は<b>すべて(b)の効果</b>。実測 <b>28/34 は到達可能な理論上限ちょうど</b>（下記§3-2参照）。</p>
+
+    <h3>残る未踏6分岐の内訳（34 − 28 = 6）</h3>
+    <table class="g-table">
+      <tr><th>クラス</th><th>未踏数</th><th>状態</th><th>根拠</th></tr>
+      <tr class="warn"><td><code>SqlMapItemDao</code></td><td class="num">3</td><td><span class="incl-badge incl-no">本Storyのスコープ外</span></td><td>本Storyのシナリオでは踏まない（構造的到達不能ではなく、対象シナリオを実行していないため）</td></tr>
+      <tr class="warn"><td><code>SqlMapSequenceDao</code></td><td class="num">1</td><td><span class="incl-badge incl-no">本Storyのスコープ外</span></td><td>同上</td></tr>
+      <tr><td><code>Cart</code>（<code>addItem</code>の<code>cartItem != null</code>false側）</td><td class="num">1</td><td><span class="incl-badge incl-yes">構造的に到達不能</span></td><td>呼び出し元 <code>AddItemToCartAction</code>/<code>Controller</code> がいずれも <code>containsItemId</code> で事前ガードしてから <code>addItem()</code> を呼ぶため、内部の <code>cartItem == null</code> 判定は常にtrue（<b>本Story実装フェーズの新発見</b>）</td></tr>
+      <tr><td><code>CartItem</code>（<code>getTotalPrice()</code>の<code>item != null</code>false側）</td><td class="num">1</td><td><span class="incl-badge incl-yes">構造的に到達不能</span></td><td><code>new CartItem()</code>唯一の生成箇所（<code>Cart.java:38</code>）の直後L39が必ず<code>setItem(非null)</code>（計画フェーズでSMが確認）</td></tr>
+    </table>
+    <p class="lead">クラス粒度の除外機構（<code>--classfiles</code>）では<code>Cart</code>/<code>CartItem</code>の一部分岐だけを分母から引けない（実際にカバーされている残り分岐まで消える）ため、<b>分母34は据え置き</b>。実測28/34は「本Storyで届く理論上限」にちょうど到達している。</p>
+  </section>
+
+  <!-- 4. ゲート値再合意案 -->
+  <section>
+    <h2>4. ゲート値の再合意案（PO 判断）</h2>
+    <div class="gate-grid">
+      <div class="gate-box">
+        <div class="gate-lbl">BRANCH（主指標）</div>
+        <div class="gate-old">#50 フロア: ≥ 16/34（47.1%）</div>
+        <div class="gate-val">≥ 28/34</div>
+        <div class="gate-frac">提案フロア = 82.4%（実測そのもの）</div>
+      </div>
+      <div class="gate-box">
+        <div class="gate-lbl">INSTRUCTION（副指標）</div>
+        <div class="gate-old">#50 フロア: ≥ 1144/1588（72.0%・<code>gate</code>）</div>
+        <div class="gate-val">≥ 1360/1424</div>
+        <div class="gate-frac">提案フロア = 95.5%（<code>gate-v2</code>へ分母切替）</div>
+      </div>
+    </div>
+    <div class="floor-note">
+      絶対数が正・%は可読形（丸めの議論を封じる）。<b>分母の変更自体が再合意のトリガ</b>（#50合意の運用ルールを踏襲）。
+      #50の次イテレーション暫定目標（BRANCH ≥ 24/34）は実測28/34で<b>達成済み</b>。現在値ちょうど＝「十分」ではなく「ここから下げない」非退行フロア。
+      フロアの引き上げは今回同様、PO/SM確認のうえ手動（自動ラチェットはしない）。
+    </div>
+  </section>
+
+  <!-- 5. parityTest実行結果 -->
+  <section>
+    <h2>5. <code>parityTest</code> の実行結果（legacy 停止状態・SM 独立再実行）</h2>
+    <div class="poc-terminal">
+<span class="poc-line poc-good">BUILD SUCCESSFUL — 23 tests, 0 failures, 0 errors</span>
+<span class="poc-line poc-note">（legacy を docker rm 済みの状態で SM が --rerun により独立に再実行）</span>
+    </div>
+    <table class="g-table">
+      <tr><th>Specクラス</th><th>件数</th><th>内訳</th></tr>
+      <tr><td><code>AccountParitySpec</code></td><td class="num">6</td><td>4シナリオ（W4/W5a/W5b/W5c）＋ AC-neg4 独立検証2</td></tr>
+      <tr><td><code>CatalogParitySpec</code></td><td class="num">6</td><td>既存R1-R6（変更なし）</td></tr>
+      <tr><td><code>OrderHistoryParitySpec</code></td><td class="num">3</td><td>R7・R8a・R8b（新規）</td></tr>
+      <tr><td><code>OrderParitySpec</code></td><td class="num">3</td><td>既存W1/W2/W3（変更なし）</td></tr>
+      <tr><td><code>CartParitySpec</code></td><td class="num">1</td><td>cart-boundary（新規）</td></tr>
+      <tr><td><code>NewHttpClientSpec</code></td><td class="num">3</td><td>インフラ（HTTPクライアント基盤）</td></tr>
+      <tr><td><code>ParityIntegrationTestBaseSmokeSpec</code></td><td class="num">1</td><td>インフラ（Testcontainers起動スモーク）</td></tr>
+    </table>
+    <p class="lead">23 = シナリオSpec 19（17シナリオ＋AC-neg4の独立検証2）＋ インフラSpec 4。</p>
+  </section>
+
+  <!-- 6. 検証資産の耐久性 -->
+  <section>
+    <h2>6. 検証資産の耐久性（Sprint 21 の教訓の適用）</h2>
+    <p class="lead">各シナリオについて「前提が崩れたとき <code>parityTest</code> は落ちるか？」に答え、落ちないものは<b>採取時 assert（満たさなければ golden を書き出さず fail）</b>で担保した。</p>
+    <table class="g-table">
+      <tr><th>シナリオ</th><th>前提</th><th>担保の形</th><th>parityTest は落ちるか</th></tr>
+      <tr><td>W4</td><td>bannerdataにfavoriteCategoryId存在・3表が1行ずつ増える</td><td>採取時COUNT検査</td><td><span class="incl-badge incl-yes">✓</span> account[*]/accountsCreated</td></tr>
+      <tr><td>W5a</td><td>password=""→updateSignonが走らない</td><td>編集前後のsignon.password不変を検査</td><td><span class="incl-badge incl-yes">✓</span> account[*]</td></tr>
+      <tr><td>W5b</td><td>新PWでupdateSignonが走る</td><td>signon.passwordの変化を検査</td><td><span class="incl-badge incl-yes">✓</span> ＋ AC-neg4（新PW200/旧PW401）が毎回実行</td></tr>
+      <tr><td>W5c</td><td>account.passwordを送らない→null側到達</td><td>送信Mapにキー非含有をコードで保証</td><td>—（カバレッジ専用のため対象外）</td></tr>
+      <tr><td>R7</td><td>一覧の増分が作成2件と一致</td><td>orderId集合の一致を検査</td><td><span class="incl-badge incl-yes">✓</span> entries</td></tr>
+      <tr><td>R8a</td><td>参照orderIdが自分の実在注文／旧の詳細でproductNameが空</td><td>ORDERS存在確認／descriptionセルの空assert</td><td><span class="incl-badge incl-yes">✓</span> lines[EST-1].productName</td></tr>
+      <tr class="hl"><td>R8b</td><td>指定orderIdが<b>両側とも</b>存在しない</td><td>旧=<code>LegacyDbReader#orderExists</code>／新=<code>NewDbReader#orderExists</code>（<b>SM指摘により本Storyで新設・R8b行参照</b>）</td><td><span class="incl-badge incl-yes">✓</span> 両側でfail-path実証済み</td></tr>
+      <tr><td>cart</td><td>各ステップの数量・空カート状態</td><td>HTML実測をステップ毎にassert</td><td><span class="incl-badge incl-yes">✓</span> entries</td></tr>
+    </table>
+    <div class="finding-card resolved">
+      <div class="f-title"><span class="f-tag f-tag-fixed">是正済み</span>R8b の新側前提assert欠落</div>
+      <p>初出時、R8bの前提（orderIdが存在しない）は旧側にしかassertが無く、新側 <code>NewScenarioRunner#orderDetailMissing</code> には対になる検証が欠けていた（新側は不在/非所有を同一403にするため、DBだけではこの前提崩壊を検知できない）。SM指摘を受け <code>NewDbReader#orderExists</code> を新設し、新側にも前提assertを追加。<b>999999999を新側DBへ一時的に強制INSERTしたシナリオでfail-path（専用メッセージでfail）も実証済み</b>。</p>
+    </div>
+  </section>
+
+  <!-- 7. レビュー結果 -->
+  <section>
+    <h2>7. レビュー結果</h2>
+    <div class="verdict-grid">
+      <div class="verdict-box"><div class="v-lbl">規約</div><div class="v-val">指摘なし</div></div>
+      <div class="verdict-box"><div class="v-lbl">セキュリティ</div><div class="v-val">指摘なし</div></div>
+      <div class="verdict-box"><div class="v-lbl">パフォーマンス</div><div class="v-val">指摘なし</div></div>
+    </div>
+    <p class="lead">対象コードは <code>src/main</code> ゼロ変更（test スコープのみ）のため、3観点いずれも実質対象外。<b>SM 独立 verification は2件検出</b>し、1件は是正、1件は誤検出と判明した:</p>
+    <div class="finding-card resolved">
+      <div class="f-title"><span class="f-tag f-tag-fixed">是正</span>R8b の新側前提assert欠落（上記§6参照）</div>
+      <p>Sprint 21 所見①（W3・ID-1の証拠固定化欠落）と同型のリスクをSMが独立発見。是正済み。</p>
+    </div>
+    <div class="finding-card resolved">
+      <div class="f-title"><span class="f-tag f-tag-false">SMの誤検出と判明</span>「(a)/(b)は手計算では？」という疑義</div>
+      <p>#50のexec（<code>out2</code>）に対する<code>gate-v2</code>が非標準の一時ディレクトリ名で生成されており、標準配置には見当たらなかったためSMが疑義を提起。実際は<code>report.sh</code>の機構出力であることを確認し、標準配置へコピーし直して解消した。</p>
+    </div>
+  </section>
+
+  <!-- 8. 訂正された事実 -->
+  <section>
+    <h2>8. 今スプリントで訂正された事実（5件・うちIssue本文の誤り3件）</h2>
+    <table class="g-table">
+      <tr><th>項目</th><th>誤</th><th>正</th><th>検出</th></tr>
+      <tr><td>W5のケース数</td><td class="num">2</td><td class="num">3</td><td>SM</td></tr>
+      <tr><td>R8bの新側ステータス</td><td class="num">404</td><td class="num">403</td><td>DEV</td></tr>
+      <tr><td>AC-neg4のログインパス</td><td><code>/api/login</code></td><td><code>/api/auth/login</code></td><td>DEV</td></tr>
+      <tr><td>到達可能上限</td><td class="num">30/34 → 29/34</td><td class="num">28/34</td><td>DEV（2段階とも）</td></tr>
+      <tr><td>「(a)/(b)が手計算」という疑義</td><td>—</td><td>SMの誤検出（機構出力だった）</td><td>DEV</td></tr>
+    </table>
+    <p class="lead">上3件（W5ケース数・R8bステータス・到達可能上限）は<b>Issue #51 本文そのものの誤り</b>。<b>PO が次回 Refinement で本文の一括訂正を対応する方針</b>（本スプリントでは実装・レポート側の記述を正しい値に揃えた）。</p>
+  </section>
+
+  <!-- 動作確認ポイント -->
+  <section>
+    <h2>動作確認ポイント（ユーザー確認用）</h2>
+    <ul class="verify-list">
+      <li class="verify-item">
+        <div class="verify-num">1</div>
+        <div class="verify-content">
+          <strong><code>reports/after/l2-parity-coverage.md</code>「Sprint 22 追記」に実測とゲート再合意案（§4）が記録されていること</strong>
+          <span>BRANCH 28/34(82.4%)・INSTRUCTION 1360/1424(95.5%)が本HTML §3・§4と一致しているか</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">2</div>
+        <div class="verify-content">
+          <strong><code>spec/intended-diff-ledger.md</code> の ID-14／ID-24 の関連Story欄に #51 が追記されていること</strong>
+          <span>R8a=ID-24・R8b=ID-14 の観測点になったことの記録</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">3</div>
+        <div class="verify-content">
+          <strong>AC3 の意図的逸脱（R8a が EQUIVALENT ではなく INTENDED_DIVERGENCE(ID-24) になった判断）に納得できること</strong>
+          <span>本HTML §1 の紫色の注記ボックス・§2 のシナリオ表 ★マーク参照</span>
+        </div>
+      </li>
+      <li class="verify-item">
+        <div class="verify-num">4</div>
+        <div class="verify-content">
+          <strong>ゲート値の再合意案（BRANCH ≥28/34・INSTRUCTION ≥1360/1424）を PO として承認するか判断すること</strong>
+          <span>本HTML §4 参照。承認後にレポート§5-6・#50合意値の更新が確定する</span>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- 改修スコープ確認 -->
+  <section>
+    <h2>改修スコープ確認</h2>
+    <table class="scope-table">
+      <tr><th>対象</th><th>変更</th><th>内容</th></tr>
+      <tr><td><code>jpetstore-backend/src/test/.../parity/</code>（Spec・Runner・canonical等）</td><td><span class="tag-new">新規/変更</span></td><td>AccountParitySpec/OrderHistoryParitySpec/CartParitySpec新設、ParitySnapshot/ParityComparator拡張、両側Runner追加</td></tr>
+      <tr><td><code>src/test/resources/parity/golden/</code></td><td><span class="tag-new">新規8本</span></td><td>account-register/account-edit-nopw/account-edit-pw/account-edit-pwfield-absent/orders-list/order-detail-own/order-detail-missing/cart-boundary</td></tr>
+      <tr><td><code>jpetstore-backend/src/main/**</code></td><td><span class="tag-unchanged">変更なし</span></td><td><b>本Storyは0行変更</b>（test スコープ単独）</td></tr>
+      <tr><td><code>migration-agent-base/tools/legacy-jacoco/report.sh</code></td><td><span class="tag-changed">変更あり</span></td><td>2本出し→3本出し（<code>ac1</code>/<code>gate</code>/<code>gate-v2</code>）＋除外反証チェックをSTRICT/BASELINEの2方式へ拡張</td></tr>
+      <tr><td><code>reports/after/l2-parity-coverage.md</code></td><td><span class="tag-changed">変更あり</span></td><td>Sprint 22 追記（S1〜S10）</td></tr>
+      <tr><td><code>spec/intended-diff-ledger.md</code>・<code>spec/l2-parity-design.md</code></td><td><span class="tag-changed">変更あり</span></td><td>ID-14/ID-24関連Story追記・台帳8行追加</td></tr>
+      <tr><td><code>legacy-jpetstore</code>（ソース・WAR・<code>run/</code>）</td><td><span class="tag-unchanged">変更なし</span></td><td>凍結アーティファクトの原則を維持（採取用overlayで被せるのみ）</td></tr>
+    </table>
+  </section>
+
+</div>
+</body>
+</html>
