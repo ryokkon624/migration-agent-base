@@ -102,7 +102,7 @@ R8b の例外クラス名（`java.lang.NullPointerException`）は `divergentFie
 | R7 | 一覧の増分がちょうど2件で作った orderId と一致 | 一覧 delta の orderId 集合 == 作成2件 | ✅ `entries` |
 | R8a | 参照 orderId が自分の実在注文 | ORDERS に存在し `userid == 'j2ee'` | ✅ `lines`/`orderTotal`/`httpStatus` |
 | R8a | **旧の注文詳細で商品名が空**（ID-24 の前提・**Q6 で追加**） | ViewOrder.jsp の description セルから抽出した productName が**空/空白であること**。満たさなければ golden を書き出さず fail | ✅ `lines[EST-1].productName` を canonical に載せるので、新側が空を返すようになれば「INTENDED_DIVERGENCE 宣言だが実測が一致（台帳の形骸化）」で fail |
-| R8b | 指定 orderId が存在しない | `SELECT COUNT(*) FROM ORDERS WHERE ORDERID=?` == 0 | ✅ |
+| R8b | 指定 orderId が存在しない（**両側で assert**。SM verification対応：初出時は旧側`LegacyDbReader#orderExists`のみで新側に対になる assert が無く、`GET /api/orders/{id}`が不在/非所有を同一403にする（ID-4/SBD-8）ためスナップショットだけでは前提崩壊を検知できなかった） | 旧= `SELECT COUNT(*) FROM ORDERS WHERE ORDERID=?` == 0（`LegacyDbReader#orderExists`）／新= `SELECT COUNT(*) FROM t_order WHERE order_id=?` == 0（`NewDbReader#orderExists`。`NewScenarioRunner#orderDetailMissing`冒頭でassert） | ✅ 旧新とも前提が崩れれば専用メッセージでfail（新側のfail-pathは999999999を強制的に実在させたシナリオで実証済み） |
 | R8b | 旧が 500 かつ本文にスタックトレース | `status==500` かつ本文に例外クラス名／`at org.springframework.samples.` を含む | ✅ 新側が 403 から動けば fail |
 | cart | 2回追加で qty=2／削除後に空／再削除でも 200 かつ空 | 各ステップの HTML 実測を assert | ✅ `entries` |
 

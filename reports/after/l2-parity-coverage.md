@@ -503,3 +503,20 @@ legacy（`jpetstore-legacy-jacoco-measure`）を`docker rm`で削除・停止済
 `./gradlew parityTest`を実行し、**green**を確認した（`AccountParitySpec`6・`OrderHistoryParitySpec`3・
 `CartParitySpec`1・既存`OrderParitySpec`3・`CatalogParitySpec`6、計19件すべてpass）。
 `./gradlew test`（golden整合性チェック`ParityScenariosSpec`含む）もgreen。
+
+## S10. SM verification対応: R8bの前提assertを新側にも追加（Sprint21所見①と同型・両側で対称化）
+
+初出時、R8bの前提（指定orderIdが存在しない）は旧側（`LegacyScenarioRunner#orderDetailMissing`・
+`LegacyDbReader#orderExists`）にしかassertが無く、`NewScenarioRunner#orderDetailMissing`には対になる
+検証が欠けていた。`GET /api/orders/{orderId}`は不在/非所有を同一の403にする（ID-4/SBD-8・訂正A）ため、
+仮に999999999が新側DBで実在するようになっても`snapshot`（403・stackTraceExposed=false）だけでは
+前提崩壊を検知できず、`parityTest`はgreenのままID-14の観測点だけが静かに失われる状態だった
+（Sprint21 SM verification所見①＝W3の証拠固定化と同型のリスク。SM指摘）。
+
+対応: `NewDbReader#orderExists(long)`を新設し、`NewScenarioRunner#orderDetailMissing`の冒頭で
+実行前にDBへ問い合わせ、実在すれば`IllegalStateException`（専用メッセージ）でfailするよう是正した
+（`capture.LegacyDbReader#orderExists`と対称）。fail-pathは999999999を`t_order`へ一時的に強制INSERTする
+使い捨てspecで実証済み（`R8b(order-detail-missing)の前提が不成立: orderId=999999999が新側DBに実在する。
+ID-14の観測点(403がstale-session/不正ID起因であること)が成立しない。`のメッセージでfailすることを確認・
+検証後にspecとINSERT行はいずれも削除済み）。`memory/dev/short_term.md`のSM-3表（R8bの行）も
+「両側でassert」に更新した。
