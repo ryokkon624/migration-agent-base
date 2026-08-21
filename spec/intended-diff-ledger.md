@@ -23,7 +23,7 @@
 | **ID-11** | 資格情報を GET でも受理・`j2ee/j2ee` プリフィル・ロックアウト無し（ログイン）／登録試行に列挙対策なし（メール検証は #32 へ分離） | POST body 限定・プリフィル廃止・レート制限/ロックアウト（ログイン=`t_login_attempt`・登録=`t_register_attempt`、いずれも DB-backed。architecture-conventions D7）。ゲートは「照合前にスロットを原子確保」する方式のため、成功ログインも枠を1つ消費する意味論を伴う（同一usernameへの高並行「成功」ログインが`max-attempts`超で一過性401になり得るが、`recordSuccess`のDELETEで即自己回復する受容済みトレードオフ・Sprint20決定） | 認証堅牢化 | SBD-6 / S10,S11,R10,R13,S12,R14 | #20, #13, #41 |
 | **ID-12** | `forwardAction` を無検証 `sendRedirect`（オープンリダイレクト） | リダイレクト先は allowlist/相対のみ | フィッシング防止 | SBD-9 / S9,R11 | #20 |
 | **ID-13** | 現在PW 未確認で PW 変更 | 現在PW 確認/再認証を必須 | 機微操作保護 | SBD-16 / S6 | #15 |
-| **ID-14** | stale-session/不正 ID で 500＋スタックトレース露出（3経路） | 404/空へ正規化・trace 非露出 | 情報漏えい防止 | SBD-10 / S18,R9 | #3, #2, #10, #23 |
+| **ID-14** | stale-session/不正 ID で 500＋スタックトレース露出（3経路） | 404/空へ正規化・trace 非露出（**注文詳細経路（`GET /api/orders/{orderId}`）は ID-4 と重畳して 403** ＝ `OrderApplicationService#getOrder` が不存在/非所有を同一の `AccessDeniedException` にするため。trace 非露出という ID-14 の趣旨は 403 でも成立する。#51 R8b で実測確認済み） | 情報漏えい防止 | SBD-10 / S18,R9 | #3, #2, #10, #23, #51 |
 | **ID-15** | `product.description` の HTML 内包を `escapeXml=false` で描画（格納XSS seam） | plaintext 化＋商品画像は新規アセット（nano banana） | XSS 面除去 | SBD-18 / L1 seam | #1, #3, #24 |
 | **ID-16** | 入力検証＝非空＋PW一致のみ | email 形式・最大長・PW 強度（8字以上・複数文字種）を検証 | データ健全性・資格情報強度 | F4.5 決定 / SBD-5 | #17, #15 |
 | **ID-17** | カート数量 0/負で `itemMap` desync（幽霊行バグ・再追加で increment） | map/list 一貫の単一削除に正規化 | バグ是正 | cart.md 決定 | #4 |
@@ -33,7 +33,7 @@
 | **ID-21** | `courier=UPS`/`locale=CA` を保持 | courier/locale 撤去（プレースホルダ） | スコープ簡素化 | E3 決定 2026-08-11 | #7, #8, #22 |
 | **ID-22** | `status="P"` 固定1行（orderstatus: linenum=orderId 等の異形） | 固定プレースホルダ・状態変更は監査ログに記録（注文作成は成功・失敗いずれも `ORDER_CREATE` イベントとして記録し、失敗時は `result=FAILURE`） | スコープ簡素化 | E3 決定 / SBD-14 | #8, #22 |
 | **ID-23** | orderId 採番が select→+1→update（非アトミック・重複リスク） | DB 原子採番 | 正確性/並行安全 | D6 | #8, #22 |
-| **ID-24** | 注文詳細（履歴経由）で明細の商品名が空 | 商品名を表示（非等価改善） | UX 改善 | E3 決定 2026-08-11 | #10 |
+| **ID-24** | 注文詳細（履歴経由）で明細の商品名が空 | 商品名を表示（非等価改善） | UX 改善 | E3 決定 2026-08-11 | #10, #51 |
 | **ID-25** | Axis 管理PW/認証情報をソースに平文・HTTP 平文・Cookie フラグ欠落 | シークレットストア・TLS 前提・Secure/HttpOnly/SameSite。JWT 署名鍵は起動時 fail-fast を denylist（既知 placeholder・弱リテラルの恒久収録）→最小鍵長 32byte（既存維持）→ユニーク文字数 24 以上（補助）の3段に強化し、`.env.example` 配布値のままでは起動不能化（Sprint20決定。将来値を変更しても過去配布値は denylist から削除しない） | 設定衛生 | SBD-11 / SBD-15 / S17,S19,R15,R16 | #23, #24, #38 |
 | **ID-26** | EOL/脆弱依存（Struts1.2.9/Axis1.4/Spring3.1/hsqldb1.8…）・版レンジ未固定 | 保守された現行版・版固定（`jpetstore-database`: `mysql-connector-j` はCVE-2023-22102〔HIGH〕確認のため`8.0.33→26.7.0`へ更新。他5依存〔Flyway/Spock/Testcontainers等〕は重大CVE・EOLとも未確認のため据え置き。更新判断基準＝「EOLまたは重大CVE確認時のみ更新」） | 依存健全化 | SBD-12 / S20,S21,R12,R17 | #23, #26 |
 | **ID-27** | 多言語＝english/japanese（日英 JSP 同梱） | i18n 基盤（文言外部化）を実装。日本語ローカライズは **#25 で完了**（`ja.ts` 全キー翻訳・ヘッダー言語切替UI・DB権威〔`m_profile.language_preference`〕での跨デバイス追従）。数値・日付フォーマットは、日付を `datetimeFormats.ja` 新設＋OrderHistory/OrderDetailの2箇所へ適用、通貨は既存の全画面インラインIntl（`style:'currency'`）がlocale連動済みのため維持し名前付きnumberFormatsは追加せず（m_code は日英データ保有済＝D4） | スコープ決定（段階的ローカライズ・#25で完結） | E4②/E5① 決定 / backlog #25 / Sprint19決定 2026-08-18 | #24, #13, #25 |
